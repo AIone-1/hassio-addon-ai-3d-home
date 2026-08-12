@@ -167,7 +167,7 @@ export default function Viewer({ onSelect, floorIndex }) {
             get calls() { return gl.info.render.calls },
             get triangles() { return gl.info.render.triangles },
             get cam() { return camera.position.toArray() },
-            get camType() { return gl.xr ? '?' : (camera.isOrthographicCamera ? 'ortho' : 'persp') },
+            get camType() { return (camera && camera.isOrthographicCamera) ? 'ortho' : 'persp' },
             scene,
             gl,
           }
