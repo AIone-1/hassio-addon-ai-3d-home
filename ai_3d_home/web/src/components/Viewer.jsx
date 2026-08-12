@@ -14,8 +14,10 @@ export const QUALITY = {
 }
 
 // 设备标签投影（HTML 覆盖在画布上）
+const NO_DEVICES = []
 function DeviceLabels({ floorIndex, containerRef }) {
-  const devices = useStore((s) => s.project.floors[floorIndex]?.devices || [])
+  const floor = useStore((s) => s.project.floors[floorIndex])
+  const devices = (floor && floor.devices) || NO_DEVICES
   const haStates = useStore((s) => s.haStates)
   const showLabels = useStore((s) => s.showLabels)
   const night = useStore((s) => s.night)
