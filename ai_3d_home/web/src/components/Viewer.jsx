@@ -88,19 +88,17 @@ function CameraFocus({ floorIndex }) {
     const add = (x, z) => { box.expandByPoint(new THREE.Vector3(x, 0, z)); has = true }
     ;(floor?.rooms || []).forEach((r) => (r.points || []).forEach((p) => add(p[0], p[1])))
     ;(floor?.furniture || []).forEach((f) => { add(f.pos[0], f.pos[2]) })
-    if (has) {
-      const c = box.getCenter(new THREE.Vector3())
-      setState({ camTarget: [c.x, 0, c.z] })
-      if (view2d) {
-        // 2D 俯视：正上方往下看
-        camera.position.set(c.x, 28, c.z)
-        camera.rotation.set(0, 0, 0)
-        camera.lookAt(c.x, 0, c.z)
-      } else {
-        // 3D 透视
-        camera.position.set(c.x + 9, c.y + 10, c.z + 12)
-        camera.lookAt(c.x, 0, c.z)
-      }
+    // 空项目也用默认中心，保证 2D/3D 切换都能定位相机
+    const c = has ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 2)
+    setState({ camTarget: [c.x, 0, c.z] })
+    if (view2d) {
+      // 2D 俯视：正上方往下看
+      camera.position.set(c.x, 28, c.z)
+      camera.lookAt(c.x, 0, c.z)
+    } else {
+      // 3D 透视
+      camera.position.set(c.x + 9, (has ? c.y : 0) + 10, c.z + 12)
+      camera.lookAt(c.x, 0, c.z)
     }
   }, [floorIndex, view2d, JSON.stringify(floor?.rooms), JSON.stringify(floor?.furniture)])
 
