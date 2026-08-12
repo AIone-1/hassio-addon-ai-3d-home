@@ -160,7 +160,7 @@ export default function Viewer({ onSelect, floorIndex }) {
     <div className="canvas-wrap" ref={containerRef}>
       <Canvas
         dpr={Math.min(window.devicePixelRatio || 1, q.dprMax)}
-        gl={{ antialias: q.aa, powerPreference: 'high-performance' }}
+        gl={{ antialias: q.aa, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         shadows={shadows}
         camera={{ position: [9, 10, 12], fov: 42, near: 0.1, far: 150 }}
         onCreated={({ gl, scene, camera }) => {
