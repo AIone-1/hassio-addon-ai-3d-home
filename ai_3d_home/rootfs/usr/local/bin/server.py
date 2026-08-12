@@ -235,13 +235,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True, "ha": code == 200, "code": code})
         if p == "/api/diag":
             base, tok = ha_endpoints()
-            env_names = sorted([k for k in os.environ.keys() if 'SUPERVISOR' in k or 'TOKEN' in k or 'HASSIO' in k])
+            all_keys = sorted(os.environ.keys())
             return self._send(200, {
                 "base": base,
                 "hasToken": bool(tok),
                 "tokenLen": len(tok),
                 "haHost": load_options().get("ha_host"),
-                "envNames": env_names,
+                "envCount": len(all_keys),
+                "envKeys": all_keys,
             })
         if p == "/api/ha/entities":
             return self._send(200, CACHE.all_entities())
