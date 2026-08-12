@@ -35,8 +35,32 @@ export function roomWallSegments(room) {
   return segs
 }
 
-// 几何变换辅助：构造一个贴墙的长方体
-export function wallBoxGeometry(len, h, thickness) {
-  // 这里用 JSX 直接画 box，不需要手动构造 BufferGeometry
-  return { len, h, thickness }
+// 清洗多边形：去掉连续重复点和共线点，避免生成退化地板
+export function cleanPolygon(points) {
+  if (!points || points.length < 3) return points
+  const out = []
+  const n = points.length
+  for (let i = 0; i < n; i++) {
+    const a = points[(i - 1 + n) % n]
+    const b = points[i]
+    const c = points[(i + 1) % n]
+    // 重复点
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue
+    // 共线点（叉积≈0）
+    const cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    if (Math.abs(cross) < 0.01) continue
+    out.push(b)
+  }
+  return out
+}
+
+// 多边形是否有效（面积>阈值）
+export function polygonArea(points) {
+  let area = 0
+  const n = points.length
+  for (let i = 0; i < n; i++) {
+    const a = points[i], b = points[(i + 1) % n]
+    area += a[0] * b[1] - b[0] * a[1]
+  }
+  return Math.abs(area) / 2
 }

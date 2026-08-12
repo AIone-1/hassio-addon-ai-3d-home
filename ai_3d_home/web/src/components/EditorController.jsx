@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { useStore, setState, currentFloor, uid, snap as doSnap, toast } from '../store'
+import { cleanPolygon, polygonArea } from '../three/geometry'
 
 // 画墙虚线预览：用细长方块拼成粗虚线（1px 的 line 太细看不清）
 function DashedPreview({ a, b, level }) {
@@ -71,16 +72,22 @@ export default function EditorController() {
         // 点回起点（<0.3m）闭合 → 生成房间
         if (first && Math.hypot(x - first[0], z - first[1]) < 0.3) {
           if (draft.pts.length >= 3) {
-            floor.rooms = floor.rooms || []
-            floor.rooms.push({
-              id: uid(), name: `房间${floor.rooms.length + 1}`,
-              height: floor.height || 2.8, color: '#d8cbb2', points: draft.pts,
-            })
-            floor.walls = [] // 房间自带墙
+            // 清洗退化点，保证地板能渲染
+            const pts = cleanPolygon(draft.pts)
+            if (pts.length >= 3 && polygonArea(pts) > 0.05) {
+              floor.rooms = floor.rooms || []
+              floor.rooms.push({
+                id: uid(), name: `房间${floor.rooms.length + 1}`,
+                height: floor.height || 2.8, color: '#d8cbb2', points: pts,
+              })
+              floor.walls = [] // 房间自带墙
+              toast('房间已生成！')
+            } else {
+              toast('房间无效，请重新画')
+            }
           }
           window.__wallDraft = null
           setPreview(null)
-          toast('房间已生成！')
         } else {
           // 从上一个点连到新点，生成线段
           if (draft.pts.length > 0) {

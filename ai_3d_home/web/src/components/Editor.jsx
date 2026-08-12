@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore, setState, currentFloor, toast } from '../store'
-import { FURNITURE_LIB } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS } from '../three/geometry'
 
 const LEFT_TOOLS = [
   { id: 'select', label: '选择', k: 'V' },
@@ -106,7 +106,9 @@ export default function Editor() {
               <button key={f.type}
                 className={`furn-item ${furnitureType === f.type ? 'active' : ''}`}
                 onClick={() => { setState({ furnitureType: f.type, tool: 'furniture' }); setFurnOpen(false) }}>
-                {f.type}<span style={{ fontSize: 9, opacity: 0.6 }}> {f.w}×{f.d}m</span>
+                <span className="furn-swatch" style={{ background: FURNITURE_COLORS[f.type] || '#888' }} />
+                {f.type}
+                <span className="furn-dim"> {f.w}×{f.d}m</span>
               </button>
             ))}
           </div>

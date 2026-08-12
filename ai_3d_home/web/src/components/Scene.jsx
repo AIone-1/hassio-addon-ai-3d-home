@@ -233,7 +233,7 @@ const MODE_LIGHT = {
   '全屋': { ambient: 0.6, hemi: 0.5, sun: 1.4, sunColor: '#ffffff', tint: '#dfe7ff' },
   '照明': { ambient: 0.4, hemi: 0.4, sun: 0.8, sunColor: '#ffd8a8', tint: '#ffe8c8' },
   '遮阳': { ambient: 0.5, hemi: 0.35, sun: 0.7, sunColor: '#c8d4e8', tint: '#d0d8e8' },
-  '环境': { ambient: 0.55, hemi: 0.55, sun: 1.2, sunColor: '#e8f0d8', tint: '#dce8d0' },
+  '环境': { ambient: 0.4, hemi: 0.35, sun: 0.9, sunColor: '#b8d0f0', tint: '#b8d0f0' },
   '安防': { ambient: 0.35, hemi: 0.3, sun: 0.6, sunColor: '#e0d8f0', tint: '#c8c8e0' },
 }
 

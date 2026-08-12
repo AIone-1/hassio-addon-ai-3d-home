@@ -6,6 +6,7 @@ import EditorController from './components/EditorController'
 import BindDrawer from './components/BindDrawer'
 import { useStore, setState, getState, toast } from './store'
 import { api, TOGGLE_DOMAINS } from './api'
+import { cleanPolygon, polygonArea } from './three/geometry'
 
 export default function App() {
   const project = useStore((s) => s.project)
@@ -122,23 +123,29 @@ export default function App() {
         if (window.__wallDraft && window.__wallDraft.pts.length >= 3) {
           const draft = window.__wallDraft
           const floor = getState().project.floors[getState().currentFloor]
-          floor.rooms = floor.rooms || []
-          floor.rooms.push({
-            id: Math.random().toString(36).slice(2, 10), name: `房间${floor.rooms.length + 1}`,
-            height: floor.height || 2.8, color: '#d8cbb2', points: draft.pts,
-          })
-          floor.walls = [] // 房间自带墙
+          const pts = cleanPolygon(draft.pts)
+          if (pts.length >= 3 && polygonArea(pts) > 0.05) {
+            floor.rooms = floor.rooms || []
+            floor.rooms.push({
+              id: Math.random().toString(36).slice(2, 10), name: `房间${floor.rooms.length + 1}`,
+              height: floor.height || 2.8, color: '#d8cbb2', points: pts,
+            })
+            floor.walls = [] // 房间自带墙
+            setState({ project: { ...getState().project }, saved: false })
+            toast('房间已生成！')
+          } else {
+            toast('房间无效，请重新画')
+          }
           window.__wallDraft = null
-          setState({ project: { ...getState().project }, saved: false })
-          toast('房间已生成！')
         } else if (window.__wallDraft) {
           toast('至少点 3 个点才能闭合')
         }
       }
       if (e.key === 'Escape') {
+        // ESC：退出编辑 + 清草稿/选中/弹窗
         window.__wallDraft = null
         setDeviceModal(null)
-        setState({ bindOpen: false, pendingEntity: null, selected: null })
+        setState({ editing: false, bindOpen: false, pendingEntity: null, selected: null, view2d: false })
       }
       // 工具快捷键 V/H/W/D/N/F/E/B
       const map = { v: 'select', h: 'pan', w: 'wall', d: 'door', n: 'window', f: 'furniture', e: 'device', b: 'texture' }

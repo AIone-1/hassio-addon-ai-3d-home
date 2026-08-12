@@ -138,7 +138,7 @@ function CameraFocus({ floorIndex }) {
 
 const MODE_BG = {
   '全屋': '#e9eef2', '照明': '#1d2638', '遮阳': '#d8e0ec',
-  '环境': '#dfe9dc', '安防': '#22262f',
+  '环境': '#0e1a30', '安防': '#22262f',
 }
 
 export default function Viewer({ onSelect, floorIndex }) {
