@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useStore, setState, currentFloor, uid, snap as doSnap } from '../store'
 
@@ -75,9 +74,6 @@ export default function EditorController() {
       default: break
     }
   }
-
-  // 墙草稿预览（画墙时的线）
-  const draftPts = useMemo(() => window.__wallDraft?.pts || [], [project, tool])
 
   return (
     <>
