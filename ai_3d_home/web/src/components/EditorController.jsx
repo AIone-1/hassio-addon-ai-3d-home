@@ -55,10 +55,11 @@ export default function EditorController() {
     return [x, z]
   }
 
-  // 按下：画墙点/放家具/放设备
+  // 按下：画墙点/放家具/放设备（只允许左键，右键平移不误触）
   const handleFloorDown = (event) => {
     event.stopPropagation()
     if (!editing) return
+    if (event.button !== 0) return  // 非左键（右键/中键）忽略，避免和 OrbitControls 平移冲突
     const [x, z] = pointOnFloor(event)
 
     switch (tool) {

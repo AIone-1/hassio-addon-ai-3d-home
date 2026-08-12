@@ -14,8 +14,8 @@ export const FURNITURE_LIB = [
 ]
 
 export const FURNITURE_COLORS = {
-  沙发: '#6f8fae', 床: '#8a7f9e', 餐桌: '#b08968', 书桌: '#a07850',
-  衣柜: '#7d6848', 橱柜: '#7d6848', 岛台: '#9a8a78', 茶几: '#b08968', 书架: '#8a6b4f',
+  沙发: '#4f6a88', 床: '#5f5378', 餐桌: '#8a5f38', 书桌: '#7a5030',
+  衣柜: '#5a4528', 橱柜: '#5a4528', 岛台: '#6f5f4a', 茶几: '#8a5f38', 书架: '#6f4a30',
 }
 
 export const WALL_THICK = 0.12
