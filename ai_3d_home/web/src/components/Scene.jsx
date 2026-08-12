@@ -280,9 +280,9 @@ export default function Scene({ onSelect, floorIndex }) {
       />
 
       <group ref={rootRef}>
-        {/* 2D 模式：纯白干净的画图平面 */}
+        {/* 2D 模式：纯白画图平面（低于地板，不盖住房间地板） */}
         {view2d && (
-          <mesh position={[0, level, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[0, level - 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[80, 80]} />
             <meshBasicMaterial color={night ? '#1c2333' : '#f7fafc'} side={THREE.DoubleSide} />
           </mesh>

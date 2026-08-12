@@ -127,7 +127,8 @@ function CameraFocus({ floorIndex }) {
     const c = has ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 2)
     setState({ camTarget: [c.x, 0, c.z] })
     if (!view2d) {
-      camera.position.set(c.x + 9, (has ? c.y : 0) + 10, c.z + 12)
+      // 更俯视的默认视角：地板接近水平，便于整体看户型
+      camera.position.set(c.x, (has ? c.y : 0) + 15, c.z + 8)
       camera.lookAt(c.x, 0, c.z)
     }
   }, [floorIndex, view2d, JSON.stringify(floor?.rooms), JSON.stringify(floor?.furniture)])
