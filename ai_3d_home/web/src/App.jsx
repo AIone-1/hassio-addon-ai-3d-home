@@ -15,7 +15,7 @@ export default function App() {
   const selected = useStore((s) => s.selected)
   const haConnected = useStore((s) => s.haConnected)
   const haStates = useStore((s) => s.haStates)
-  const toast = useStore((s) => s.toast)
+  const toastMsg = useStore((s) => s.toast)
   const [deviceModal, setDeviceModal] = useState(null)
   const saveTimer = useRef(null)
 
@@ -174,7 +174,7 @@ export default function App() {
         </div>
       )}
 
-      {toast && <div className="toast">{toast}</div>}
+      {toastMsg && <div className="toast">{toastMsg}</div>}
     </div>
   )
 }
