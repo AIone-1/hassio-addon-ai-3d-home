@@ -79,10 +79,21 @@ export default function App() {
     }, 800)
   }, [project])
 
-  // ---------- 选择处理 ----------
+  // ---------- 选择/删除处理 ----------
   const handleSelect = useCallback((sel) => {
+    const st = getState()
+    if (st.tool === 'delete') {
+      // 删除模式：点谁删谁
+      const floor = st.project.floors[st.currentFloor]
+      if (sel.type === 'room') floor.rooms = floor.rooms.filter((r) => r.id !== sel.ref.id)
+      else if (sel.type === 'furniture') floor.furniture = floor.furniture.filter((f) => f.id !== sel.ref.id)
+      else if (sel.type === 'device') floor.devices = floor.devices.filter((d) => d.id !== sel.ref.id)
+      else if (sel.type === 'wall' && sel.index != null) floor.walls.splice(sel.index, 1)
+      setState({ project: { ...st.project }, saved: false, selected: null })
+      toast('已删除')
+      return
+    }
     if (!editing) {
-      // 非编辑模式：点到设备打开控制弹窗
       if (sel && sel.type === 'device') {
         setDeviceModal(sel.ref)
         return

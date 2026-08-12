@@ -75,10 +75,11 @@ function DeviceLabels({ floorIndex, containerRef }) {
   return null
 }
 
-// 相机对焦（目标通过 store 传给 Controls）
+// 相机对焦（目标通过 store 传给 Controls；2D 切俯视视角）
 function CameraFocus({ floorIndex }) {
   const project = useStore((s) => s.project)
   const floor = project.floors[floorIndex]
+  const view2d = useStore((s) => s.view2d)
   const { camera } = useThree()
 
   useEffect(() => {
@@ -90,10 +91,18 @@ function CameraFocus({ floorIndex }) {
     if (has) {
       const c = box.getCenter(new THREE.Vector3())
       setState({ camTarget: [c.x, 0, c.z] })
-      camera.position.set(c.x + 9, c.y + 10, c.z + 12)
-      camera.lookAt(c.x, 0, c.z)
+      if (view2d) {
+        // 2D 俯视：正上方往下看
+        camera.position.set(c.x, 28, c.z)
+        camera.rotation.set(0, 0, 0)
+        camera.lookAt(c.x, 0, c.z)
+      } else {
+        // 3D 透视
+        camera.position.set(c.x + 9, c.y + 10, c.z + 12)
+        camera.lookAt(c.x, 0, c.z)
+      }
     }
-  }, [floorIndex, JSON.stringify(floor?.rooms), JSON.stringify(floor?.furniture)])
+  }, [floorIndex, view2d, JSON.stringify(floor?.rooms), JSON.stringify(floor?.furniture)])
 
   return null
 }

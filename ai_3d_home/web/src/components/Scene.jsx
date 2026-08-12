@@ -101,7 +101,7 @@ function Room({ room, floor, level, selected, onSelect, interactive }) {
         <shapeGeometry args={[shape]} />
         <meshStandardMaterial color={room.color || floor.color || '#e6dcc8'} side={THREE.DoubleSide} roughness={0.9} />
       </mesh>
-      {/* 墙 */}
+      {/* 墙（毛玻璃材质对齐原版） */}
       {roomWallSegments(room).map((seg, i) => {
         const len = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1])
         if (len < 0.001) return null
@@ -111,7 +111,7 @@ function Room({ room, floor, level, selected, onSelect, interactive }) {
         return (
           <mesh key={i} position={[mx, h / 2 + level, mz]} rotation={[0, -ang, 0]}>
             <boxGeometry args={[len, h, WALL_THICK]} />
-            <meshStandardMaterial color={wallColor} roughness={0.85} />
+            <meshPhysicalMaterial color={wallColor} transparent opacity={selected ? 0.6 : 0.35} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />
           </mesh>
         )
       })}
@@ -228,7 +228,7 @@ export default function Scene({ onSelect, floorIndex }) {
         {/* 网格 */}
         <gridHelper args={[20, 40, night ? '#3a4a6a' : '#8a9bb5', night ? '#1a2338' : '#2a3550']} position={[0, -0.02, 0]} />
 
-        {/* 手绘墙段（墙体工具直接画的） */}
+        {/* 手绘墙段（墙体工具直接画的，毛玻璃材质对齐原版；删除模式可点） */}
         {(floor.walls || []).map((w, i) => {
           const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1])
           if (len < 0.01) return null
@@ -237,9 +237,14 @@ export default function Scene({ onSelect, floorIndex }) {
           const mz = (w.a[1] + w.b[1]) / 2
           const ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0])
           return (
-            <mesh key={i} position={[mx, h / 2 + level, mz]} rotation={[0, -ang, 0]}>
+            <mesh
+              key={i}
+              position={[mx, h / 2 + level, mz]}
+              rotation={[0, -ang, 0]}
+              onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) } : undefined}
+            >
               <boxGeometry args={[len, h, WALL_THICK]} />
-              <meshStandardMaterial color="#e8b95a" roughness={0.85} />
+              <meshPhysicalMaterial color="#ffffff" transparent opacity={0.45} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />
             </mesh>
           )
         })}

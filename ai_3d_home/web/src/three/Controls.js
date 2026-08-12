@@ -8,6 +8,7 @@ export function Controls({ enabled = true }) {
   const { camera, gl } = useThree()
   const ref = useRef()
   const target = useStore((s) => s.camTarget)
+  const view2d = useStore((s) => s.view2d)
 
   useEffect(() => {
     const c = new ThreeOrbitControls(camera, gl.domElement)
@@ -16,6 +17,16 @@ export function Controls({ enabled = true }) {
     ref.current = c
     return () => c.dispose()
   }, [camera, gl])
+
+  // 2D 模式：禁旋转，只允许平移缩放
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.enableRotate = !view2d
+      ref.current.mouseButtons = view2d
+        ? { LEFT: ThreeOrbitControls.MOUSE.PAN, MIDDLE: ThreeOrbitControls.MOUSE.DOLLY, RIGHT: ThreeOrbitControls.MOUSE.PAN }
+        : { LEFT: ThreeOrbitControls.MOUSE.ROTATE, MIDDLE: ThreeOrbitControls.MOUSE.DOLLY, RIGHT: ThreeOrbitControls.MOUSE.PAN }
+    }
+  }, [view2d])
 
   useEffect(() => {
     if (ref.current && target) ref.current.target.set(target[0], target[1], target[2])
