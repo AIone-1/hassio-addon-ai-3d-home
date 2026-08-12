@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import { OrbitControls as ThreeOrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { MOUSE } from 'three'
 import { useStore } from '../store'
 
 // R3F 与 three 自带 OrbitControls 的桥接
@@ -23,8 +24,8 @@ export function Controls({ enabled = true }) {
     if (ref.current) {
       ref.current.enableRotate = !view2d
       ref.current.mouseButtons = view2d
-        ? { LEFT: ThreeOrbitControls.MOUSE.PAN, MIDDLE: ThreeOrbitControls.MOUSE.DOLLY, RIGHT: ThreeOrbitControls.MOUSE.PAN }
-        : { LEFT: ThreeOrbitControls.MOUSE.ROTATE, MIDDLE: ThreeOrbitControls.MOUSE.DOLLY, RIGHT: ThreeOrbitControls.MOUSE.PAN }
+        ? { LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN }
+        : { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN }
     }
   }, [view2d])
 
