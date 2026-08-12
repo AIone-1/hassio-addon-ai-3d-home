@@ -80,6 +80,7 @@ function CameraSwitcher({ view2d, bounds }) {
   const perspective = useThree((s) => s.camera)
   const set = useThree((s) => s.set)
   const gl = useThree((s) => s.gl)
+  const camTarget = useStore((s) => s.camTarget)
   const orthoRef = useRef()
 
   useEffect(() => {
@@ -88,21 +89,24 @@ function CameraSwitcher({ view2d, bounds }) {
       const ortho = orthoRef.current
       const half = (bounds && bounds > 5) ? bounds : 10
       const aspect = gl.domElement.width / gl.domElement.height
-      ortho.left = -half
-      ortho.right = half
-      ortho.top = half / aspect
-      ortho.bottom = -half / aspect
+      // 居中到楼层中心，和 3D 视角对齐，避免 2D↔3D 切换偏移
+      const cx = (camTarget && camTarget[0]) || 0
+      const cz = (camTarget && camTarget[2]) || 0
+      ortho.left = cx - half
+      ortho.right = cx + half
+      ortho.top = cz + half / aspect
+      ortho.bottom = cz - half / aspect
       ortho.updateProjectionMatrix()
-      ortho.position.set(0, 50, 0)
+      ortho.position.set(cx, 50, cz)
       ortho.up.set(0, 0, -1)
-      ortho.lookAt(0, 0, 0)
+      ortho.lookAt(cx, 0, cz)
       set({ camera: ortho })
       if (window.__dbg3d) window.__dbg3d.activeCam = 'ortho'
     } else {
       set({ camera: perspective })
       if (window.__dbg3d) window.__dbg3d.activeCam = 'persp'
     }
-  }, [view2d, bounds])
+  }, [view2d, bounds, camTarget && camTarget[0], camTarget && camTarget[2]])
 
   return null
 }

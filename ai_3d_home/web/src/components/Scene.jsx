@@ -89,11 +89,27 @@ function FurnitureModel({ type }) {
   }
 }
 
+// 选中高亮框（蓝色线框）
+function SelectBox({ center, size, rot }) {
+  const geo = useMemo(() => {
+    const g = new THREE.BoxGeometry(size[0], size[1], size[2])
+    return new THREE.EdgesGeometry(g)
+  }, [size[0], size[1], size[2]])
+  return (
+    <lineSegments geometry={geo} position={[center[0], center[1], center[2]]} rotation={[0, (rot || 0) * Math.PI / 180, 0]}>
+      <lineBasicMaterial color="#2f7fe0" />
+    </lineSegments>
+  )
+}
+
 // ---------- 单个家具 ----------
 function Furniture({ item, level, selected, onSelect, interactive }) {
   const pos = item.pos || [0, 0, 0]
   const rot = item.rot || 0
   const scale = item.scale || [1, 1, 1]
+  const lib = FURNITURE_LIB.find((f) => f.type === item.type)
+  const w = (lib ? lib.w : 1) * (scale[0] || 1)
+  const d = (lib ? lib.d : 0.6) * (scale[2] || 1)
   return (
     <group
       position={[pos[0], level + (pos[1] || 0), pos[2]]}
@@ -102,7 +118,7 @@ function Furniture({ item, level, selected, onSelect, interactive }) {
       onClick={interactive ? (e) => { e.stopPropagation(); onSelect(item) } : undefined}
     >
       <FurnitureModel type={item.type} />
-      {selected && <mesh position={[0, 0.02, 0]}><boxGeometry args={[2.4, 0.02, 1.4]} /><meshStandardMaterial color="#5aa2ff" transparent opacity={0.4} /></mesh>}
+      {selected && <SelectBox center={[0, (lib && lib.type === '床' ? 1 : 0.6), 0]} size={[w + 0.3, 1.4, d + 0.3]} rot={0} />}
     </group>
   )
 }
@@ -177,7 +193,7 @@ function Opening({ op, floor, level }) {
 }
 
 // ---------- 设备标记 ----------
-function DeviceMarker({ dev, level, onSelect, interactive }) {
+function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
   const state = useStore((s) => s.haStates[dev.entity_id])
   const domain = (dev.entity_id || '').split('.')[0]
   const isOn = state && state.state === 'on'
@@ -202,6 +218,12 @@ function DeviceMarker({ dev, level, onSelect, interactive }) {
         <sphereGeometry args={[0.13, 16, 12]} />
         <meshStandardMaterial color={color} emissive={emissive} emissiveIntensity={0.6} />
       </mesh>
+      {selected && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.25, 0.35, 24]} />
+          <meshBasicMaterial color="#2f7fe0" side={THREE.DoubleSide} transparent opacity={0.8} />
+        </mesh>
+      )}
     </group>
   )
 }
@@ -320,6 +342,7 @@ export default function Scene({ onSelect, floorIndex }) {
         {/* 设备 */}
         {(floor.devices || []).map((dev) => (
           <DeviceMarker key={dev.id} dev={dev} level={level}
+            selected={sel && sel.type === 'device' && sel.ref.id === dev.id}
             interactive={interactive}
             onSelect={(d) => onSelect({ type: 'device', ref: d })} />
         ))}

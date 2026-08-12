@@ -43,6 +43,7 @@ export default function EditorController() {
   const snapOn = useStore((s) => s.snap)
   const project = useStore((s) => s.project)
   const [preview, setPreview] = useState(null)
+  const [hover, setHover] = useState(null)
 
   const floor = currentFloor()
   if (!floor) return null
@@ -108,13 +109,23 @@ export default function EditorController() {
       }
       default: break
     }
+    // 空白点击取消选中
+    if (tool === 'select') {
+      setState({ selected: null })
+    }
   }
 
-  // 移动：画墙时更新虚线预览
+  // 移动：画墙时更新虚线预览 + 吸附点位置
   const handleFloorMove = (event) => {
-    if (!editing || tool !== 'wall' || !window.__wallDraft || !window.__wallDraft.pts.length) return
+    if (!editing) return
     const [x, z] = pointOnFloor(event)
-    setPreview([x, z])
+    // 吸附点：墙/家具/设备工具下显示
+    if (tool === 'wall' || tool === 'furniture' || tool === 'device') {
+      setHover([x, z])
+    }
+    if (tool === 'wall' && window.__wallDraft && window.__wallDraft.pts.length) {
+      setPreview([x, z])
+    }
   }
 
   const draft = window.__wallDraft
@@ -133,6 +144,20 @@ export default function EditorController() {
         <planeGeometry args={[200, 200]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
+
+      {/* 吸附点标记（墙/家具/设备工具下，鼠标位置显示，吸附开时对齐 0.5m） */}
+      {editing && (tool === 'wall' || tool === 'furniture' || tool === 'device') && hover && (
+        <group position={[hover[0], level + 0.03, hover[1]]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.12, 0.18, 24]} />
+            <meshBasicMaterial color="#2f7fe0" side={THREE.DoubleSide} />
+          </mesh>
+          <mesh>
+            <sphereGeometry args={[0.05, 10, 10]} />
+            <meshBasicMaterial color="#2f7fe0" />
+          </mesh>
+        </group>
+      )}
 
       {/* 画墙虚线预览（点住拖动时显示，粗虚线清晰） */}
       {editing && tool === 'wall' && lastPt && preview && (
