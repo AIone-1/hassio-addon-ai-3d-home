@@ -92,7 +92,7 @@ export default function EditorController() {
       new THREE.Vector3(prev[0], level + 0.03, prev[1]),
       new THREE.Vector3(x, level + 0.03, z),
     ])
-    geo.computeLineDistances()
+    previewRef.current.computeLineDistances()
   }
 
   return (

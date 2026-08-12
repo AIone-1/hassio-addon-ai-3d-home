@@ -97,8 +97,10 @@ function CameraSwitcher({ view2d, bounds }) {
       ortho.up.set(0, 0, -1)
       ortho.lookAt(0, 0, 0)
       set({ camera: ortho })
+      if (window.__dbg3d) window.__dbg3d.activeCam = 'ortho'
     } else {
       set({ camera: perspective })
+      if (window.__dbg3d) window.__dbg3d.activeCam = 'persp'
     }
   }, [view2d, bounds])
 
