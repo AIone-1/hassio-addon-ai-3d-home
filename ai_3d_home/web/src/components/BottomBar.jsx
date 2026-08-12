@@ -27,7 +27,7 @@ export default function BottomBar() {
         <button className="bb-btn" onClick={cycleQuality} title="切换画质">
           {qLabel}
         </button>
-        <button className="bb-btn" title="玻璃效果（开发中）">璃玻璃</button>
+        <button className="bb-btn" disabled style={{ opacity: 0.4, cursor: 'not-allowed' }} title="玻璃效果（开发中）">璃玻璃</button>
       </div>
       <div className="bb-group">
         <span className="bb-btn" style={{ cursor: 'default' }}>设备{deviceCount}</span>
@@ -35,7 +35,7 @@ export default function BottomBar() {
         <button className={`bb-btn ${editing ? 'active' : ''}`} onClick={() => setState({ editing: !editing })}>
           {editing ? '退出编辑' : '编辑'}
         </button>
-        <button className="bb-btn" title="设置（开发中）">设置</button>
+        <button className="bb-btn" disabled style={{ opacity: 0.4, cursor: 'not-allowed' }} title="设置（开发中）">设置</button>
       </div>
       <div className="bb-group">
         {MODES.map((m) => (

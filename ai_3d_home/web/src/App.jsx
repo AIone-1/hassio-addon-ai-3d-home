@@ -4,7 +4,7 @@ import BottomBar from './components/BottomBar'
 import Editor from './components/Editor'
 import EditorController from './components/EditorController'
 import BindDrawer from './components/BindDrawer'
-import { useStore, setState, getState } from './store'
+import { useStore, setState, getState, toast } from './store'
 import { api, TOGGLE_DOMAINS } from './api'
 
 export default function App() {
@@ -15,7 +15,7 @@ export default function App() {
   const selected = useStore((s) => s.selected)
   const haConnected = useStore((s) => s.haConnected)
   const haStates = useStore((s) => s.haStates)
-  const [toast, setToast] = useState('')
+  const toast = useStore((s) => s.toast)
   const [deviceModal, setDeviceModal] = useState(null)
   const saveTimer = useRef(null)
 
@@ -100,26 +100,28 @@ export default function App() {
     setTimeout(async () => {
       try { setState({ haStates: await api.states() }) } catch (e) {}
     }, 800)
-    setToast(`已发送 ${dev.name} 切换指令`)
+    toast(`已发送 ${dev.name} 切换指令`)
   }
 
   // ---------- 键盘快捷键 ----------
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Enter') {
-        // 闭合画墙草稿
-        if (window.__wallDraft) {
+        // 闭合画墙草稿 → 生成房间
+        if (window.__wallDraft && window.__wallDraft.pts.length >= 3) {
           const draft = window.__wallDraft
           const floor = getState().project.floors[getState().currentFloor]
-          if (draft.pts.length >= 3) {
-            floor.rooms = floor.rooms || []
-            floor.rooms.push({
-              id: Math.random().toString(36).slice(2, 10), name: `房间${floor.rooms.length + 1}`,
-              height: floor.height || 2.8, color: '#d8cbb2', points: draft.pts,
-            })
-            setState({ project: { ...getState().project }, saved: false })
-          }
+          floor.rooms = floor.rooms || []
+          floor.rooms.push({
+            id: Math.random().toString(36).slice(2, 10), name: `房间${floor.rooms.length + 1}`,
+            height: floor.height || 2.8, color: '#d8cbb2', points: draft.pts,
+          })
+          floor.walls = [] // 房间自带墙
           window.__wallDraft = null
+          setState({ project: { ...getState().project }, saved: false })
+          toast('房间已生成！')
+        } else if (window.__wallDraft) {
+          toast('至少点 3 个点才能闭合')
         }
       }
       if (e.key === 'Escape') {

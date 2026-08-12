@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStore, setState, currentFloor } from '../store'
+import { useStore, setState, currentFloor, toast } from '../store'
 import { FURNITURE_LIB } from '../three/geometry'
 
 const LEFT_TOOLS = [
@@ -30,7 +30,10 @@ export default function Editor() {
     setState({ tool: t })
     if (t === 'furniture') setFurnOpen(true)
     else if (t === 'device') { setState({ bindOpen: true }); setFurnOpen(false) }
-    else { setFurnOpen(false); setCatOpen(false) }
+    else if (t === 'wall') {
+      setFurnOpen(false); setCatOpen(false)
+      toast('画墙：点画布放墙点，点回起点或按 Enter 闭合生成房间')
+    } else { setFurnOpen(false); setCatOpen(false) }
   }
 
   const exportJson = () => {

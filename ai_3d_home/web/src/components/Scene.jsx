@@ -212,11 +212,11 @@ export default function Scene({ onSelect, floorIndex }) {
 
   return (
     <>
-      {/* 环境光（随渲染模式变化） */}
-      <ambientLight intensity={night ? 0.35 : ml.ambient} />
-      <hemisphereLight args={[ml.tint, '#6a7a9a', night ? 0.3 : ml.hemi]} />
+      {/* 环境光（随渲染模式变化，默认提亮便于看清） */}
+      <ambientLight intensity={night ? 0.4 : Math.max(ml.ambient, 0.7)} />
+      <hemisphereLight args={[ml.tint, '#6a7a9a', night ? 0.35 : Math.max(ml.hemi, 0.6)]} />
       <directionalLight
-        position={[8, 14, 9]} intensity={night ? 0.6 : ml.sun} color={ml.sunColor}
+        position={[8, 14, 9]} intensity={night ? 0.7 : Math.max(ml.sun, 1.6)} color={ml.sunColor}
         castShadow={shadows}
         shadow-mapSize-width={1024} shadow-mapSize-height={1024}
         shadow-camera-left={-16} shadow-camera-right={16}
@@ -227,6 +227,22 @@ export default function Scene({ onSelect, floorIndex }) {
       <group ref={rootRef}>
         {/* 网格 */}
         <gridHelper args={[20, 40, night ? '#3a4a6a' : '#8a9bb5', night ? '#1a2338' : '#2a3550']} position={[0, -0.02, 0]} />
+
+        {/* 手绘墙段（墙体工具直接画的） */}
+        {(floor.walls || []).map((w, i) => {
+          const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1])
+          if (len < 0.01) return null
+          const h = floor.height || 2.8
+          const mx = (w.a[0] + w.b[0]) / 2
+          const mz = (w.a[1] + w.b[1]) / 2
+          const ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0])
+          return (
+            <mesh key={i} position={[mx, h / 2 + level, mz]} rotation={[0, -ang, 0]}>
+              <boxGeometry args={[len, h, WALL_THICK]} />
+              <meshStandardMaterial color="#e8b95a" roughness={0.85} />
+            </mesh>
+          )
+        })}
 
         {/* 房间 */}
         {(floor.rooms || []).map((room) => (

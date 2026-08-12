@@ -28,6 +28,18 @@ let state = {
   haEntities: [],             // 全量实体
   haConnected: false,
   saved: true,
+  toast: '',
+}
+
+let toastTimer = null
+export function toast(msg, ms = 2200) {
+  state = { ...state, toast: msg }
+  listeners.forEach((l) => l(state))
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    state = { ...state, toast: '' }
+    listeners.forEach((l) => l(state))
+  }, ms)
 }
 
 const listeners = new Set()

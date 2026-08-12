@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { useStore, setState, currentFloor, uid, snap as doSnap } from '../store'
+import { useStore, setState, currentFloor, uid, snap as doSnap, toast } from '../store'
 
 // 编辑器交互：画墙/放家具/放设备/开门窗/删除
 export default function EditorController() {
@@ -28,27 +28,33 @@ export default function EditorController() {
 
     switch (tool) {
       case 'wall': {
-        // 画墙链：点击加点，回到起点闭合 → 生成房间
-        if (!floor.walls) floor.walls = []
+        // 画墙：每点一下立即生成一段可见墙体；回到起点闭合 → 自动生成房间
+        floor.walls = floor.walls || []
         if (!window.__wallDraft) window.__wallDraft = { pts: [] }
         const draft = window.__wallDraft
         const first = draft.pts[0]
-        // 回到起点闭合
+        // 回到起点（<0.3m）闭合
         if (first && Math.hypot(x - first[0], z - first[1]) < 0.3) {
           if (draft.pts.length >= 3) {
-            // 生成房间
             floor.rooms = floor.rooms || []
             floor.rooms.push({
               id: uid(), name: `房间${floor.rooms.length + 1}`,
               height: floor.height || 2.8, color: '#d8cbb2', points: draft.pts,
             })
-            // 同步生成墙段
-            floor.walls = floor.walls || []
+            // 房间自带墙，清除手绘墙段避免重复
+            floor.walls = []
           }
           window.__wallDraft = null
-        } else {
-          draft.pts.push([x, z])
+          setState({ project: { ...project }, saved: false })
+          toast('房间已生成！可继续画下一个')
+          break
         }
+        // 从上一个点连到新点，生成可见墙段
+        if (draft.pts.length > 0) {
+          const prev = draft.pts[draft.pts.length - 1]
+          floor.walls.push({ a: [...prev], b: [x, z] })
+        }
+        draft.pts.push([x, z])
         setState({ project: { ...project }, saved: false })
         break
       }
