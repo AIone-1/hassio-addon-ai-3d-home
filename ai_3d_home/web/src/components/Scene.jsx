@@ -110,9 +110,11 @@ function Furniture({ item, level, selected, onSelect, interactive }) {
 // ---------- 房间（地板 + 墙） ----------
 function Room({ room, floor, level, selected, onSelect, interactive }) {
   const pts = room.points || []
+  const view2d = useStore((s) => s.view2d)
   if (pts.length < 3) return null
   const h = room.height || floor.height || 2.8
-  const wallColor = selected ? '#6aa2ff' : '#f5f2ec'
+  // 2D 用深色清晰实线（floor plan 感），3D 用浅色墙
+  const wallColor = selected ? '#2f7fe0' : (view2d ? '#3a4a66' : '#f5f2ec')
 
   const shape = useMemo(() => {
     const s = new THREE.Shape()
@@ -128,7 +130,7 @@ function Room({ room, floor, level, selected, onSelect, interactive }) {
         <shapeGeometry args={[shape]} />
         <meshStandardMaterial color={room.color || floor.color || '#e6dcc8'} side={THREE.DoubleSide} roughness={0.9} />
       </mesh>
-      {/* 墙（毛玻璃材质对齐原版） */}
+      {/* 墙（2D 深色实线；3D 毛玻璃材质对齐原版） */}
       {roomWallSegments(room).map((seg, i) => {
         const len = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1])
         if (len < 0.001) return null
@@ -137,8 +139,10 @@ function Room({ room, floor, level, selected, onSelect, interactive }) {
         const ang = Math.atan2(seg.b[1] - seg.a[1], seg.b[0] - seg.a[0])
         return (
           <mesh key={i} position={[mx, h / 2 + level, mz]} rotation={[0, -ang, 0]}>
-            <boxGeometry args={[len, h, WALL_THICK]} />
-            <meshPhysicalMaterial color={wallColor} transparent opacity={selected ? 0.6 : 0.35} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />
+            <boxGeometry args={[len, view2d ? 0.01 : h, view2d ? WALL_THICK : WALL_THICK]} />
+            {view2d
+              ? <meshBasicMaterial color={wallColor} />
+              : <meshPhysicalMaterial color={wallColor} transparent opacity={selected ? 0.6 : 0.35} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />}
           </mesh>
         )
       })}
@@ -286,8 +290,10 @@ export default function Scene({ onSelect, floorIndex }) {
               rotation={[0, -ang, 0]}
               onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) } : undefined}
             >
-              <boxGeometry args={[len, h, WALL_THICK]} />
-              <meshPhysicalMaterial color="#ffffff" transparent opacity={0.45} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />
+              <boxGeometry args={[len, view2d ? 0.01 : h, WALL_THICK]} />
+              {view2d
+                ? <meshBasicMaterial color="#3a4a66" />
+                : <meshPhysicalMaterial color="#ffffff" transparent opacity={0.45} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />}
             </mesh>
           )
         })}

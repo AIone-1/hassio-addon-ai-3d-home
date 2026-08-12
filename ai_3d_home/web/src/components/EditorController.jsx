@@ -1,6 +1,38 @@
-import { useRef } from 'react'
+import { useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { useStore, setState, currentFloor, uid, snap as doSnap, toast } from '../store'
+
+// 画墙虚线预览：用细长方块拼成粗虚线（1px 的 line 太细看不清）
+function DashedPreview({ a, b, level }) {
+  const segs = useMemo(() => {
+    if (!a || !b) return []
+    const dx = b[0] - a[0], dz = b[1] - a[1]
+    const len = Math.hypot(dx, dz)
+    if (len < 0.01) return []
+    const n = Math.max(4, Math.round(len / 0.4))
+    const out = []
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 0.55) / n
+      out.push({
+        x: a[0] + dx * t0, z: a[1] + dz * t0,
+        len: Math.hypot(dx * (t1 - t0), dz * (t1 - t0)),
+        ang: Math.atan2(dz, dx),
+      })
+    }
+    return out
+  }, [a && a[0], a && a[1], b && b[0], b && b[1]])
+
+  return (
+    <group>
+      {segs.map((s, i) => (
+        <mesh key={i} position={[s.x, level + 0.06, s.z]} rotation={[0, -s.ang, 0]}>
+          <boxGeometry args={[s.len + 0.03, 0.03, 0.07]} />
+          <meshBasicMaterial color="#2f7fe0" />
+        </mesh>
+      ))}
+    </group>
+  )
+}
 
 // 编辑器交互：画墙（点→拖虚线预览→点生成）、放家具、放设备、删除
 export default function EditorController() {
@@ -10,7 +42,7 @@ export default function EditorController() {
   const pendingEntity = useStore((s) => s.pendingEntity)
   const snapOn = useStore((s) => s.snap)
   const project = useStore((s) => s.project)
-  const previewRef = useRef(null)
+  const [preview, setPreview] = useState(null)
 
   const floor = currentFloor()
   if (!floor) return null
@@ -18,7 +50,7 @@ export default function EditorController() {
 
   const pointOnFloor = (event) => {
     let x = event.point.x, z = event.point.z
-    if (snapOn) { x = doSnap(x); z = doSnap(z) }
+    if (snapOn) { x = doSnap(x, 0.5); z = doSnap(z, 0.5) }
     return [x, z]
   }
 
@@ -45,8 +77,7 @@ export default function EditorController() {
             floor.walls = [] // 房间自带墙
           }
           window.__wallDraft = null
-          window.__wallPreview = null
-          if (previewRef.current) previewRef.current.visible = false
+          setPreview(null)
           toast('房间已生成！')
         } else {
           // 从上一个点连到新点，生成线段
@@ -81,19 +112,13 @@ export default function EditorController() {
 
   // 移动：画墙时更新虚线预览
   const handleFloorMove = (event) => {
-    if (!editing || tool !== 'wall' || !window.__wallDraft || !previewRef.current) return
-    const draft = window.__wallDraft
-    if (!draft.pts.length) return
+    if (!editing || tool !== 'wall' || !window.__wallDraft || !window.__wallDraft.pts.length) return
     const [x, z] = pointOnFloor(event)
-    const prev = draft.pts[draft.pts.length - 1]
-    previewRef.current.visible = true
-    const geo = previewRef.current.geometry
-    geo.setFromPoints([
-      new THREE.Vector3(prev[0], level + 0.03, prev[1]),
-      new THREE.Vector3(x, level + 0.03, z),
-    ])
-    previewRef.current.computeLineDistances()
+    setPreview([x, z])
   }
+
+  const draft = window.__wallDraft
+  const lastPt = draft && draft.pts.length ? draft.pts[draft.pts.length - 1] : null
 
   return (
     <>
@@ -109,11 +134,10 @@ export default function EditorController() {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* 画墙虚线预览（点住拖动时显示） */}
-      <line ref={previewRef} visible={false}>
-        <bufferGeometry />
-        <lineDashedMaterial color="#5aa2ff" dashSize={0.3} gapSize={0.15} />
-      </line>
+      {/* 画墙虚线预览（点住拖动时显示，粗虚线清晰） */}
+      {editing && tool === 'wall' && lastPt && preview && (
+        <DashedPreview a={lastPt} b={preview} level={level} />
+      )}
     </>
   )
 }
