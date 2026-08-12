@@ -141,10 +141,12 @@ function Room({ room, floor, level, selected, onSelect, interactive }) {
 
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
-      {/* 地板 */}
+      {/* 地板：2D 用不受光材质保证始终可见；3D 用受光材质 */}
       <mesh position={[0, level, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <shapeGeometry args={[shape]} />
-        <meshStandardMaterial color={room.color || floor.color || '#e6dcc8'} side={THREE.DoubleSide} roughness={0.9} />
+        {view2d
+          ? <meshBasicMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} />
+          : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} roughness={0.9} />}
       </mesh>
       {/* 墙（2D 深色实线；3D 毛玻璃材质对齐原版） */}
       {roomWallSegments(room).map((seg, i) => {
@@ -234,7 +236,7 @@ const MODE_LIGHT = {
   '照明': { ambient: 0.4, hemi: 0.4, sun: 0.8, sunColor: '#ffd8a8', tint: '#ffe8c8' },
   '遮阳': { ambient: 0.5, hemi: 0.35, sun: 0.7, sunColor: '#c8d4e8', tint: '#d0d8e8' },
   '环境': { ambient: 0.4, hemi: 0.35, sun: 0.9, sunColor: '#b8d0f0', tint: '#b8d0f0' },
-  '安防': { ambient: 0.35, hemi: 0.3, sun: 0.6, sunColor: '#e0d8f0', tint: '#c8c8e0' },
+  '安防': { ambient: 0.55, hemi: 0.5, sun: 1.2, sunColor: '#ffffff', tint: '#dfe7ff' },
 }
 
 // ---------- 主场景 ----------

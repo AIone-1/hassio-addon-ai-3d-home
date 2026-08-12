@@ -56,11 +56,21 @@ export default function EditorController() {
     return [x, z]
   }
 
-  // 按下：画墙点/放家具/放设备（只允许左键，右键平移不误触）
+  // 按下：画墙点/放家具/放设备（左键操作；右键=取消当前草稿）
   const handleFloorDown = (event) => {
     event.stopPropagation()
     if (!editing) return
-    if (event.button !== 0) return  // 非左键（右键/中键）忽略，避免和 OrbitControls 平移冲突
+    if (event.button === 2) {
+      // 右键：取消当前画墙草稿
+      if (window.__wallDraft) {
+        window.__wallDraft = null
+        setPreview(null)
+        setHover(null)
+        toast('已取消')
+      }
+      return
+    }
+    if (event.button !== 0) return  // 非左键忽略
     const [x, z] = pointOnFloor(event)
 
     switch (tool) {
