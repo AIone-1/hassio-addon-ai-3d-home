@@ -1,6 +1,16 @@
 // 后端 API 封装
+// ⚠️ HA ingress 下页面路径是 /api/hassio_ingress/<token>/，API 必须用相对路径拼
+// 否则 fetch('/api/...') 会打到 HA 根路径 404
+function apiBase() {
+  let p = location.pathname
+  if (p.endsWith('index.html')) p = p.slice(0, -'index.html'.length)
+  if (!p.endsWith('/')) p += '/'
+  return p
+}
+const BASE = apiBase()
+
 async function req(path, opts = {}) {
-  const r = await fetch(path, {
+  const r = await fetch(BASE + path, {
     method: opts.method || 'GET',
     headers: opts.body ? { 'Content-Type': 'application/json' } : {},
     body: opts.body ? JSON.stringify(opts.body) : undefined,
