@@ -1,0 +1,7 @@
+# 前端源码的依赖与本地构建缓存（构建产物已输出到 rootfs/，需提交）
+ai_3d_home/web/node_modules/
+ai_3d_home/web/dist/
+ai_3d_home/web/.vite/
+*.pyc
+__pycache__/
+.git/

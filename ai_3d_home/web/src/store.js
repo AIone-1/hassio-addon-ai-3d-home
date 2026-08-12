@@ -1,0 +1,52 @@
+// 极简外部 store（useSyncExternalStore），无依赖
+import { useSyncExternalStore } from 'react'
+
+let state = {
+  project: { version: 1, floors: [] },
+  settings: {},
+  currentFloor: 0,
+  camTarget: [0, 0, 2],
+  // 视图
+  quality: 'balanced',        // eco | smooth | balanced | high
+  shadows: true,
+  autoRotate: false,
+  night: false,
+  mode: '全屋',               // 全屋 | 照明 | 遮阳 | 环境 | 安防
+  view2d: false,              // 2D/3D
+  snap: true,
+  showLabels: true,
+  // 编辑状态
+  editing: false,             // 是否在编辑器
+  tool: 'select',             // select|pan|wall|door|window|furniture|device|texture|delete
+  furnitureType: '沙发',
+  selected: null,             // {type:'room'|'wall'|'furniture'|'device'|'opening', ref, floorIdx}
+  roomDraft: null,            // 画房间/墙的草稿
+  pendingEntity: null,        // 待绑定实体
+  bindOpen: false,            // 绑定抽屉
+  // 数据
+  haStates: {},               // entity_id -> state
+  haEntities: [],             // 全量实体
+  haConnected: false,
+  saved: true,
+}
+
+const listeners = new Set()
+export function getState() { return state }
+export function setState(partial) {
+  state = typeof partial === 'function' ? partial(state) : { ...state, ...partial }
+  listeners.forEach((l) => l(state))
+}
+export function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn) }
+
+export function useStore(selector) {
+  return useSyncExternalStore(subscribe, () => selector(state))
+}
+
+// 工具函数
+export const uid = () => Math.random().toString(36).slice(2, 10)
+export const snap = (v, g = 0.1) => Math.round(v / g) * g
+export function currentFloor(s = state) {
+  const f = s.project.floors[s.currentFloor]
+  if (!f) return null
+  return f
+}

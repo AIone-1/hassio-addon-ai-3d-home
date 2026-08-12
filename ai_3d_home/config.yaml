@@ -1,0 +1,39 @@
+name: "AI 3D Home"
+version: "0.1.0"
+slug: "ai_3d_home"
+description: >-
+  3D 户型可视化与控制中心（自研版，对齐 JMGLink 3D Home 的功能与 UI）。
+  画户型、绑定 HA 实体、实时状态与控制。
+url: "https://github.com/AIone-1/hassio-addon-ai-3d-home"
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+boot: auto
+homeassistant_api: true
+hassio_role: default
+ingress: true
+ingress_port: 8099
+ingress_entry: "/"
+panel_icon: "mdi:floor-plan"
+panel_title: "AI 3D Home"
+map:
+  - addon_config:rw
+  - share:rw
+ports:
+  8099/tcp: null
+ports_description:
+  8099/tcp: "Web UI（建议走 Ingress 面板）"
+
+options:
+  ha_host: "supervisor"
+  ha_port: 8123
+  ha_token: ""
+  poll_interval: 3
+
+schema:
+  ha_host: "str?"
+  ha_port: "port?"
+  ha_token: "password?"
+  poll_interval: "int(1,30)"
