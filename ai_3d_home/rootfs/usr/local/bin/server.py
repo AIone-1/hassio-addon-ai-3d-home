@@ -233,6 +233,14 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/health":
             code, data = ha_request("GET", "/")
             return self._send(200, {"ok": True, "ha": code == 200, "code": code})
+        if p == "/api/diag":
+            base, tok = ha_endpoints()
+            return self._send(200, {
+                "base": base,
+                "hasToken": bool(tok),
+                "tokenLen": len(tok),
+                "haHost": load_options().get("ha_host"),
+            })
         if p == "/api/ha/entities":
             return self._send(200, CACHE.all_entities())
         if p == "/api/ha/states":

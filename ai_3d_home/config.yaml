@@ -1,5 +1,5 @@
 name: "AI 3D Home"
-version: "0.1.0"
+version: "0.1.0-p2"
 slug: "ai_3d_home"
 description: >-
   3D 户型可视化与控制中心（自研版，对齐 JMGLink 3D Home 的功能与 UI）。
