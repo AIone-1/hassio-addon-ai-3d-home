@@ -119,6 +119,16 @@ export default function Viewer({ onSelect, floorIndex }) {
         gl={{ antialias: q.aa, powerPreference: 'high-performance' }}
         shadows={shadows}
         camera={{ position: [9, 10, 12], fov: 42, near: 0.1, far: 150 }}
+        onCreated={({ gl, scene, camera }) => {
+          window.__dbg3d = {
+            get frames() { return gl.info.render.frame },
+            get calls() { return gl.info.render.calls },
+            get triangles() { return gl.info.render.triangles },
+            get cam() { return camera.position.toArray() },
+            scene,
+            gl,
+          }
+        }}
       >
         <color attach="background" args={[bg]} />
         <fog attach="fog" args={[bg, night ? 30 : 40, night ? 70 : 90]} />
