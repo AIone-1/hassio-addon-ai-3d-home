@@ -34,7 +34,16 @@ export default function App() {
       } catch (e) { /* 本地开发 */ }
       try {
         const p = await api.project()
-        if (p && Array.isArray(p.floors)) setState({ project: p })
+        if (p && Array.isArray(p.floors)) {
+          // 无楼层时自动创建默认楼层（否则编辑器交互平面不渲染，画不了）
+          if (p.floors.length === 0) {
+            p.floors.push({
+              id: Math.random().toString(36).slice(2, 10), name: '一层', level: 0,
+              height: 2.8, color: '#e6dcc8', rooms: [], walls: [], furniture: [], devices: [], openings: [],
+            })
+          }
+          setState({ project: p, currentFloor: 0 })
+        }
       } catch (e) {}
       // 拉全量实体（绑定用）
       const pollEntities = async () => {
