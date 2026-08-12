@@ -4,6 +4,33 @@ import * as THREE from 'three'
 import { useStore } from '../store'
 import { roomWallSegments, FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK } from '../three/geometry'
 
+// 加粗画图网格（用细长方体做线，比 gridHelper 的 1px 清晰得多）
+function DrawingGrid({ size = 20, cell = 1, level, night }) {
+  const n = Math.round(size / cell)
+  const half = size / 2
+  const lines = []
+  const mainColor = night ? '#6a7a9a' : '#4f7fae'
+  const subColor = night ? '#3a4a6a' : '#a8c4e0'
+  for (let i = 0; i <= n; i++) {
+    const p = -half + i * cell
+    const isMajor = i % 5 === 0
+    const t = isMajor ? 0.05 : 0.025
+    const c = isMajor ? mainColor : subColor
+    // X 方向（横线）
+    lines.push(
+      <mesh key={`h${i}`} position={[0, level + 0.01, p]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[size, t]} />
+        <meshBasicMaterial color={c} transparent opacity={isMajor ? 0.9 : 0.65} />
+      </mesh>,
+      <mesh key={`v${i}`} position={[p, level + 0.01, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[t, size]} />
+        <meshBasicMaterial color={c} transparent opacity={isMajor ? 0.9 : 0.65} />
+      </mesh>,
+    )
+  }
+  return <group>{lines}</group>
+}
+
 // ---------- 家具模型（按类型用基础体组合，原点在底部中心） ----------
 function FurnitureModel({ type }) {
   const lib = FURNITURE_LIB.find((f) => f.type === type)
@@ -235,10 +262,11 @@ export default function Scene({ onSelect, floorIndex }) {
           </mesh>
         )}
 
-        {/* 网格：只在编辑时显示；2D 是清晰画图网格（1m 格），退出编辑无网格 */}
-        {editing && (
+        {/* 网格：只在编辑时显示。2D 用加粗清晰网格（1m 格），3D 编辑用细网格 */}
+        {editing && view2d && <DrawingGrid size={20} cell={1} level={level} night={night} />}
+        {editing && !view2d && (
           <gridHelper
-            args={[view2d ? 20 : 30, view2d ? 20 : 30, night ? '#5a6a8a' : (view2d ? '#5d84b0' : '#b8c6d8'), night ? '#3a4a6a' : (view2d ? '#b8cae0' : '#dde6ef')]}
+            args={[30, 30, night ? '#5a6a8a' : '#b8c6d8', night ? '#3a4a6a' : '#dde6ef']}
             position={[0, level + 0.005, 0]}
           />
         )}
