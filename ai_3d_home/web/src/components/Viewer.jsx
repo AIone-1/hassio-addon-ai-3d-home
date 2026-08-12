@@ -75,7 +75,37 @@ function DeviceLabels({ floorIndex, containerRef }) {
   return null
 }
 
-// 相机对焦（目标通过 store 传给 Controls；2D 切俯视视角）
+// 真正的 2D 正交相机（对齐原版：2D 是平面视图，不是 3D 俯视）
+function CameraSwitcher({ view2d, bounds }) {
+  const perspective = useThree((s) => s.camera)
+  const set = useThree((s) => s.set)
+  const gl = useThree((s) => s.gl)
+  const orthoRef = useRef()
+
+  useEffect(() => {
+    if (view2d) {
+      if (!orthoRef.current) orthoRef.current = new THREE.OrthographicCamera(-10, 10, 6, -6, 0.1, 300)
+      const ortho = orthoRef.current
+      const half = (bounds && bounds > 5) ? bounds : 10
+      const aspect = gl.domElement.width / gl.domElement.height
+      ortho.left = -half
+      ortho.right = half
+      ortho.top = half / aspect
+      ortho.bottom = -half / aspect
+      ortho.updateProjectionMatrix()
+      ortho.position.set(0, 50, 0)
+      ortho.up.set(0, 0, -1)
+      ortho.lookAt(0, 0, 0)
+      set({ camera: ortho })
+    } else {
+      set({ camera: perspective })
+    }
+  }, [view2d, bounds])
+
+  return null
+}
+
+// 相机对焦（3D 透视视角；2D 由 CameraSwitcher 用正交相机接管）
 function CameraFocus({ floorIndex }) {
   const project = useStore((s) => s.project)
   const floor = project.floors[floorIndex]
@@ -88,15 +118,9 @@ function CameraFocus({ floorIndex }) {
     const add = (x, z) => { box.expandByPoint(new THREE.Vector3(x, 0, z)); has = true }
     ;(floor?.rooms || []).forEach((r) => (r.points || []).forEach((p) => add(p[0], p[1])))
     ;(floor?.furniture || []).forEach((f) => { add(f.pos[0], f.pos[2]) })
-    // 空项目也用默认中心，保证 2D/3D 切换都能定位相机
     const c = has ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 2)
     setState({ camTarget: [c.x, 0, c.z] })
-    if (view2d) {
-      // 2D 俯视：正上方往下看
-      camera.position.set(c.x, 28, c.z)
-      camera.lookAt(c.x, 0, c.z)
-    } else {
-      // 3D 透视
+    if (!view2d) {
       camera.position.set(c.x + 9, (has ? c.y : 0) + 10, c.z + 12)
       camera.lookAt(c.x, 0, c.z)
     }
@@ -115,9 +139,20 @@ export default function Viewer({ onSelect, floorIndex }) {
   const shadows = useStore((s) => s.shadows)
   const night = useStore((s) => s.night)
   const mode = useStore((s) => s.mode)
+  const view2d = useStore((s) => s.view2d)
+  const floor = useStore((s) => s.project.floors[floorIndex])
   const containerRef = useRef(null)
   const q = QUALITY[quality] || QUALITY.balanced
   const bg = night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋'])
+
+  // 计算楼层范围（供 2D 正交相机取景）
+  const floorBounds = (() => {
+    let maxR = 8
+    const add = (x, z) => { const r = Math.hypot(x, z); if (r > maxR) maxR = r }
+    ;(floor?.rooms || []).forEach((r) => (r.points || []).forEach((p) => add(p[0], p[1])))
+    ;(floor?.furniture || []).forEach((f) => add(f.pos[0], f.pos[2]))
+    return Math.min(maxR * 1.5, 40)
+  })()
 
   return (
     <div className="canvas-wrap" ref={containerRef}>
@@ -132,6 +167,7 @@ export default function Viewer({ onSelect, floorIndex }) {
             get calls() { return gl.info.render.calls },
             get triangles() { return gl.info.render.triangles },
             get cam() { return camera.position.toArray() },
+            get camType() { return gl.xr ? '?' : (camera.isOrthographicCamera ? 'ortho' : 'persp') },
             scene,
             gl,
           }
@@ -142,6 +178,7 @@ export default function Viewer({ onSelect, floorIndex }) {
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />
         <CameraFocus floorIndex={floorIndex} />
+        <CameraSwitcher view2d={view2d} bounds={floorBounds} />
         <DeviceLabels floorIndex={floorIndex} containerRef={containerRef} />
         <EditorController />
       </Canvas>

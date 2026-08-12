@@ -194,6 +194,8 @@ export default function Scene({ onSelect, floorIndex }) {
   const selected = useStore((s) => s.selected)
   const tool = useStore((s) => s.tool)
   const mode = useStore((s) => s.mode)
+  const view2d = useStore((s) => s.view2d)
+  const editing = useStore((s) => s.editing)
   const rootRef = useRef()
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
@@ -225,8 +227,19 @@ export default function Scene({ onSelect, floorIndex }) {
       />
 
       <group ref={rootRef}>
-        {/* 网格 */}
-        <gridHelper args={[20, 40, night ? '#3a4a6a' : '#8a9bb5', night ? '#1a2338' : '#2a3550']} position={[0, -0.02, 0]} />
+        {/* 2D 模式：干净的浅色地面平面 */}
+        {view2d && (
+          <mesh position={[0, level, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[80, 80]} />
+            <meshBasicMaterial color={night ? '#1c2333' : '#f2f5f8'} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+
+        {/* 网格（编辑时更明显） */}
+        <gridHelper
+          args={[editing ? 40 : 20, editing ? 40 : 40, night ? '#3a4a6a' : (editing ? '#b8c6da' : '#8a9bb5'), night ? '#1a2338' : (editing ? '#d5dfec' : '#2a3550')]}
+          position={[0, level + 0.005, 0]}
+        />
 
         {/* 手绘墙段（墙体工具直接画的，毛玻璃材质对齐原版；删除模式可点） */}
         {(floor.walls || []).map((w, i) => {
