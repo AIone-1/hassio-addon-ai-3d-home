@@ -20,11 +20,11 @@ function DrawingGrid({ size = 20, cell = 1, level, night }) {
     lines.push(
       <mesh key={`h${i}`} position={[0, level + 0.01, p]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[size, t]} />
-        <meshBasicMaterial color={c} transparent opacity={isMajor ? 0.9 : 0.65} />
+        <meshBasicMaterial color={c} transparent opacity={isMajor ? 0.9 : 0.6} side={THREE.DoubleSide} />
       </mesh>,
       <mesh key={`v${i}`} position={[p, level + 0.01, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[t, size]} />
-        <meshBasicMaterial color={c} transparent opacity={isMajor ? 0.9 : 0.65} />
+        <meshBasicMaterial color={c} transparent opacity={isMajor ? 0.9 : 0.6} side={THREE.DoubleSide} />
       </mesh>,
     )
   }
