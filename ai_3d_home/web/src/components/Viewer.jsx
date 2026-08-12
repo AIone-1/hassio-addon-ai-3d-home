@@ -141,6 +141,41 @@ const MODE_BG = {
   '环境': '#0e1a30', '安防': '#cfe4f5',
 }
 
+// 场景背景：自定义图片 > 安防渐变天蓝 > 模式纯色
+function SceneBackground({ mode, night, bgImage }) {
+  const scene = useThree((s) => s.scene)
+
+  useEffect(() => {
+    if (bgImage) {
+      new THREE.TextureLoader().load(bgImage, (tex) => {
+        scene.background = tex
+      }, undefined, () => {
+        scene.background = new THREE.Color(night ? '#0a1020' : '#e9eef2')
+      })
+      return
+    }
+    if (mode === '安防') {
+      // 渐变天蓝（上深下浅）
+      const canvas = document.createElement('canvas')
+      canvas.width = 4
+      canvas.height = 512
+      const ctx = canvas.getContext('2d')
+      const g = ctx.createLinearGradient(0, 0, 0, 512)
+      g.addColorStop(0, '#9cc8e8')
+      g.addColorStop(1, '#e8f4fc')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, 4, 512)
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.needsUpdate = true
+      scene.background = tex
+      return
+    }
+    scene.background = new THREE.Color(night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋']))
+  }, [mode, night, bgImage])
+
+  return null
+}
+
 export default function Viewer({ onSelect, floorIndex }) {
   const quality = useStore((s) => s.quality)
   const shadows = useStore((s) => s.shadows)
@@ -148,6 +183,7 @@ export default function Viewer({ onSelect, floorIndex }) {
   const mode = useStore((s) => s.mode)
   const view2d = useStore((s) => s.view2d)
   const floor = useStore((s) => s.project.floors[floorIndex])
+  const bgImage = useStore((s) => s.bgImage)
   const containerRef = useRef(null)
   const q = QUALITY[quality] || QUALITY.balanced
   const bg = night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋'])
@@ -180,7 +216,7 @@ export default function Viewer({ onSelect, floorIndex }) {
           }
         }}
       >
-        <color attach="background" args={[bg]} />
+        <SceneBackground mode={mode} night={night} bgImage={bgImage} />
         <fog attach="fog" args={[bg, night ? 30 : 40, night ? 70 : 90]} />
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />

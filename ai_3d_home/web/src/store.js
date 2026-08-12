@@ -29,6 +29,8 @@ let state = {
   haConnected: false,
   saved: true,
   toast: '',
+  bgImage: '',           // 自定义背景图 URL
+  settingsOpen: false,   // 设置面板
 }
 
 let toastTimer = null

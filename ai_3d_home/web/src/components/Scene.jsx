@@ -124,13 +124,15 @@ function Furniture({ item, level, selected, onSelect, interactive }) {
 }
 
 // ---------- 房间（地板 + 墙） ----------
-function Room({ room, floor, level, selected, onSelect, interactive }) {
+function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) {
   const pts = room.points || []
   const view2d = useStore((s) => s.view2d)
   if (pts.length < 3) return null
   const h = room.height || floor.height || 2.8
   // 2D 用深色清晰实线（floor plan 感），3D 用浅色墙
   const wallColor = selected ? '#2f7fe0' : (view2d ? '#3a4a66' : '#f5f2ec')
+  // 每个房间地板微小高度差，避免重叠房间 z-fighting 互相盖住
+  const floorY = level + roomIdx * 0.002
 
   const shape = useMemo(() => {
     const s = new THREE.Shape()
@@ -142,7 +144,7 @@ function Room({ room, floor, level, selected, onSelect, interactive }) {
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
       {/* 地板：2D 用不受光材质保证始终可见；3D 用受光材质 */}
-      <mesh position={[0, level, 0]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0, floorY, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <shapeGeometry args={[shape]} />
         {view2d
           ? <meshBasicMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} />
@@ -323,8 +325,8 @@ export default function Scene({ onSelect, floorIndex }) {
         })}
 
         {/* 房间 */}
-        {(floor.rooms || []).map((room) => (
-          <Room key={room.id} room={room} floor={floor} level={level}
+        {(floor.rooms || []).map((room, idx) => (
+          <Room key={room.id} room={room} roomIdx={idx} floor={floor} level={level}
             selected={sel && sel.type === 'room' && sel.ref.id === room.id}
             interactive={interactive}
             onSelect={(r) => onSelect({ type: 'room', ref: r })} />

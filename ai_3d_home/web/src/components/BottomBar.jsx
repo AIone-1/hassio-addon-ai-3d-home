@@ -35,7 +35,7 @@ export default function BottomBar() {
         <button className={`bb-btn ${editing ? 'active' : ''}`} onClick={() => setState({ editing: !editing })}>
           {editing ? '退出编辑' : '编辑'}
         </button>
-        <button className="bb-btn" disabled style={{ opacity: 0.4, cursor: 'not-allowed' }} title="设置（开发中）">设置</button>
+        <button className="bb-btn" onClick={() => setState({ settingsOpen: true })}>设置</button>
       </div>
       <div className="bb-group">
         {MODES.map((m) => (

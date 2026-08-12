@@ -17,6 +17,8 @@ export default function App() {
   const haConnected = useStore((s) => s.haConnected)
   const haStates = useStore((s) => s.haStates)
   const toastMsg = useStore((s) => s.toast)
+  const settingsOpen = useStore((s) => s.settingsOpen)
+  const bgImage = useStore((s) => s.bgImage)
   const [deviceModal, setDeviceModal] = useState(null)
   const saveTimer = useRef(null)
 
@@ -31,6 +33,7 @@ export default function App() {
           shadows: settings.shadows !== undefined ? settings.shadows : true,
           autoRotate: !!settings.autoRotate,
           night: !!settings.night,
+          bgImage: settings.bgImage || '',
         })
       } catch (e) { /* 本地开发 */ }
       try {
@@ -145,7 +148,7 @@ export default function App() {
         // ESC：退出编辑 + 清草稿/选中/弹窗
         window.__wallDraft = null
         setDeviceModal(null)
-        setState({ editing: false, bindOpen: false, pendingEntity: null, selected: null, view2d: false })
+        setState({ editing: false, bindOpen: false, pendingEntity: null, selected: null, view2d: false, settingsOpen: false })
       }
       // 工具快捷键 V/H/W/D/N/F/E/B
       const map = { v: 'select', h: 'pan', w: 'wall', d: 'door', n: 'window', f: 'furniture', e: 'device', b: 'texture' }
@@ -193,6 +196,33 @@ export default function App() {
       )}
 
       {toastMsg && <div className="toast">{toastMsg}</div>}
+
+      {/* 设置面板：背景图 */}
+      {settingsOpen && (
+        <div className="modal-mask" onClick={() => setState({ settingsOpen: false })}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="dname">设置</div>
+            <div className="field" style={{ margin: '10px 0' }}>
+              <label>背景图片 URL（留空=默认背景；安防模式为渐变天蓝）</label>
+              <input
+                type="text"
+                defaultValue={bgImage}
+                placeholder="https://example.com/bg.jpg"
+                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: '#0e1628', color: '#fff' }}
+              />
+            </div>
+            <div className="dev-actions">
+              <button className="primary" onClick={() => {
+                const input = document.querySelector('.modal-box input')
+                const url = input ? input.value.trim() : ''
+                setState({ bgImage: url, settingsOpen: false })
+                api.saveSettings({ ...getState().settings, bgImage: url }).catch(() => {})
+              }}>应用</button>
+              <button className="close-btn" onClick={() => setState({ settingsOpen: false })}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
