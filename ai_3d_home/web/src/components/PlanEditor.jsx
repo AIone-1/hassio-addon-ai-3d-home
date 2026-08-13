@@ -71,6 +71,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const [draft, setDraft] = useState(null)     // { pts: [[x,y],...], walls: [墙对象] } 画墙草稿
   const [cursor, setCursor] = useState(null)    // [x,y] 世界坐标（已吸附）
   const dragRef = useRef(null)                  // 拖动的家具/设备对象
+  const openingDragRef = useRef(null)           // 拖动的门窗对象（沿墙移动）
   const panRef = useRef(null)                   // { w:[x,y], p:[x,y] } 平移起点
   const planMoveRef = useRef(null)              // 移动户型的起点世界坐标
 
@@ -243,7 +244,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   // ---------- 交互 ----------
   const handleFloorDown = (e) => {
     if (e.button === 2) {
+      // 右键 = 取消：取消画墙草稿 + 取消删除/画墙工具 + 取消选中
       if (draft) cancelDraft()
+      if (tool === 'wall' || tool === 'delete') setState({ tool: 'select' })
+      setState({ selected: null })
       return
     }
     if (e.button === 1 || tool === 'pan') {
@@ -326,6 +330,20 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setState({ project: { ...getState().project }, saved: false })
       return
     }
+    if (openingDragRef.current) {
+      // 门窗沿墙移动：找最近墙，更新 wallId + offset
+      let best = null, bd = 0.6
+      for (const wall of (floor?.walls || [])) {
+        const r = pointToSeg(w, wall.start, wall.end)
+        if (r.dist < bd) { bd = r.dist; best = { wall, t: r.t } }
+      }
+      if (best) {
+        openingDragRef.current.wallId = best.wall.id
+        openingDragRef.current.offset = best.t
+        setState({ project: { ...getState().project }, saved: false })
+      }
+      return
+    }
     if (dragRef.current) {
       const [x, y] = snap(w)
       dragRef.current.pos[0] = Math.round(x * 10) / 10
@@ -340,6 +358,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const handleUp = () => {
     panRef.current = null
     dragRef.current = null
+    openingDragRef.current = null
     planMoveRef.current = null
   }
 
@@ -349,6 +368,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setState({ selected: { type, ref: obj } })
     dragRef.current = obj
     svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
+  }
+  // 双击 = 选中并切到移动工具（后续按住即可拖动）
+  const doubleClickDrag = (e, type, obj) => {
+    if (type !== 'furniture' && type !== 'device' && type !== 'opening') return
+    e.stopPropagation()
+    setState({ selected: { type, ref: obj }, tool: 'move' })
   }
   const clickEl = (e, type, ref) => {
     if (tool !== 'select' && tool !== 'delete') return
@@ -513,7 +538,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         const selO = isSel('opening', op.id)
         return (
           <g key={op.id} transform={`translate(${px} ${py}) rotate(${ang})`} className="plan-opening"
-            onClick={e => clickEl(e, 'opening', op)}>
+            onClick={e => clickEl(e, 'opening', op)}
+            onDoubleClick={e => doubleClickDrag(e, 'opening', op)}
+            onPointerDown={tool === 'move' ? (e) => { e.stopPropagation(); setState({ selected: { type: 'opening', ref: op } }); openingDragRef.current = op; svgRef.current && svgRef.current.setPointerCapture(e.pointerId) } : undefined}>
             <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className="opening-track" />
             <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className={`opening-line ${isDoor ? 'door' : 'window'} ${selO ? 'selected' : ''}`} />
             {isDoor && doorStyle === 'swing' && (
@@ -554,6 +581,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             key={f.id}
             transform={`translate(${f.pos[0]} ${f.pos[2]}) rotate(${f.rot || 0})`}
             onClick={e => clickEl(e, 'furniture', f)}
+            onDoubleClick={e => doubleClickDrag(e, 'furniture', f)}
             onPointerDown={e => startDrag(e, 'furniture', f)}
           >
             <rect
@@ -575,6 +603,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             key={dev.id}
             transform={`translate(${dev.pos[0]} ${dev.pos[2]})`}
             onClick={e => clickEl(e, 'device', dev)}
+            onDoubleClick={e => doubleClickDrag(e, 'device', dev)}
             onPointerDown={e => startDrag(e, 'device', dev)}
           >
             {selD && <circle r="0.34" className="plan-device-halo" />}
