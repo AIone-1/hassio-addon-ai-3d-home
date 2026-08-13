@@ -97,6 +97,7 @@ function CameraSwitcher({ view2d }) {
       ortho.right = cx + half
       ortho.top = cz + half / aspect
       ortho.bottom = cz - half / aspect
+      ortho.zoom = 1 // 重置缩放，避免 2D 里缩放过、切 3D 再切回来残留
       ortho.updateProjectionMatrix()
       ortho.position.set(cx, 50, cz)
       ortho.up.set(0, 0, -1)

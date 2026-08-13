@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import { OrbitControls as ThreeOrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MOUSE } from 'three'
-import { useStore } from '../store'
+import { useStore, getState } from '../store'
 
 // 鼠标按键映射：平移工具 / 2D 时左键=平移
 function mouseButtons(view2d, tool) {
@@ -24,6 +24,12 @@ export function Controls({ enabled = true }) {
     const c = new ThreeOrbitControls(camera, gl.domElement)
     c.enableDamping = true
     c.dampingFactor = 0.08
+    // 相机切换（2D↔3D 正交/透视）时 OrbitControls 会重建，默认 target=(0,0,0)、enableRotate=true。
+    // 必须立刻按当前状态重置，否则 2D 视图会偏到原点、还能被旋转（不规整的根因）。
+    const st = getState()
+    if (st.camTarget) c.target.set(st.camTarget[0], st.camTarget[1], st.camTarget[2])
+    c.enableRotate = !st.view2d && st.tool !== 'pan'
+    c.mouseButtons = mouseButtons(st.view2d, st.tool)
     ref.current = c
     return () => c.dispose()
   }, [camera, gl])
