@@ -204,7 +204,7 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   )
 }
 
-// ---------- 门窗（墙段上的开口） ----------
+// ---------- 门窗（墙段上的开口，对齐原版） ----------
 function Opening({ op, floor, level }) {
   const wall = (floor.walls || []).find((w) => w.id === op.wallId)
   if (!wall) return null
@@ -216,13 +216,58 @@ function Opening({ op, floor, level }) {
   const pz = a[1] + (b[1] - a[1]) * t
   const wd = op.width || 0.9
   const isDoor = op.type !== 'window'
-  return (
-    <mesh position={[px, level + (isDoor ? h * 0.275 : h - 1.4), pz]} rotation={[0, -ang, 0]}>
-      {isDoor
-        ? <boxGeometry args={[wd, h * 0.55, 0.06]} />
-        : <boxGeometry args={[wd, 0.9, 0.05]} />}
-      <meshStandardMaterial color={isDoor ? '#8a6b4f' : '#bfe3ff'} roughness={0.6} />
+  const depth = WALL_THICK + 0.01
+
+  if (isDoor) {
+    // 门：门框（左右+上）+ 门扇（木色微开）+ 把手
+    const doorH = h * 0.75
+    const frameT = 0.06
+    const frame = (x, y, w, hh) => (
+      <mesh position={[x, y, 0]} receiveShadow>
+        <boxGeometry args={[w, hh, depth]} />
+        <meshStandardMaterial color="#e7ebef" roughness={0.56} metalness={0.01} />
+      </mesh>
+    )
+    return (
+      <group position={[px, level, pz]} rotation={[0, -ang, 0]}>
+        {frame(-wd / 2, doorH / 2, frameT, doorH)}
+        {frame(wd / 2, doorH / 2, frameT, doorH)}
+        {frame(0, doorH - frameT / 2, wd, frameT)}
+        {/* 门扇（以左侧为轴，微开） */}
+        <group position={[-wd / 2, 0, 0]} rotation={[0, -0.58, 0]}>
+          <mesh position={[wd / 2, doorH / 2, 0.03]} castShadow>
+            <boxGeometry args={[wd * 0.96, doorH * 0.97, 0.045]} />
+            <meshStandardMaterial color="#b78b61" roughness={0.72} metalness={0.012} />
+          </mesh>
+          {/* 把手 */}
+          <mesh position={[wd * 0.8, doorH * 0.54, 0.065]}>
+            <sphereGeometry args={[0.035, 16, 8]} />
+            <meshStandardMaterial color="#71604d" metalness={0.55} roughness={0.28} />
+          </mesh>
+        </group>
+      </group>
+    )
+  }
+  // 窗：玻璃（透光）+ 边框（上下左右 4 条）
+  const winH = 0.9
+  const winY = h - 1.4
+  const bar = (x, y, w, hh) => (
+    <mesh position={[x, y, 0]}>
+      <boxGeometry args={[w, hh, 0.04]} />
+      <meshBasicMaterial color="#ffffff" transparent opacity={0.58} depthWrite={false} toneMapped={false} />
     </mesh>
+  )
+  return (
+    <group position={[px, level + winY + winH / 2, pz]} rotation={[0, -ang, 0]}>
+      <mesh>
+        <planeGeometry args={[wd, winH]} />
+        <meshPhysicalMaterial color="#d8f2ff" transmission={0.72} transparent opacity={0.5} roughness={0.08} metalness={0.02} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      {bar(0, winH / 2, wd, 0.03)}
+      {bar(0, -winH / 2, wd, 0.03)}
+      {bar(-wd / 2, 0, 0.03, winH)}
+      {bar(wd / 2, 0, 0.03, winH)}
+    </group>
   )
 }
 
