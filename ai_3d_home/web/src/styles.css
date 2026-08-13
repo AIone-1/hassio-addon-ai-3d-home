@@ -167,3 +167,26 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .furn-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.25); flex-shrink: 0; }
 .furn-dim { font-size: 10px; color: var(--muted); font-weight: 400; }
 .furn-thumb { width: 42px; height: 42px; object-fit: contain; border-radius: 6px; background: rgba(255,255,255,0.06); flex-shrink: 0; }
+
+/* ---------- 2D 编辑器画布容器 + 家具属性面板 ---------- */
+.plan-wrap { position: absolute; inset: 0; }
+.plan-furniture-wall { stroke-dasharray: 0.12 0.08; }
+.plan-furniture-ceiling { stroke-dasharray: 0.04 0.06; }
+.plan-props { position: absolute; top: 60px; right: 14px; width: 240px; padding: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px; backdrop-filter: blur(8px); z-index: 25; }
+.plan-props-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.plan-props-head span { font-weight: 600; font-size: 13px; }
+.plan-props-del { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent;
+  color: var(--danger); font-size: 11px; cursor: pointer; }
+.plan-props-del:hover { border-color: var(--danger); }
+.plan-props-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.plan-props-row:last-child { margin-bottom: 0; }
+.plan-props-label { font-size: 11px; color: var(--muted); min-width: 32px; }
+.plan-props-row button { padding: 5px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel2);
+  color: var(--text); font-size: 12px; cursor: pointer; }
+.plan-props-row button:hover { background: rgba(255,255,255,0.06); }
+.plan-props-row input[type="number"] { width: 62px; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--panel2); color: var(--text); font-size: 12px; }
+.plan-props-unit { font-size: 11px; color: var(--muted); }
+.plan-props-seg { flex: 1; text-align: center; }
+.plan-props-seg.active { background: var(--accent) !important; color: #081018 !important; font-weight: 600; border-color: var(--accent) !important; }

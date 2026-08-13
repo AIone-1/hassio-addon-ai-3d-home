@@ -1,26 +1,35 @@
 // 程序化几何构建（坐标方案已验证：墙先旋转后平移、地板 DoubleSide、z 不翻转）
 
-// 家具库：尺寸对齐原版（长×宽×高 m）
+// 家具库：尺寸对齐原版（长×宽×高 m），placement 决定挂哪（floor 地面 / wall 墙面 / ceiling 屋顶）
 export const FURNITURE_LIB = [
-  { type: '沙发', w: 2.2, d: 0.9, h: 0.68 },
-  { type: '床', w: 1.8, d: 2.0, h: 0.42 },
-  { type: '餐桌', w: 1.4, d: 0.82, h: 0.62 },
-  { type: '书桌', w: 1.2, d: 0.6, h: 0.62 },
-  { type: '衣柜', w: 1.4, d: 0.6, h: 1.22 },
-  { type: '橱柜', w: 1.6, d: 0.6, h: 0.72 },
-  { type: '岛台', w: 1.8, d: 0.9, h: 0.72 },
-  { type: '茶几', w: 1.0, d: 0.55, h: 0.3 },
-  { type: '书架', w: 1.1, d: 0.32, h: 1.12 },
-  { type: '马桶', w: 0.4, d: 0.68, h: 0.75 },
-  { type: '空气净化器', w: 0.26, d: 0.26, h: 0.62 },
-  { type: '电视机', w: 1.4, d: 0.3, h: 0.85 },
+  { type: '沙发', w: 2.2, d: 0.9, h: 0.68, placement: 'floor' },
+  { type: '床', w: 1.8, d: 2.0, h: 0.42, placement: 'floor' },
+  { type: '餐桌', w: 1.4, d: 0.82, h: 0.62, placement: 'floor' },
+  { type: '书桌', w: 1.2, d: 0.6, h: 0.62, placement: 'floor' },
+  { type: '衣柜', w: 1.4, d: 0.6, h: 1.22, placement: 'floor' },
+  { type: '橱柜', w: 1.6, d: 0.6, h: 0.72, placement: 'floor' },
+  { type: '岛台', w: 1.8, d: 0.9, h: 0.72, placement: 'floor' },
+  { type: '茶几', w: 1.0, d: 0.55, h: 0.3, placement: 'floor' },
+  { type: '书架', w: 1.1, d: 0.32, h: 1.12, placement: 'floor' },
+  { type: '马桶', w: 0.4, d: 0.68, h: 0.75, placement: 'floor' },
+  { type: '空气净化器', w: 0.26, d: 0.26, h: 0.62, placement: 'floor' },
+  { type: '电视机', w: 1.4, d: 0.3, h: 0.85, placement: 'floor' },
+  { type: '壁灯', w: 0.25, d: 0.2, h: 0.35, placement: 'wall' },
+  { type: '挂画', w: 0.6, d: 0.06, h: 0.8, placement: 'wall' },
+  { type: '吊灯', w: 0.5, d: 0.5, h: 0.7, placement: 'ceiling' },
+  { type: '吸顶灯', w: 0.45, d: 0.45, h: 0.16, placement: 'ceiling' },
+  { type: '筒灯', w: 0.16, d: 0.16, h: 0.06, placement: 'ceiling' },
 ]
+
+// 挂墙家具默认离地高度（m）；挂顶用层高、地面为 0
+export const FURNITURE_WALL_HEIGHT = 1.2
 
 // 2D 平面图家具描边色（浅色系，对齐原版 floor plan 风格）
 export const FURNITURE_COLORS = {
   沙发: '#718b80', 床: '#a58b76', 餐桌: '#a67e5f', 书桌: '#a67e5f',
   衣柜: '#778b7e', 橱柜: '#778b7e', 岛台: '#987c62', 茶几: '#937d70', 书架: '#748774',
   马桶: '#9aa7b5', 空气净化器: '#9aa7b5', 电视机: '#5a6470',
+  壁灯: '#d8b06a', 挂画: '#c0906a', 吊灯: '#d8b06a', 吸顶灯: '#d8b06a', 筒灯: '#d8b06a',
 }
 
 // 3D 家具主题色（对齐原版 glass 风格：统一蓝灰，不是每件一个色）

@@ -335,6 +335,70 @@ function FurnitureModel({ type }) {
           ))}
         </group>
       )
+    case '壁灯':
+      return (
+        <group>
+          {/* 灯座（贴墙） */}
+          <FBox position={[0, 0, 0]} size={[w * 0.6, h * 0.3, d * 0.8]} color={D} />
+          {/* 灯罩（朝下的暖光球） */}
+          <mesh position={[0, -h * 0.4, 0]}>
+            <sphereGeometry args={[w * 0.45, 16, 12]} />
+            <meshStandardMaterial color="#f6e7c0" emissive="#ffd98a" emissiveIntensity={0.5} />
+          </mesh>
+        </group>
+      )
+    case '挂画':
+      return (
+        <group>
+          {/* 画框（薄板，用户旋转贴墙） */}
+          <FBox position={[0, 0, 0]} size={[w, h, d]} color={D} />
+          {/* 画心 */}
+          <mesh position={[0, 0, d / 2 + 0.003]}>
+            <planeGeometry args={[w * 0.82, h * 0.82]} />
+            <meshStandardMaterial color="#d8c9a8" roughness={0.55} />
+          </mesh>
+        </group>
+      )
+    case '吊灯':
+      return (
+        <group>
+          {/* 吊线（从天花板往下） */}
+          <mesh position={[0, -h * 0.55, 0]}>
+            <cylinderGeometry args={[0.012, 0.012, h * 0.9, 8]} />
+            <meshStandardMaterial color="#3a3f47" metalness={0.6} roughness={0.3} />
+          </mesh>
+          {/* 灯罩（锥形朝下） */}
+          <mesh position={[0, -h, 0]}>
+            <coneGeometry args={[w * 0.5, h * 0.4, 20]} />
+            <meshStandardMaterial color="#f0e2b6" emissive="#ffd98a" emissiveIntensity={0.55} />
+          </mesh>
+          {/* 灯芯 */}
+          <mesh position={[0, -h * 0.96, 0]}>
+            <sphereGeometry args={[w * 0.09, 12, 12]} />
+            <meshBasicMaterial color="#fff3c4" />
+          </mesh>
+        </group>
+      )
+    case '吸顶灯':
+      return (
+        <group>
+          {/* 贴顶扁圆盘（朝下发光） */}
+          <mesh position={[0, -h * 0.4, 0]}>
+            <cylinderGeometry args={[w * 0.5, w * 0.48, h, 24]} />
+            <meshStandardMaterial color="#f0e2b6" emissive="#ffe9a8" emissiveIntensity={0.5} />
+          </mesh>
+        </group>
+      )
+    case '筒灯':
+      return (
+        <group>
+          {/* 嵌入式小圆盘（朝下） */}
+          <mesh position={[0, -h * 0.4, 0]}>
+            <cylinderGeometry args={[w * 0.5, w * 0.5, h, 20]} />
+            <meshStandardMaterial color="#f0e2b6" emissive="#fff0c0" emissiveIntensity={0.45} />
+          </mesh>
+        </group>
+      )
     default:
       return <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
   }
