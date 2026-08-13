@@ -108,9 +108,14 @@ function CameraFocus({ floorIndex }) {
   return null
 }
 
+// 对齐原版 glass 风格主题背景/雾色（day 模式）
 const MODE_BG = {
-  '全屋': '#e9eef2', '照明': '#1d2638', '遮阳': '#d8e0ec',
-  '环境': '#0e1a30', '安防': '#cfe4f5',
+  '全屋': '#5278ae', '照明': '#5879ad', '遮阳': '#080c22',
+  '环境': '#4f74aa', '安防': '#070a1d',
+}
+const MODE_FOG = {
+  '全屋': '#6d8ebe', '照明': '#6685b4', '遮阳': '#0c122b',
+  '环境': '#6889ba', '安防': '#0b0f27',
 }
 
 // 场景背景：按 bgMode 切换 纯色/背景图/渐变/夜景
@@ -165,7 +170,7 @@ export default function Viewer({ onSelect, floorIndex }) {
   const bgMode = useStore((s) => s.bgMode)
   const containerRef = useRef(null)
   const q = QUALITY[quality] || QUALITY.balanced
-  const bg = night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋'])
+  const fogColor = night ? '#0a1020' : (MODE_FOG[mode] || MODE_FOG['全屋'])
 
   return (
     <div className="canvas-wrap" ref={containerRef}>
@@ -187,7 +192,7 @@ export default function Viewer({ onSelect, floorIndex }) {
         }}
       >
         <SceneBackground mode={mode} night={night} bgImage={bgImage} bgMode={bgMode} />
-        <fog attach="fog" args={[bg, night ? 30 : 40, night ? 70 : 90]} />
+        <fog attach="fog" args={[fogColor, night ? 30 : 40, night ? 70 : 90]} />
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />
         <CameraFocus floorIndex={floorIndex} />

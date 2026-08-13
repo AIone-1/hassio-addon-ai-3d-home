@@ -26,6 +26,9 @@ export function Controls({ enabled = true }) {
     c.enableDamping = true
     c.dampingFactor = 0.08
     c.autoRotateSpeed = 1.2
+    // 限制极角：相机不能翻到地面以下（否则户型图底面朝上、穿模）
+    c.minPolarAngle = 0.05
+    c.maxPolarAngle = Math.PI / 2 - 0.05
     // 相机切换（2D↔3D 正交/透视）时 OrbitControls 会重建，默认 target=(0,0,0)、enableRotate=true。
     // 必须立刻按当前状态重置，否则 2D 视图会偏到原点、还能被旋转（不规整的根因）。
     const st = getState()
