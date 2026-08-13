@@ -139,9 +139,8 @@ function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) 
 
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
-      {/* 地板：万能剖分 + 2D 不受光材质保证始终可见 */}
-      <mesh position={[0, floorY, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <bufferGeometry {...floorGeo} />
+      {/* 地板：直接挂载几何体（R3F 标准写法，保证地板一定渲染） */}
+      <mesh geometry={floorGeo} position={[0, floorY, 0]} rotation={[Math.PI / 2, 0, 0]}>
         {view2d
           ? <meshBasicMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} />
           : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} roughness={0.9} />}
