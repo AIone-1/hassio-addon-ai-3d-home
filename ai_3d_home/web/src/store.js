@@ -49,7 +49,8 @@ export function toast(msg, ms = 2200) {
 const listeners = new Set()
 export function getState() { return state }
 export function setState(partial) {
-  state = typeof partial === 'function' ? partial(state) : { ...state, ...partial }
+  const next = typeof partial === 'function' ? partial(state) : partial
+  state = { ...state, ...next }
   listeners.forEach((l) => l(state))
 }
 export function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn) }
