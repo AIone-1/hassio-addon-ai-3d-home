@@ -15,7 +15,7 @@ import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 PORT = int(os.environ.get("PORT", "8099"))
 WEBUI_DIR = os.environ.get("WEBUI_DIR", "/usr/local/bin/webui")
@@ -196,6 +196,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def _send_file(self, path):
+        path = unquote(path)  # 解码中文文件名（如 %E8%BE%B9 -> 边）
         fs = os.path.join(WEBUI_DIR, path.lstrip("/"))
         if not os.path.abspath(fs).startswith(WEBUI_DIR):
             return self._send(403, {"error": "forbidden"})
