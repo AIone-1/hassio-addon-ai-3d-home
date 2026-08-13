@@ -82,6 +82,8 @@ export default function App() {
         return s
       }
       const pollStates = async () => {
+        // 自动旋转时跳过轮询，避免 fetch/解析打断 3D 渲染导致卡顿；转完下一个周期恢复
+        if (getState().autoRotate) return
         try {
           const st = await api.states()
           if (st && typeof st === 'object') {
