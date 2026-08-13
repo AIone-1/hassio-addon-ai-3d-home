@@ -23,11 +23,10 @@ export default function App() {
   const bgMode = useStore((s) => s.bgMode)
   const view2d = useStore((s) => s.view2d)
   const [deviceModal, setDeviceModal] = useState(null)
-  const [fps, setFps] = useState(0)
-  const [maxStutter, setMaxStutter] = useState(0)
   const saveTimer = useRef(null)
+  const fpsRef = useRef(null)
 
-  // FPS + 最大卡顿计数（诊断卡顿用：最大卡顿=最近一秒最慢一帧的间隔，能测出瞬时卡）
+  // FPS + 最大卡顿计数（直接写 DOM，不经过 React setState，避免每秒重渲染制造垃圾）
   useEffect(() => {
     let frames = 0
     let last = performance.now()
@@ -40,8 +39,12 @@ export default function App() {
       prev = now
       frames++
       if (now - last >= 1000) {
-        setFps(Math.round(frames * 1000 / (now - last)))
-        setMaxStutter(Math.round(maxGap))
+        const f = Math.round(frames * 1000 / (now - last))
+        const el = fpsRef.current
+        if (el) {
+          el.textContent = `${f} FPS · 卡顿 ${Math.round(maxGap)}ms`
+          el.style.color = f >= 50 ? 'var(--ok)' : f >= 30 ? 'var(--accent2)' : 'var(--danger)'
+        }
         frames = 0
         maxGap = 0
         last = now
@@ -209,14 +212,7 @@ export default function App() {
         <span style={{ color: 'var(--accent2)' }}>
           {editing ? `· 房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
         </span>
-        <span style={{ color: fps >= 50 ? 'var(--ok)' : fps >= 30 ? 'var(--accent2)' : 'var(--danger)', fontSize: '16px', fontWeight: 700 }}>
-          {fps > 0 ? ` ${fps} FPS` : ''}
-        </span>
-        {maxStutter > 0 && (
-          <span style={{ color: maxStutter > 50 ? 'var(--danger)' : 'var(--accent2)', fontSize: '13px', fontWeight: 700 }}>
-            最大卡顿 {maxStutter}ms
-          </span>
-        )}
+        <span ref={fpsRef} style={{ fontSize: '16px', fontWeight: 700 }} />
       </div>
 
       <BottomBar />
