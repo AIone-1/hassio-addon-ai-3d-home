@@ -180,6 +180,49 @@ function FurnitureModel({ type }) {
           {[-0.28, -0.1, 0.1, 0.28].map((V, b) => <FBox key={`bk${V}`} position={[V * w, h * (0.26 + (b % 2) * 0.2), -d * 0.08]} size={[w * 0.1, h * 0.16, d * 0.42]} color={b % 2 ? '#8198a8' : '#9f8d7f'} roughness={0.66} />)}
         </group>
       )
+    case '马桶':
+      return (
+        <group>
+          {/* 水箱（后） */}
+          <FBox position={[0, h * 0.72, d * 0.28]} size={[w * 0.9, h * 0.45, d * 0.28]} color="#f2f2f2" roughness={0.3} />
+          {/* 座体（前） */}
+          <FBox position={[0, h * 0.32, -d * 0.1]} size={[w * 0.88, h * 0.38, d * 0.5]} color="#f2f2f2" roughness={0.3} />
+          {/* 马桶盖 */}
+          <FBox position={[0, h * 0.55, -d * 0.1]} size={[w * 0.95, h * 0.06, d * 0.5]} color="#e0e0e0" roughness={0.35} />
+          {/* 底座 */}
+          <FBox position={[0, h * 0.06, -d * 0.12]} size={[w * 0.7, h * 0.12, d * 0.35]} color="#e8e8e8" roughness={0.4} />
+        </group>
+      )
+    case '空气净化器':
+      return (
+        <group>
+          {/* 圆柱机身 */}
+          <mesh position={[0, h * 0.4, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[w * 0.5, w * 0.5, h * 0.75, 32]} />
+            <meshPhysicalMaterial color="#f0f2f5" roughness={0.4} metalness={0.01} clearcoat={0.2} clearcoatRoughness={0.6} />
+          </mesh>
+          {/* 顶部出风口 */}
+          <mesh position={[0, h * 0.9, 0]}>
+            <cylinderGeometry args={[w * 0.56, w * 0.56, h * 0.1, 32]} />
+            <meshStandardMaterial color="#d8dde3" roughness={0.35} />
+          </mesh>
+          {/* 前面小屏 */}
+          <FBox position={[0, h * 0.45, -w * 0.5]} size={[w * 0.3, h * 0.12, 0.02]} color="#2a2f36" roughness={0.4} />
+        </group>
+      )
+    case '电视机':
+      return (
+        <group>
+          {/* 边框 */}
+          <FBox position={[0, h * 0.52, 0]} size={[w * 1.02, h * 0.82, 0.04]} color="#2a2e35" roughness={0.5} />
+          {/* 屏幕 */}
+          <FBox position={[0, h * 0.52, 0.01]} size={[w * 0.94, h * 0.74, 0.02]} color="#14161a" roughness={0.25} />
+          {/* 支架立柱 */}
+          <FBox position={[0, h * 0.12, 0]} size={[0.06, h * 0.2, 0.06]} color="#3a4048" roughness={0.5} />
+          {/* 底座 */}
+          <FBox position={[0, h * 0.025, 0]} size={[w * 0.4, h * 0.05, d * 0.9]} color="#2a2e35" roughness={0.5} />
+        </group>
+      )
     default:
       return <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
   }
