@@ -7,7 +7,7 @@ export default defineConfig({
   base: './',
   build: {
     outDir: '../rootfs/usr/local/bin/webui',
-    emptyOutDir: true,
+    emptyOutDir: false,
     assetsDir: 'assets',
   },
 })
