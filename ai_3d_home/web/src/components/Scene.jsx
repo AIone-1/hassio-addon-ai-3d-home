@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore, setState } from '../store'
-import { FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK, robustFloorGeometry } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, robustFloorGeometry } from '../three/geometry'
 
 // 对齐原版主题（glass 视觉风格）：墙=半透明毛玻璃，地板=冷色调色板
 const THEME = {
@@ -46,61 +46,142 @@ function DrawingGrid({ size = 20, cell = 1, level, night }) {
   return <group>{lines}</group>
 }
 
-// ---------- 家具模型（按类型用基础体组合，原点在底部中心） ----------
+// 颜色混合（对齐原版 _ 函数）
+function mixColor(a, b, t) { return '#' + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString() }
+
+// 家具盒子（对齐原版 uA：boxGeometry + physical 材质 clearcoat）
+function FBox({ position, size, color, roughness = 0.72 }) {
+  return (
+    <mesh position={position} castShadow receiveShadow>
+      <boxGeometry args={size} />
+      <meshPhysicalMaterial color={color} roughness={roughness} metalness={0.018} clearcoat={0.16} clearcoatRoughness={0.82} />
+    </mesh>
+  )
+}
+
+// ---------- 家具模型（对齐原版：每个家具用多个盒子拼出具体造型，统一蓝灰主题色） ----------
 function FurnitureModel({ type }) {
   const lib = FURNITURE_LIB.find((f) => f.type === type)
   const w = lib ? lib.w : 1
   const d = lib ? lib.d : 0.6
-  const c = FURNITURE_COLORS[type] || '#9aa7b5'
+  const h = lib ? lib.h : 0.6
+  const M = FURNITURE_MAIN
+  const D = FURNITURE_DETAIL
+  const A = FURNITURE_ACCENT
+  const q = Math.min(0.12, h * 0.16)  // 桌面厚度
+  const legs = (V) => [-1, 1].flatMap(x => [-1, 1].map(z => (
+    <FBox key={`${x}${z}`} position={[x * (w / 2 - 0.09), V / 2, z * (d / 2 - 0.09)]} size={[0.08, V, 0.08]} color={D} />
+  )))
 
   switch (type) {
-    case '沙发': return (
-      <group>
-        <mesh position={[0, 0.2, 0]}><boxGeometry args={[w, 0.4, d]} /><meshStandardMaterial color={c} /></mesh>
-        <mesh position={[0, 0.65, -d / 2 + 0.1]}><boxGeometry args={[w, 0.6, 0.2]} /><meshStandardMaterial color={c} /></mesh>
-        <mesh position={[-w / 2 + 0.09, 0.3, 0]}><boxGeometry args={[0.18, 0.6, d]} /><meshStandardMaterial color={c} /></mesh>
-        <mesh position={[w / 2 - 0.09, 0.3, 0]}><boxGeometry args={[0.18, 0.6, d]} /><meshStandardMaterial color={c} /></mesh>
-      </group>
-    )
-    case '床': return (
-      <group>
-        <mesh position={[0, 0.175, 0]}><boxGeometry args={[w, 0.35, d]} /><meshStandardMaterial color={c} /></mesh>
-        <mesh position={[0, 0.55, -d / 2 + 0.06]}><boxGeometry args={[w, 0.7, 0.12]} /><meshStandardMaterial color={c} /></mesh>
-        <mesh position={[0, 0.42, d * 0.3]}><boxGeometry args={[0.5, 0.1, 0.6]} /><meshStandardMaterial color="#f0f0f0" /></mesh>
-      </group>
-    )
-    case '餐桌': case '书桌': case '茶几': {
-      const topH = type === '书桌' ? 0.75 : 0.75
+    case '沙发':
       return (
         <group>
-          <mesh position={[0, topH, 0]}><boxGeometry args={[w, 0.06, d]} /><meshStandardMaterial color={c} /></mesh>
-          {[[-w/2+0.05, -d/2+0.05], [w/2-0.05, -d/2+0.05], [-w/2+0.05, d/2-0.05], [w/2-0.05, d/2-0.05]].map(([x, z], i) => (
-            <mesh key={i} position={[x, topH/2, z]}><cylinderGeometry args={[0.04, 0.04, topH, 6]} /><meshStandardMaterial color="#555" /></mesh>
-          ))}
+          <FBox position={[0, h * 0.24, d * 0.14]} size={[w, h * 0.48, d * 0.58]} color={M} />
+          <FBox position={[0, h * 0.68, d * 0.34]} size={[w, h * 0.36, d * 0.16]} color={D} />
+          <FBox position={[-w * 0.45, h * 0.38, d * 0.02]} size={[w * 0.12, h * 0.44, d * 0.58]} color={M} />
+          <FBox position={[w * 0.45, h * 0.38, d * 0.02]} size={[w * 0.12, h * 0.44, d * 0.58]} color={M} />
+          {[-0.24, 0.24].map(V => <FBox key={`s${V}`} position={[V * w, h * 0.53, d * 0.06]} size={[w * 0.43, h * 0.12, d * 0.48]} color={A} roughness={0.5} />)}
+          {[-0.25, 0.25].map(V => <FBox key={`p${V}`} position={[V * w, h * 0.7, d * 0.22]} size={[w * 0.34, h * 0.22, d * 0.12]} color={D} roughness={0.5} />)}
+        </group>
+      )
+    case '床':
+      return (
+        <group>
+          <FBox position={[0, h * 0.2, 0]} size={[w, h * 0.4, d]} color={M} />
+          <FBox position={[0, h * 0.64, -d * 0.43]} size={[w + 0.04, h * 0.78, d * 0.12]} color={D} />
+          <FBox position={[0, h * 0.48, d * 0.12]} size={[w * 0.9, h * 0.15, d * 0.72]} color={A} />
+          {[-0.24, 0.24].map(V => <FBox key={`bp${V}`} position={[V * w, h * 0.64, -d * 0.21]} size={[w * 0.3, h * 0.18, d * 0.18]} color={mixColor(A, '#ffffff', 0.14)} roughness={0.46} />)}
+          <FBox position={[0, h * 0.56, d * 0.22]} size={[w * 0.72, h * 0.05, d * 0.38]} color={mixColor(D, '#ffffff', 0.1)} roughness={0.48} />
+        </group>
+      )
+    case '餐桌': {
+      const chair = (V, b, rot) => (
+        <group key={`c${V}${b}`} position={[V * w, 0, b * d]} rotation={[0, rot, 0]}>
+          <FBox position={[0, Math.max(0.1, h * 0.34), 0]} size={[w * 0.22, h * 0.18, d * 0.2]} color={A} roughness={0.52} />
+          <FBox position={[0, Math.max(0.1, h * 0.58), d * 0.09]} size={[w * 0.22, h * 0.34, d * 0.07]} color={D} roughness={0.54} />
+          <FBox position={[-0.08 * w, Math.max(0.05, h * 0.18), -d * 0.055]} size={[0.035, h * 0.36, 0.035]} color={D} roughness={0.6} />
+          <FBox position={[0.08 * w, Math.max(0.05, h * 0.18), -d * 0.055]} size={[0.035, h * 0.36, 0.035]} color={D} roughness={0.6} />
+        </group>
+      )
+      return (
+        <group>
+          <FBox position={[0, h - q / 2, 0]} size={[w, q, d]} color={M} roughness={0.5} />
+          <FBox position={[0, h + q * 0.12, 0]} size={[w * 0.82, q * 0.18, d * 0.72]} color={mixColor(A, '#ffffff', 0.1)} roughness={0.42} />
+          {legs(h - q)}
+          {chair(-0.34, -0.72, Math.PI)}
+          {chair(0.34, -0.72, Math.PI)}
+          {chair(-0.34, 0.72, 0)}
+          {chair(0.34, 0.72, 0)}
         </group>
       )
     }
-    case '衣柜': case '橱柜': return (
-      <group>
-        <mesh position={[0, 0.45, 0]}><boxGeometry args={[w, 0.9, d]} /><meshStandardMaterial color={c} /></mesh>
-        <mesh position={[0, 0.45, d/2 + 0.01]}><boxGeometry args={[w*0.8, 0.04, 0.02]} /><meshStandardMaterial color="#333" /></mesh>
-      </group>
-    )
-    case '岛台': return (
-      <group>
-        <mesh position={[0, 0.45, 0]}><boxGeometry args={[w, 0.9, d]} /><meshStandardMaterial color={c} /></mesh>
-        <mesh position={[0, 0.5, 0]}><boxGeometry args={[w*0.9, 0.1, d*0.9]} /><meshStandardMaterial color="#e8e0d0" /></mesh>
-      </group>
-    )
-    case '书架': return (
-      <group>
-        <mesh position={[0, 0.6, 0]}><boxGeometry args={[w, 1.2, d]} /><meshStandardMaterial color={c} /></mesh>
-        <mesh position={[0, 0.6, d/2+0.02]}><boxGeometry args={[w*0.9, 1.1, 0.03]} /><meshStandardMaterial color="#f5f0e8" /></mesh>
-      </group>
-    )
-    default: return (
-      <mesh position={[0, 0.25, 0]}><boxGeometry args={[w, 0.5, d]} /><meshStandardMaterial color={c} /></mesh>
-    )
+    case '书桌':
+      return (
+        <group>
+          <FBox position={[0, h - q / 2, 0]} size={[w, q, d]} color={M} roughness={0.5} />
+          {legs(h - q)}
+          <FBox position={[0, h * 0.55, -d * 0.4]} size={[w * 0.48, h * 0.48, d * 0.16]} color={D} />
+          <FBox position={[0, h + 0.14, -d * 0.18]} size={[w * 0.34, h * 0.36, 0.045]} color={mixColor(D, '#dff4ff', 0.28)} roughness={0.42} />
+          <FBox position={[0, h + 0.015, -d * 0.18]} size={[0.06, 0.08, 0.05]} color={D} roughness={0.56} />
+        </group>
+      )
+    case '衣柜':
+      return (
+        <group>
+          <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
+          <FBox position={[0, h * 0.54, -d / 2 - 0.004]} size={[0.035, h * 0.76, 0.02]} color={D} />
+          {[-0.25, 0.25].map(V => <FBox key={`h${V}`} position={[V * w, h * 0.54, -d / 2 - 0.012]} size={[0.018, h * 0.68, 0.018]} color={D} roughness={0.48} />)}
+        </group>
+      )
+    case '橱柜':
+      return (
+        <group>
+          <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
+          <FBox position={[0, h + 0.025, 0]} size={[w + 0.04, 0.05, d + 0.04]} color={D} roughness={0.5} />
+          {[-0.22, 0, 0.22].map(V => <FBox key={`l${V}`} position={[V * w, h * 0.54, -d / 2 - 0.012]} size={[0.014, h * 0.62, 0.016]} color={D} roughness={0.48} />)}
+        </group>
+      )
+    case '岛台':
+      return (
+        <group>
+          <FBox position={[0, h * 0.42, 0]} size={[w * 0.92, h * 0.84, d * 0.88]} color={M} />
+          <FBox position={[0, h + 0.035, 0]} size={[w + 0.08, 0.07, d + 0.08]} color={D} roughness={0.44} />
+          <mesh position={[w * 0.23, h + 0.076, -d * 0.12]} receiveShadow>
+            <boxGeometry args={[w * 0.2, 0.012, d * 0.22]} />
+            <meshPhysicalMaterial color="#d8e4e8" roughness={0.26} metalness={0.04} clearcoat={0.18} clearcoatRoughness={0.64} />
+          </mesh>
+          {[-0.08, 0.08].map(V => (
+            <mesh key={`b${V}`} position={[w * -0.18 + V, h + 0.083, d * 0.12]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[0.055, 0.075, 24]} />
+              <meshBasicMaterial color="#9fb0b8" transparent opacity={0.48} toneMapped={false} />
+            </mesh>
+          ))}
+        </group>
+      )
+    case '茶几':
+      return (
+        <group>
+          <mesh position={[0, h, 0]} castShadow receiveShadow>
+            <boxGeometry args={[w, Math.min(0.06, h * 0.18), d]} />
+            <meshPhysicalMaterial color="#e6efee" roughness={0.22} metalness={0.015} clearcoat={0.22} clearcoatRoughness={0.54} transparent opacity={0.56} />
+          </mesh>
+          <FBox position={[0, h * 0.48, 0]} size={[w * 0.56, h * 0.16, d * 0.38]} color={M} roughness={0.56} />
+          {legs(Math.max(0.16, h * 0.72))}
+        </group>
+      )
+    case '书架':
+      return (
+        <group>
+          <FBox position={[0, h / 2, d * 0.42]} size={[w, h, d * 0.12]} color={D} />
+          <FBox position={[-w / 2 + 0.035, h / 2, 0]} size={[0.07, h, d]} color={M} />
+          <FBox position={[w / 2 - 0.035, h / 2, 0]} size={[0.07, h, d]} color={M} />
+          {[0.18, 0.38, 0.58, 0.78].map(V => <FBox key={`sh${V}`} position={[0, h * V, 0]} size={[w, 0.055, d]} color={M} roughness={0.56} />)}
+          {[-0.28, -0.1, 0.1, 0.28].map((V, b) => <FBox key={`bk${V}`} position={[V * w, h * (0.26 + (b % 2) * 0.2), -d * 0.08]} size={[w * 0.1, h * 0.16, d * 0.42]} color={b % 2 ? '#8198a8' : '#9f8d7f'} roughness={0.66} />)}
+        </group>
+      )
+    default:
+      return <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
   }
 }
 
