@@ -14,6 +14,7 @@ export const QUALITY = {
 
 // 设备标签投影（HTML 覆盖在画布上）
 const NO_DEVICES = []
+const _v = new THREE.Vector3()  // 复用的临时向量，避免每帧 new 造成 GC 压力
 function DeviceLabels({ floorIndex, containerRef }) {
   const floor = useStore((s) => s.project.floors[floorIndex])
   const devices = (floor && floor.devices) || NO_DEVICES
@@ -42,18 +43,18 @@ function DeviceLabels({ floorIndex, containerRef }) {
   }, [devices.length, floorIndex])
 
   useFrame(() => {
+    if (devices.length === 0) return
     const wrap = containerRef.current
     if (!wrap) return
     const rect = wrap.getBoundingClientRect()
-    const v = new THREE.Vector3()
+    const v = _v  // 复用临时向量，避免每帧 new 导致 GC 压力（GC 是周期性卡顿的常见原因）
     devices.forEach((dev) => {
       const el = els.current.get(dev.id)
       if (!el) return
       el.classList.toggle('light-theme', !night)
       el.style.display = showLabels ? 'block' : 'none'
       if (!showLabels) return
-      const pos = new THREE.Vector3(dev.pos[0], (0) + (dev.pos[1] || 1.4), dev.pos[2])
-      v.copy(pos).project(camera)
+      v.set(dev.pos[0], (dev.pos[1] || 1.4), dev.pos[2]).project(camera)
       if (v.z > 1) { el.style.display = 'none'; return }
       el.style.left = (v.x * 0.5 + 0.5) * rect.width + 'px'
       el.style.top = (-v.y * 0.5 + 0.5) * rect.height + 'px'
