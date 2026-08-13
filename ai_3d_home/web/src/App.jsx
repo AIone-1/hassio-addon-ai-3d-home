@@ -23,7 +23,26 @@ export default function App() {
   const bgMode = useStore((s) => s.bgMode)
   const view2d = useStore((s) => s.view2d)
   const [deviceModal, setDeviceModal] = useState(null)
+  const [fps, setFps] = useState(0)
   const saveTimer = useRef(null)
+
+  // FPS 计数（诊断卡顿用）
+  useEffect(() => {
+    let frames = 0
+    let last = performance.now()
+    let raf
+    const loop = (now) => {
+      frames++
+      if (now - last >= 500) {
+        setFps(Math.round(frames * 1000 / (now - last)))
+        frames = 0
+        last = now
+      }
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   // ---------- 启动 ----------
   useEffect(() => {
@@ -181,6 +200,9 @@ export default function App() {
         {haConnected ? 'Home Assistant 已连接' : '未连接'}
         <span style={{ color: 'var(--accent2)' }}>
           {editing ? `· 房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
+        </span>
+        <span style={{ color: fps >= 50 ? 'var(--ok)' : fps >= 30 ? 'var(--accent2)' : 'var(--danger)' }}>
+          {fps > 0 ? `· ${fps} FPS` : ''}
         </span>
       </div>
 
