@@ -8,6 +8,7 @@ export default function BottomBar() {
   const rotateDir = useStore((s) => s.rotateDir)
   const rotateSpeed = useStore((s) => s.rotateSpeed)
   const quality = useStore((s) => s.quality)
+  const shadows = useStore((s) => s.shadows)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
   const deviceCount = project.floors.reduce((n, f) => n + (f.devices || []).length, 0)
@@ -41,8 +42,11 @@ export default function BottomBar() {
         <button className="bb-btn" onClick={() => setState((s) => ({ recenterKey: s.recenterKey + 1 }))} title="居中视角">
           ⌖ 居中
         </button>
-        <button className="bb-btn" onClick={cycleQuality} title="切换画质">
-          {qLabel}
+        <button className="bb-btn" onClick={cycleQuality} title="切换画质（流畅/均衡/高清/极致）">
+          ⚙️ {qLabel}
+        </button>
+        <button className={`bb-btn ${shadows ? 'active' : ''}`} onClick={() => setState({ shadows: !shadows })} title="切换投影">
+          ☀️ 投影
         </button>
         <button className="bb-btn" disabled style={{ opacity: 0.4, cursor: 'not-allowed' }} title="玻璃效果（开发中）">璃玻璃</button>
       </div>
