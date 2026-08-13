@@ -146,12 +146,12 @@ function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) 
 
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
-      {/* 地板：包围盒矩形平面，任何房间都渲染 */}
-      <mesh position={[bb.cx, floorY, bb.cz]} rotation={[Math.PI / 2, 0, 0]}>
+      {/* 地板：包围盒矩形平面，法线朝上（-π/2），renderOrder 强制绘制在前 */}
+      <mesh position={[bb.cx, floorY, bb.cz]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
         <planeGeometry args={[Math.max(bb.w, 0.2), Math.max(bb.d, 0.2)]} />
         {view2d
-          ? <meshBasicMaterial color={room.color || floor.color || '#e6ddc9'} side={THREE.DoubleSide} />
-          : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} roughness={0.9} />}
+          ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} />
+          : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} roughness={0.9} />}
       </mesh>
       {/* 2D 地板描边：让房间范围一目了然 */}
       {view2d && (
