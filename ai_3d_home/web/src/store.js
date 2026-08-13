@@ -24,6 +24,7 @@ let state = {
   editing: false,             // 是否在编辑器
   tool: 'select',             // select|pan|wall|door|window|furniture|device|texture|delete
   furnitureType: '沙发',
+  furnitureScale: 1,          // 家具尺寸缩放倍数
   selected: null,             // {type:'room'|'wall'|'furniture'|'device'|'opening', ref, floorIdx}
   roomDraft: null,            // 画房间/墙的草稿
   pendingEntity: null,        // 待绑定实体

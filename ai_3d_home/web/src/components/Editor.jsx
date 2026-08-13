@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useStore, setState, currentFloor, getState, toast } from '../store'
 import { api } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS } from '../three/geometry'
@@ -27,9 +27,21 @@ export default function Editor() {
   const mode = useStore((s) => s.mode)
   const project = useStore((s) => s.project)
   const modelCatalog = useStore((s) => s.modelCatalog)
+  const furnitureScale = useStore((s) => s.furnitureScale)
   const floor = currentFloor()
   const [furnOpen, setFurnOpen] = useState(false)
   const [catOpen, setCatOpen] = useState(false)
+  const [openCats, setOpenCats] = useState({})
+
+  // 下载模型按中文分类分组
+  const groupedCatalog = useMemo(() => {
+    const m = {}
+    for (const it of modelCatalog) {
+      if (!m[it.label]) m[it.label] = []
+      m[it.label].push(it)
+    }
+    return m
+  }, [modelCatalog])
 
   const setTool = (t) => {
     setState({ tool: t })
@@ -126,22 +138,56 @@ export default function Editor() {
         <button className="et-btn" onClick={() => setCatOpen(false) + setFurnOpen(!furnOpen)}>家具</button>
         {furnOpen && (
           <div className="furn-picker">
-            {FURNITURE_LIB.map((f) => (
-              <button key={f.type}
-                className={`furn-item ${furnitureType === f.type ? 'active' : ''}`}
-                onClick={() => { setState({ furnitureType: f.type, tool: 'furniture' }); setFurnOpen(false) }}>
-                <span className="furn-swatch" style={{ background: FURNITURE_COLORS[f.type] || '#888' }} />
-                {f.type}
-                <span className="furn-dim"> {f.w}×{f.d}m</span>
-              </button>
-            ))}
-            {modelCatalog.map((m) => (
-              <button key={m.type}
-                className={`furn-item ${furnitureType === m.type ? 'active' : ''}`}
-                onClick={() => { setState({ furnitureType: m.type, tool: 'furniture' }); setFurnOpen(false) }}>
-                <img className="furn-thumb" src={thumbUrl(m.thumb)} alt={m.label} loading="lazy" />
-                <span>{m.label}</span>
-              </button>
+            {/* 尺寸选择 */}
+            <div className="furn-size">
+              <span className="furn-size-label">尺寸</span>
+              {[0.6, 0.8, 1, 1.2, 1.5].map((s) => (
+                <button key={s} className={`furn-size-btn ${furnitureScale === s ? 'active' : ''}`}
+                  onClick={() => setState({ furnitureScale: s })}>
+                  {Math.round(s * 100)}%
+                </button>
+              ))}
+            </div>
+            {/* 内置家具（程序化建模） */}
+            <div className="furn-cat" onClick={() => setOpenCats(o => ({ ...o, 内置: !o['内置'] }))}>
+              <span className="furn-cat-label">内置家具</span>
+              <span className="furn-cat-count">{FURNITURE_LIB.length}</span>
+              <span className="furn-cat-arrow">{openCats['内置'] ? '▾' : '▸'}</span>
+            </div>
+            {openCats['内置'] && (
+              <div className="furn-items">
+                {FURNITURE_LIB.map((f) => (
+                  <button key={f.type}
+                    className={`furn-item ${furnitureType === f.type ? 'active' : ''}`}
+                    onClick={() => { setState({ furnitureType: f.type, tool: 'furniture' }); setFurnOpen(false) }}>
+                    <span className="furn-swatch" style={{ background: FURNITURE_COLORS[f.type] || '#888' }} />
+                    {f.type}
+                    <span className="furn-dim"> {f.w}×{f.d}m</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* 下载模型（按分类折叠） */}
+            {Object.entries(groupedCatalog).map(([label, items]) => (
+              <div key={label}>
+                <div className="furn-cat" onClick={() => setOpenCats(o => ({ ...o, [label]: !o[label] }))}>
+                  <span className="furn-cat-label">{label}</span>
+                  <span className="furn-cat-count">{items.length}</span>
+                  <span className="furn-cat-arrow">{openCats[label] ? '▾' : '▸'}</span>
+                </div>
+                {openCats[label] && (
+                  <div className="furn-items">
+                    {items.map((m) => (
+                      <button key={m.type}
+                        className={`furn-item ${furnitureType === m.type ? 'active' : ''}`}
+                        onClick={() => { setState({ furnitureType: m.type, tool: 'furniture' }); setFurnOpen(false) }}>
+                        <img className="furn-thumb" src={thumbUrl(m.thumb)} alt={m.label} loading="lazy" />
+                        <span>{m.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

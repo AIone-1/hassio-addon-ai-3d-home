@@ -263,7 +263,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       const [x, y] = snap(toWorld(e))
       const fl = getState().project.floors[floorIndex]
       fl.furniture = fl.furniture || []
-      fl.furniture.push({ id: uid(), type: furnitureType, pos: [x, 0, y], rot: 0, scale: [1, 1, 1] })
+      const s = getState().furnitureScale || 1
+      fl.furniture.push({ id: uid(), type: furnitureType, pos: [x, 0, y], rot: 0, scale: [s, s, s] })
       setState({ project: { ...getState().project }, saved: false })
       return
     }
