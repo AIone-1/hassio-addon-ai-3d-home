@@ -237,7 +237,7 @@ function Opening({ op, floor, level }) {
         <group position={[-wd / 2, 0, 0]} rotation={[0, -0.58, 0]}>
           <mesh position={[wd / 2, doorH / 2, 0.03]} castShadow>
             <boxGeometry args={[wd * 0.96, doorH * 0.97, 0.045]} />
-            <meshStandardMaterial color="#b78b61" roughness={0.72} metalness={0.012} />
+            <meshStandardMaterial color="#4a7ab5" roughness={0.72} metalness={0.012} />
           </mesh>
           {/* 把手 */}
           <mesh position={[wd * 0.8, doorH * 0.54, 0.065]}>
