@@ -6,6 +6,7 @@ import { FURNITURE_LIB, FURNITURE_COLORS } from '../three/geometry'
 const LEFT_TOOLS = [
   { id: 'select', label: '选择', k: 'V' },
   { id: 'move', label: '移动', k: 'M' },
+  { id: 'movePlan', label: '移动户型', k: 'G' },
   { id: 'pan', label: '平移', k: 'H' },
   { id: 'wall', label: '墙体', k: 'W' },
   { id: 'door', label: '门', k: 'D' },

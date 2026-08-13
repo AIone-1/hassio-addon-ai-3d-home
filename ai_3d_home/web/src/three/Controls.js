@@ -19,17 +19,20 @@ export function Controls({ enabled = true }) {
   const target = useStore((s) => s.camTarget)
   const view2d = useStore((s) => s.view2d)
   const tool = useStore((s) => s.tool)
+  const autoRotate = useStore((s) => s.autoRotate)
 
   useEffect(() => {
     const c = new ThreeOrbitControls(camera, gl.domElement)
     c.enableDamping = true
     c.dampingFactor = 0.08
+    c.autoRotateSpeed = 1.2
     // 相机切换（2D↔3D 正交/透视）时 OrbitControls 会重建，默认 target=(0,0,0)、enableRotate=true。
     // 必须立刻按当前状态重置，否则 2D 视图会偏到原点、还能被旋转（不规整的根因）。
     const st = getState()
     if (st.camTarget) c.target.set(st.camTarget[0], st.camTarget[1], st.camTarget[2])
     c.enableRotate = !st.view2d && st.tool !== 'pan'
     c.mouseButtons = mouseButtons(st.view2d, st.tool)
+    c.autoRotate = st.autoRotate
     ref.current = c
     return () => c.dispose()
   }, [camera, gl])
@@ -41,6 +44,11 @@ export function Controls({ enabled = true }) {
       ref.current.mouseButtons = mouseButtons(view2d, tool)
     }
   }, [view2d, tool])
+
+  // 自动旋转（绕 target=户型中心，不再绕原点偏移）
+  useEffect(() => {
+    if (ref.current) ref.current.autoRotate = autoRotate
+  }, [autoRotate])
 
   useEffect(() => {
     if (ref.current && target) ref.current.target.set(target[0], target[1], target[2])

@@ -1,8 +1,8 @@
 import { useMemo, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore, setState } from '../store'
-import { roomWallSegments, FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK, robustFloorGeometry, wallKey } from '../three/geometry'
+import { FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK, robustFloorGeometry } from '../three/geometry'
 
 // 加粗画图网格（用细长方体做线，比 gridHelper 的 1px 清晰得多）
 function DrawingGrid({ size = 20, cell = 1, level, night }) {
@@ -266,13 +266,11 @@ export default function Scene({ onSelect, floorIndex }) {
   const floor = useStore((s) => s.project.floors[floorIndex])
   const night = useStore((s) => s.night)
   const shadows = useStore((s) => s.shadows)
-  const autoRotate = useStore((s) => s.autoRotate)
   const selected = useStore((s) => s.selected)
   const tool = useStore((s) => s.tool)
   const mode = useStore((s) => s.mode)
   const view2d = useStore((s) => s.view2d)
   const editing = useStore((s) => s.editing)
-  const rootRef = useRef()
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
   const interactive = tool === 'select' || tool === 'delete'
@@ -283,28 +281,6 @@ export default function Scene({ onSelect, floorIndex }) {
   const handleMoveFurniture = () => {
     setState({ project: { ...project }, saved: false })
   }
-
-  // 收集所有房间的墙段并去重共享墙（相邻房间共用一堵墙只渲染一次，记录归属房间用于选中高亮）
-  const wallSegs = useMemo(() => {
-    const seen = new Map()
-    for (const room of (floor?.rooms || [])) {
-      for (const seg of roomWallSegments(room)) {
-        const k = wallKey(seg)
-        if (seen.has(k)) {
-          seen.get(k).roomIds.add(room.id)
-        } else {
-          seen.set(k, { seg, roomIds: new Set([room.id]), h: room.height || floor.height || 2.8 })
-        }
-      }
-    }
-    return Array.from(seen.values())
-  }, [JSON.stringify((floor?.rooms || []).map((r) => r.points))])
-
-  useFrame((_, delta) => {
-    if (autoRotate && !view2d && rootRef.current) {
-      rootRef.current.rotation.y += (20 * Math.PI / 180) * Math.min(delta, 0.1)
-    }
-  })
 
   if (!floor) return null
   const level = floor.level || 0
@@ -324,7 +300,7 @@ export default function Scene({ onSelect, floorIndex }) {
         shadow-bias={-0.00016}
       />
 
-      <group ref={rootRef}>
+      <group>
         {/* 2D 模式：无房间时显示白色画图平面（编辑界面用干净表面，背景图不在这里生效） */}
         {view2d && (floor.rooms || []).length === 0 && (
           <mesh position={[0, level - 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -342,17 +318,17 @@ export default function Scene({ onSelect, floorIndex }) {
           />
         )}
 
-        {/* 手绘墙段（墙体工具直接画的，毛玻璃材质对齐原版；删除模式可点） */}
+        {/* 墙（持久化线段，毛玻璃材质对齐原版；删除模式可点） */}
         {(floor.walls || []).map((w, i) => {
-          const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1])
-          if (len < 0.01) return null
+          const len = Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
+          if (len < 0.001) return null
           const h = floor.height || 2.8
-          const mx = (w.a[0] + w.b[0]) / 2
-          const mz = (w.a[1] + w.b[1]) / 2
-          const ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0])
+          const mx = (w.start[0] + w.end[0]) / 2
+          const mz = (w.start[1] + w.end[1]) / 2
+          const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0])
           return (
             <mesh
-              key={i}
+              key={w.id || i}
               position={[mx, h / 2 + level, mz]}
               rotation={[0, -ang, 0]}
               onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) } : undefined}
@@ -360,7 +336,7 @@ export default function Scene({ onSelect, floorIndex }) {
               <boxGeometry args={[len, view2d ? 0.01 : h, WALL_THICK]} />
               {view2d
                 ? <meshBasicMaterial color="#3a4a66" />
-                : <meshPhysicalMaterial color="#ffffff" transparent opacity={0.45} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />}
+                : <meshPhysicalMaterial color="#f5f2ec" transparent opacity={0.35} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />}
             </mesh>
           )
         })}
@@ -371,25 +347,6 @@ export default function Scene({ onSelect, floorIndex }) {
             interactive={interactive}
             onSelect={(r) => onSelect({ type: 'room', ref: r })} />
         ))}
-
-        {/* 墙（去重共享墙；2D 深色实线，3D 毛玻璃材质对齐原版；选中房间的墙高亮） */}
-        {wallSegs.map(({ seg, roomIds, h }, i) => {
-          const len = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1])
-          if (len < 0.001) return null
-          const mx = (seg.a[0] + seg.b[0]) / 2
-          const mz = (seg.a[1] + seg.b[1]) / 2
-          const ang = Math.atan2(seg.b[1] - seg.a[1], seg.b[0] - seg.a[0])
-          const isSel = sel && sel.type === 'room' && roomIds.has(sel.ref.id)
-          const wallColor = isSel ? '#2f7fe0' : (view2d ? '#3a4a66' : '#f5f2ec')
-          return (
-            <mesh key={`wall${i}`} position={[mx, h / 2 + level, mz]} rotation={[0, -ang, 0]}>
-              <boxGeometry args={[len, view2d ? 0.01 : h, WALL_THICK]} />
-              {view2d
-                ? <meshBasicMaterial color={wallColor} />
-                : <meshPhysicalMaterial color={wallColor} transparent opacity={isSel ? 0.6 : 0.35} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />}
-            </mesh>
-          )
-        })}
 
         {/* 门窗 */}
         {(floor.openings || []).map((op) => <Opening key={op.id} op={op} floor={floor} level={level} />)}

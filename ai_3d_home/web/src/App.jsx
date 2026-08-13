@@ -6,6 +6,7 @@ import Editor from './components/Editor'
 import BindDrawer from './components/BindDrawer'
 import { useStore, setState, getState, toast } from './store'
 import { api, TOGGLE_DOMAINS, BASE } from './api'
+import { roomsToWalls, recomputeRooms } from './three/geometry'
 
 export default function App() {
   const project = useStore((s) => s.project)
@@ -48,6 +49,17 @@ export default function App() {
               height: 2.8, color: '#e6dcc8', rooms: [], walls: [], furniture: [], devices: [], openings: [],
             })
           }
+          // 迁移 + 一致化：墙是主数据，房间自动检测
+          p.floors.forEach((f) => {
+            // 旧数据：有房间但没墙 → 从房间多边形反推墙段
+            if ((!f.walls || f.walls.length === 0) && (f.rooms || []).length > 0) {
+              f.walls = roomsToWalls(f.rooms)
+            }
+            // 只要有墙，就重算房间（覆盖旧数据 + 房间为空的异常态）
+            if (f.walls && f.walls.length > 0) {
+              f.rooms = recomputeRooms(f)
+            }
+          })
           setState({ project: p, currentFloor: 0 })
         }
       } catch (e) {}
@@ -94,7 +106,10 @@ export default function App() {
       if (sel.type === 'room') floor.rooms = floor.rooms.filter((r) => r.id !== sel.ref.id)
       else if (sel.type === 'furniture') floor.furniture = floor.furniture.filter((f) => f.id !== sel.ref.id)
       else if (sel.type === 'device') floor.devices = floor.devices.filter((d) => d.id !== sel.ref.id)
-      else if (sel.type === 'wall' && sel.index != null) floor.walls.splice(sel.index, 1)
+      else if (sel.type === 'wall' && sel.index != null) {
+        floor.walls.splice(sel.index, 1)
+        floor.rooms = recomputeRooms(floor)
+      }
       setState({ project: { ...st.project }, saved: false, selected: null })
       toast('已删除')
       return
@@ -128,8 +143,8 @@ export default function App() {
         setDeviceModal(null)
         setState({ editing: false, bindOpen: false, pendingEntity: null, selected: null, view2d: false, settingsOpen: false, tool: 'select' })
       }
-      // 工具快捷键 V/M/H/W/D/N/F/E/B
-      const map = { v: 'select', m: 'move', h: 'pan', w: 'wall', d: 'door', n: 'window', f: 'furniture', e: 'device', b: 'texture' }
+      // 工具快捷键 V/M/G/H/W/D/N/F/E/B
+      const map = { v: 'select', m: 'move', g: 'movePlan', h: 'pan', w: 'wall', d: 'door', n: 'window', f: 'furniture', e: 'device', b: 'texture' }
       if (map[e.key.toLowerCase()] && editing) {
         setState({ tool: map[e.key.toLowerCase()] })
       }

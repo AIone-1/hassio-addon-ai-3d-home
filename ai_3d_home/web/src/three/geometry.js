@@ -101,3 +101,211 @@ export function robustFloorGeometry(points, THREE) {
   geo.computeVertexNormals()
   return geo
 }
+
+// ==================== 墙体多边形化（对齐原版 _l + $l） ====================
+// 墙是线段（start/end），房间从墙段的封闭环自动检测出来——这就是"共用墙/相交线也封闭"的机制
+
+// 线段-线段交点（含端点），无交点返回 null
+export function segmentIntersect(a, b, c, d) {
+  const ab = [b[0] - a[0], b[1] - a[1]]
+  const cd = [d[0] - c[0], d[1] - c[1]]
+  const cross = ab[0] * cd[1] - ab[1] * cd[0]
+  if (Math.abs(cross) < 1e-6) return null
+  const ac = [c[0] - a[0], c[1] - a[1]]
+  const t = (ac[0] * cd[1] - ac[1] * cd[0]) / cross
+  const u = (ac[0] * ab[1] - ac[1] * ab[0]) / cross
+  if (t < -1e-5 || t > 1 + 1e-5 || u < -1e-5 || u > 1 + 1e-5) return null
+  return [a[0] + t * ab[0], a[1] + t * ab[1]]
+}
+
+// 点是否在线段上
+export function pointOnSeg(p, a, b) {
+  const ab = [b[0] - a[0], b[1] - a[1]]
+  const ap = [p[0] - a[0], p[1] - a[1]]
+  if (Math.abs(ab[0] * ap[1] - ab[1] * ap[0]) > 1e-5) return false
+  const dot = ap[0] * ab[0] + ap[1] * ab[1]
+  const len2 = ab[0] * ab[0] + ab[1] * ab[1]
+  return dot >= -1e-5 && dot <= len2 + 1e-5
+}
+
+const _pk = (p) => `${Math.round(p[0] * 1e4)},${Math.round(p[1] * 1e4)}`
+const _dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
+
+// 有符号面积（shoelace，正=逆时针，负=顺时针）——去重时只用正值，排除外环/反向重复面
+function _signedArea(points) {
+  let area = 0
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i], b = points[(i + 1) % points.length]
+    area += a[0] * b[1] - b[0] * a[1]
+  }
+  return area / 2
+}
+
+// 去掉连续重复点 / 共线点（闭合环清洗）
+function cleanLoop(points) {
+  let t = points
+  let changed = true
+  while (changed && t.length > 3) {
+    changed = false
+    t = t.filter((p, i) => {
+      const l = t[(i - 1 + t.length) % t.length]
+      const h = t[(i + 1) % t.length]
+      const dup = _dist2(p, l) < 1e-10
+      const dup2 = _dist2(l, h) < 1e-10
+      const cross = (h[0] - p[0]) * (l[1] - p[1]) - (h[1] - p[1]) * (l[0] - p[0])
+      const collinear = Math.abs(cross) <= 1e-5
+      if (dup || dup2 || collinear) changed = true
+      return !dup && !dup2 && !collinear
+    })
+  }
+  return t
+}
+
+// 多边形质心
+export function centroid(points) {
+  const a = polygonArea(points)
+  if (a < 1e-9) return points.reduce((s, p) => [s[0] + p[0], s[1] + p[1]], [0, 0]).map((v) => v / points.length)
+  let cx = 0, cy = 0
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i], q = points[(i + 1) % points.length]
+    const cross = p[0] * q[1] - q[0] * p[1]
+    cx += (p[0] + q[0]) * cross
+    cy += (p[1] + q[1]) * cross
+  }
+  return [cx / (6 * a), cy / (6 * a)]
+}
+
+// 点是否在多边形内（射线法）
+export function pointInPolygon(p, points) {
+  let inside = false
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i], b = points[j]
+    if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside
+  }
+  return inside
+}
+
+// 从旧版房间多边形反推墙段（迁移用，去重共享墙）
+export function roomsToWalls(rooms) {
+  const seen = new Set()
+  const walls = []
+  for (const room of rooms || []) {
+    const pts = room.points || room.polygon || []
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length]
+      const k = wallKey({ a, b })
+      if (!seen.has(k)) {
+        seen.add(k)
+        walls.push({ id: `w-${walls.length}`, start: a, end: b })
+      }
+    }
+  }
+  return walls
+}
+
+// 从墙段数组检测所有封闭房间（返回多边形顶点数组 [x,z]）
+// walls: [{ start:[x,z], end:[x,z] }]
+export function detectRooms(walls) {
+  if (!walls || walls.length < 3) return []
+  // 1. 每条墙段收集其上的所有交点 + 落在其上的其它墙端点
+  const wallPts = walls.map((w) => [w.start, w.end])
+  for (let i = 0; i < walls.length; i++) {
+    for (let j = i + 1; j < walls.length; j++) {
+      const a = walls[i], b = walls[j]
+      const ip = segmentIntersect(a.start, a.end, b.start, b.end)
+      if (ip) { wallPts[i].push(ip); wallPts[j].push(ip) }
+      if (pointOnSeg(b.start, a.start, a.end)) wallPts[i].push(b.start)
+      if (pointOnSeg(b.end, a.start, a.end)) wallPts[i].push(b.end)
+      if (pointOnSeg(a.start, b.start, b.end)) wallPts[j].push(a.start)
+      if (pointOnSeg(a.end, b.start, b.end)) wallPts[j].push(a.end)
+    }
+  }
+  // 2. 每条墙段内去重点并沿方向排序 → 建平面图（节点/边/邻接）
+  const nodes = new Map()
+  const edges = new Map()
+  walls.forEach((w, idx) => {
+    const dir = [w.end[0] - w.start[0], w.end[1] - w.start[1]]
+    const len2 = dir[0] * dir[0] + dir[1] * dir[1] || 1
+    const sorted = [...new Map(wallPts[idx].map((p) => [_pk(p), p])).values()].sort((p, q) => {
+      const tp = ((p[0] - w.start[0]) * dir[0] + (p[1] - w.start[1]) * dir[1]) / len2
+      const tq = ((q[0] - w.start[0]) * dir[0] + (q[1] - w.start[1]) * dir[1]) / len2
+      return tp - tq
+    })
+    for (let k = 0; k < sorted.length - 1; k++) {
+      const a = sorted[k], b = sorted[k + 1]
+      if (_dist2(a, b) < 1e-10) continue
+      const ka = _pk(a), kb = _pk(b)
+      nodes.set(ka, a); nodes.set(kb, b)
+      const ek = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`
+      edges.set(ek, [ka, kb])
+    }
+  })
+  const adj = new Map()
+  for (const [a, b] of edges.values()) {
+    if (!adj.has(a)) adj.set(a, new Set())
+    if (!adj.has(b)) adj.set(b, new Set())
+    adj.get(a).add(b); adj.get(b).add(a)
+  }
+  // 3. 面遍历（右手规则）找封闭环
+  const visited = new Set()
+  const dkey = (a, b) => `${a}>${b}`
+  const trace = (a, b) => {
+    const loop = []
+    let cur = a, next = b
+    const maxSteps = edges.size * 2 + 2
+    for (let s = 0; s < maxSteps; s++) {
+      const dk = dkey(cur, next)
+      if (visited.has(dk)) return null
+      visited.add(dk)
+      loop.push(cur)
+      const pt = nodes.get(next)
+      const nbrs = [...(adj.get(next) || [])]
+      if (!pt || nbrs.length < 1) return null
+      nbrs.sort((x, y) => {
+        const px = nodes.get(x), py = nodes.get(y)
+        return Math.atan2(px[1] - pt[1], px[0] - pt[0]) - Math.atan2(py[1] - pt[1], py[0] - pt[0])
+      })
+      const gi = nbrs.indexOf(cur)
+      if (gi < 0) return null
+      const turn = nbrs[(gi - 1 + nbrs.length) % nbrs.length]
+      cur = next; next = turn
+      if (cur === a && next === b) break
+    }
+    if (loop.length < 3) return null
+    return cleanLoop(loop.map((k) => nodes.get(k)))
+  }
+  const rooms = []
+  for (const [a, b] of edges.values()) {
+    for (const [u, v] of [[a, b], [b, a]]) {
+      if (visited.has(dkey(u, v))) continue
+      const face = trace(u, v)
+      if (face && _signedArea(face) > 0.25) rooms.push(face)
+    }
+  }
+  return rooms
+}
+
+// 从墙段重算房间（检测封闭环 + 按质心重叠匹配旧房间，保留 id/名字/颜色）
+export function recomputeRooms(floor) {
+  const polys = detectRooms(floor.walls || [])
+  const old = floor.rooms || []
+  const used = new Set()
+  return polys.map((poly, i) => {
+    const c = centroid(poly)
+    const match = old
+      .filter((r) => !used.has(r.id))
+      .map((r) => ({ room: r, center: centroid(r.points || r.polygon || []) }))
+      .filter(({ room, center }) => pointInPolygon(c, room.points || room.polygon) || pointInPolygon(center, poly))
+      .sort((a, b) => _dist2(c, a.center) - _dist2(c, b.center))[0]
+    if (match) used.add(match.room.id)
+    return {
+      id: match ? match.room.id : `r-${i}-${Math.random().toString(36).slice(2, 7)}`,
+      name: match ? match.room.name : `房间${i + 1}`,
+      points: poly,
+      height: (match ? match.room.height : undefined) || floor.height || 2.8,
+      color: (match ? match.room.color : undefined) || '#d8cbb2',
+    }
+  })
+}
+
+

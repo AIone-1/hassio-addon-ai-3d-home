@@ -1,7 +1,8 @@
 // 独立 SVG 2D 户型编辑器（对齐 JMGLink 原版：SVG + viewBox 缩放平移，与 3D WebGL 完全隔离，永远规整）
+// 墙是线段（floor.walls 持久化），房间由墙段的封闭环自动检测（recomputeRooms）——这就是"共用墙/相交也封闭"的机制
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
-import { FURNITURE_LIB, FURNITURE_COLORS, roomWallSegments, wallKey, polygonArea, cleanPolygon } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, recomputeRooms } from '../three/geometry'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
 const SNAP = 0.5       // 吸附 0.5m
@@ -15,6 +16,7 @@ function floorBounds(floor) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   const add = (x, y) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   ;(floor?.rooms || []).forEach(r => (r.points || []).forEach(p => add(p[0], p[1])))
+  ;(floor?.walls || []).forEach(w => { add(w.start[0], w.start[1]); add(w.end[0], w.end[1]) })
   ;(floor?.furniture || []).forEach(f => add(f.pos[0], f.pos[2]))
   ;(floor?.devices || []).forEach(d => add(d.pos[0], d.pos[2]))
   if (!isFinite(minX)) { minX = -5; minY = -5; maxX = 5; maxY = 5 }
@@ -62,30 +64,19 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const [size, setSize] = useState({ w: 1, h: 1 })
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState([0, 0])
-  const [draft, setDraft] = useState(null)   // { pts: [[x,y],...] }
-  const [cursor, setCursor] = useState(null)  // [x,y] 世界坐标（已吸附）
-  const dragRef = useRef(null)                // 拖动的家具/设备对象
-  const panRef = useRef(null)                 // { w:[x,y], p:[x,y] } 平移起点（世界点 + 旧 pan）
+  const [draft, setDraft] = useState(null)     // { pts: [[x,y],...], walls: [墙对象] } 画墙草稿
+  const [cursor, setCursor] = useState(null)    // [x,y] 世界坐标（已吸附）
+  const dragRef = useRef(null)                  // 拖动的家具/设备对象
+  const panRef = useRef(null)                   // { w:[x,y], p:[x,y] } 平移起点
+  const planMoveRef = useRef(null)              // 移动户型的起点世界坐标
 
-  const bounds = useMemo(() => floorBounds(floor), [floor?.rooms, floor?.furniture, floor?.devices])
+  const bounds = useMemo(() => floorBounds(floor), [floor?.rooms, floor?.walls, floor?.furniture, floor?.devices])
   const aspect = size.w / size.h
   const fitted = useMemo(() => fitBounds(bounds, aspect), [bounds, aspect])
   const vbW = fitted.width / zoom
   const vbH = fitted.height / zoom
   const vbX = fitted.minX + (fitted.width - vbW) / 2 + pan[0]
   const vbY = fitted.minY + (fitted.height - vbH) / 2 + pan[1]
-
-  // 去重共享墙（相邻房间共用一堵墙只画一次）
-  const wallSegs = useMemo(() => {
-    const seen = new Map()
-    for (const room of (floor?.rooms || [])) {
-      for (const seg of roomWallSegments(room)) {
-        const k = wallKey(seg)
-        if (!seen.has(k)) seen.set(k, seg)
-      }
-    }
-    return Array.from(seen.values())
-  }, [JSON.stringify((floor?.rooms || []).map(r => r.points))])
 
   // ---------- 坐标 / 吸附 / 缩放 ----------
   const toWorld = (e) => {
@@ -97,7 +88,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     return [w.x, w.y]
   }
 
-  // 网格吸附 + 画墙轴向吸附（水平/垂直，让房间规整）
+  // 网格吸附 + 画墙轴向吸附（水平/垂直，让房间规整）+ 端点吸附
   const snap = (pt) => {
     let [x, y] = pt
     if (snapOn) { x = Math.round(x / SNAP) * SNAP; y = Math.round(y / SNAP) * SNAP }
@@ -106,6 +97,17 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       const dx = x - last[0], dy = y - last[1]
       if (Math.abs(dx) > 0.01 && Math.abs(dy / dx) < 0.18) y = last[1]
       else if (Math.abs(dy) > 0.01 && Math.abs(dx / dy) < 0.18) x = last[0]
+    }
+    // 端点吸附：吸附到已有墙段端点，便于共用墙精准连接
+    if (tool === 'wall') {
+      let best = null, bd = 0.25
+      for (const w of (floor?.walls || [])) {
+        for (const p of [w.start, w.end]) {
+          const d = Math.hypot(x - p[0], y - p[1])
+          if (d < bd) { bd = d; best = p }
+        }
+      }
+      if (best) { x = best[0]; y = best[1] }
     }
     return [x, y]
   }
@@ -131,25 +133,64 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setZoom(t)
   }
 
-  // 闭合画墙草稿 → 生成房间
-  const closeRoom = (pts) => {
-    const cleaned = cleanPolygon(pts)
-    if (cleaned.length >= 3) {
-      const fl = getState().project.floors[floorIndex]
-      fl.rooms = fl.rooms || []
-      fl.rooms.push({
-        id: uid(), name: `房间${fl.rooms.length + 1}`,
-        height: fl.height || 2.8, color: '#d8cbb2', points: cleaned,
-      })
-      fl.walls = []
-      setState({ project: { ...getState().project }, saved: false })
-      toast(`房间已生成（当前共 ${fl.rooms.length} 个）`)
+  // ---------- 画墙：墙段持久化 + 自动检测房间 ----------
+  const closeDraft = () => {
+    if (!draft || draft.pts.length < 3) { setDraft(null); return }
+    const fl = getState().project.floors[floorIndex]
+    fl.walls = fl.walls || []
+    const first = draft.pts[0], last = draft.pts[draft.pts.length - 1]
+    if (Math.hypot(last[0] - first[0], last[1] - first[1]) > 0.01) {
+      fl.walls.push({ id: uid(), start: [...last], end: [...first] })
     }
+    fl.rooms = recomputeRooms(fl)
     setDraft(null)
+    setState({ project: { ...getState().project }, saved: false })
+    toast(fl.rooms.length ? `已识别 ${fl.rooms.length} 个房间` : '墙体尚未形成封闭房间')
+  }
+
+  const addWallPoint = (raw) => {
+    const fl = getState().project.floors[floorIndex]
+    fl.walls = fl.walls || []
+    if (!draft || !draft.pts.length) {
+      setDraft({ pts: [snap(raw)], walls: [] })
+      return
+    }
+    const first = draft.pts[0]
+    const gx = snapOn ? Math.round(raw[0] / SNAP) * SNAP : raw[0]
+    const gy = snapOn ? Math.round(raw[1] / SNAP) * SNAP : raw[1]
+    if (draft.pts.length >= 3 && Math.hypot(gx - first[0], gy - first[1]) < CLOSE) {
+      closeDraft()
+      return
+    }
+    const [x, y] = snap(raw)
+    const last = draft.pts[draft.pts.length - 1]
+    if (Math.hypot(x - last[0], y - last[1]) < 0.01) return  // 点重复，忽略
+    const w = { id: uid(), start: [...last], end: [x, y] }
+    fl.walls.push(w)
+    setDraft({ pts: [...draft.pts, [x, y]], walls: [...draft.walls, w] })
+    setState({ project: { ...getState().project }, saved: false })
+  }
+
+  const cancelDraft = () => {
+    if (!draft) return
+    const fl = getState().project.floors[floorIndex]
+    fl.walls = (fl.walls || []).filter(w => !draft.walls.includes(w))
+    fl.rooms = recomputeRooms(fl)
+    setDraft(null)
+    setState({ project: { ...getState().project }, saved: false })
+    toast('已取消')
+  }
+
+  // ---------- 移动整个户型 ----------
+  const moveFloorBy = (dx, dy) => {
+    const fl = getState().project.floors[floorIndex]
+    ;(fl.rooms || []).forEach(r => { r.points = (r.points || []).map(p => [p[0] + dx, p[1] + dy]) })
+    ;(fl.walls || []).forEach(w => { w.start = [w.start[0] + dx, w.start[1] + dy]; w.end = [w.end[0] + dx, w.end[1] + dy] })
+    ;(fl.furniture || []).forEach(f => { f.pos[0] += dx; f.pos[2] += dy })
+    ;(fl.devices || []).forEach(d => { d.pos[0] += dx; d.pos[2] += dy })
   }
 
   // ---------- 副作用 ----------
-  // 测量 SVG 实际尺寸（算宽高比用）
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
@@ -163,10 +204,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     return () => ro.disconnect()
   }, [])
 
-  // 居中：重置缩放/平移/草稿
   useEffect(() => { setZoom(1); setPan([0, 0]); setDraft(null); dragRef.current = null }, [recenterKey])
 
-  // 放大/缩小信号（编辑器底部 +/− 按钮，绕画布中心缩放）
   useEffect(() => {
     if (!zoomDelta) return
     const svg = svgRef.current
@@ -176,16 +215,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setState({ planZoomDelta: 0 })
   }, [zoomDelta])
 
-  // Enter 闭合画墙草稿
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Enter' && draft && draft.pts.length >= 3) closeRoom(draft.pts)
+      if (e.key === 'Enter' && draft && draft.pts.length >= 3) closeDraft()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [draft])
+  }, [draft, floorIndex])
 
-  // 滚轮缩放（手动非 passive 监听，才能 preventDefault 阻止页面滚动）
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
@@ -201,7 +238,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   // ---------- 交互 ----------
   const handleFloorDown = (e) => {
     if (e.button === 2) {
-      if (draft) { setDraft(null); toast('已取消') }
+      if (draft) cancelDraft()
       return
     }
     if (e.button === 1 || tool === 'pan') {
@@ -212,17 +249,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     }
     if (e.button !== 0) return
 
-    if (tool === 'wall') {
-      const raw = toWorld(e)
-      const gx = snapOn ? Math.round(raw[0] / SNAP) * SNAP : raw[0]
-      const gy = snapOn ? Math.round(raw[1] / SNAP) * SNAP : raw[1]
-      const first = draft && draft.pts[0]
-      if (first && Math.hypot(gx - first[0], gy - first[1]) < CLOSE) {
-        closeRoom(draft.pts)  // 点回起点闭合
-      } else {
-        const [x, y] = snap(raw)
-        setDraft({ pts: [...(draft ? draft.pts : []), [x, y]] })
-      }
+    if (tool === 'wall') { addWallPoint(toWorld(e)); return }
+    if (tool === 'movePlan') {
+      planMoveRef.current = toWorld(e)
+      svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
       return
     }
     if (tool === 'furniture') {
@@ -242,7 +272,6 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setState({ project: { ...getState().project }, pendingEntity: null, bindOpen: false, saved: false })
       return
     }
-    // select/move：点空白处取消选中（元素点击由元素自身处理并 stopPropagation）
     if (tool === 'select' || tool === 'move') setState({ selected: null })
   }
 
@@ -251,6 +280,13 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     if (panRef.current) {
       const p = panRef.current
       setPan([p.p[0] + p.w[0] - w[0], p.p[1] + p.w[1] - w[1]])
+      return
+    }
+    if (planMoveRef.current) {
+      const dx = w[0] - planMoveRef.current[0], dy = w[1] - planMoveRef.current[1]
+      moveFloorBy(dx, dy)
+      planMoveRef.current = w
+      setState({ project: { ...getState().project }, saved: false })
       return
     }
     if (dragRef.current) {
@@ -267,9 +303,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const handleUp = () => {
     panRef.current = null
     dragRef.current = null
+    planMoveRef.current = null
   }
 
-  // 元素：移动工具下开始拖动；select 下点击选中/删除
   const startDrag = (e, type, obj) => {
     if (tool !== 'move') return
     e.stopPropagation()
@@ -278,7 +314,6 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
   }
   const clickEl = (e, type, ref) => {
-    // 只在选择/删除工具下拦截元素点击；画墙/放家具/放设备时让点击穿透到背景
     if (tool !== 'select' && tool !== 'delete') return
     e.stopPropagation()
     onSelect({ type, ref })
@@ -286,6 +321,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
 
   const isSel = (type, id) => selected && selected.type === type && selected.ref && selected.ref.id === id
   const rooms = floor?.rooms || []
+  const walls = floor?.walls || []
   const furniture = floor?.furniture || []
   const devices = floor?.devices || []
 
@@ -319,6 +355,13 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         fill="url(#plan-major-grid)"
       />
 
+      {/* 中心点标记（原点 = 3D 旋转中心，帮助对齐） */}
+      <g className="plan-origin">
+        <line x1={-0.5} y1={0} x2={0.5} y2={0} />
+        <line x1={0} y1={-0.5} x2={0} y2={0.5} />
+        <circle r={0.12} />
+      </g>
+
       {/* 房间：多边形 + 名字 + 面积 */}
       {rooms.map(room => {
         const cx = room.points.reduce((s, p) => s + p[0], 0) / room.points.length
@@ -336,13 +379,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         )
       })}
 
-      {/* 墙（去重共享墙） */}
-      {wallSegs.map((seg, i) => (
+      {/* 墙（持久化线段，删除模式可点） */}
+      {walls.map((w, i) => (
         <line
-          key={`w${i}`}
-          x1={seg.a[0]} y1={seg.a[1]} x2={seg.b[0]} y2={seg.b[1]}
+          key={w.id || `w${i}`}
+          x1={w.start[0]} y1={w.start[1]} x2={w.end[0]} y2={w.end[1]}
           className="plan-wall"
           strokeWidth={WALL_T}
+          onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) } : undefined}
         />
       ))}
 
@@ -386,16 +430,6 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           </g>
         )
       })}
-
-      {/* 画墙草稿（已点的墙段） */}
-      {draft && draft.pts.length > 1 && draft.pts.slice(1).map((p, i) => (
-        <line
-          key={`d${i}`}
-          x1={draft.pts[i][0]} y1={draft.pts[i][1]} x2={p[0]} y2={p[1]}
-          className="plan-wall-draft"
-          strokeWidth={WALL_T}
-        />
-      ))}
 
       {/* 画墙虚线预览（最后一个点 → 光标） */}
       {draft && draft.pts.length > 0 && cursor && tool === 'wall' && (
