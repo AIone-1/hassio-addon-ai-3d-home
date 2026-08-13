@@ -180,47 +180,114 @@ function FurnitureModel({ type }) {
           {[-0.28, -0.1, 0.1, 0.28].map((V, b) => <FBox key={`bk${V}`} position={[V * w, h * (0.26 + (b % 2) * 0.2), -d * 0.08]} size={[w * 0.1, h * 0.16, d * 0.42]} color={b % 2 ? '#8198a8' : '#9f8d7f'} roughness={0.66} />)}
         </group>
       )
-    case '马桶':
+    case '马桶': {
+      const bowl = (topR, botR, hh, y) => (
+        <mesh position={[0, y, -d * 0.08]} castShadow receiveShadow>
+          <cylinderGeometry args={[topR, botR, hh, 40]} />
+          <meshPhysicalMaterial color="#f4f5f6" roughness={0.18} metalness={0.01} clearcoat={0.55} clearcoatRoughness={0.2} />
+        </mesh>
+      )
       return (
         <group>
-          {/* 水箱（后） */}
-          <FBox position={[0, h * 0.72, d * 0.28]} size={[w * 0.9, h * 0.45, d * 0.28]} color="#f2f2f2" roughness={0.3} />
-          {/* 座体（前） */}
-          <FBox position={[0, h * 0.32, -d * 0.1]} size={[w * 0.88, h * 0.38, d * 0.5]} color="#f2f2f2" roughness={0.3} />
-          {/* 马桶盖 */}
-          <FBox position={[0, h * 0.55, -d * 0.1]} size={[w * 0.95, h * 0.06, d * 0.5]} color="#e0e0e0" roughness={0.35} />
-          {/* 底座 */}
-          <FBox position={[0, h * 0.06, -d * 0.12]} size={[w * 0.7, h * 0.12, d * 0.35]} color="#e8e8e8" roughness={0.4} />
+          {/* 水箱（后，微圆弧） */}
+          <mesh position={[0, h * 0.52, d * 0.27]} castShadow receiveShadow>
+            <cylinderGeometry args={[w * 0.5, w * 0.5, h * 0.48, 40]} />
+            <meshPhysicalMaterial color="#f4f5f6" roughness={0.18} metalness={0.01} clearcoat={0.55} clearcoatRoughness={0.2} />
+          </mesh>
+          {/* 水箱盖 */}
+          <mesh position={[0, h * 0.78, d * 0.27]}>
+            <cylinderGeometry args={[w * 0.52, w * 0.52, h * 0.05, 40]} />
+            <meshPhysicalMaterial color="#fafbfc" roughness={0.16} clearcoat={0.6} />
+          </mesh>
+          {/* 冲水按钮 */}
+          <mesh position={[0, h * 0.82, d * 0.27]}>
+            <cylinderGeometry args={[w * 0.09, w * 0.09, h * 0.03, 20]} />
+            <meshStandardMaterial color="#c2c7cf" roughness={0.25} metalness={0.5} />
+          </mesh>
+          {/* 座便器桶身（上宽下窄） */}
+          {bowl(w * 0.44, w * 0.34, h * 0.34, h * 0.2)}
+          {/* 上沿 rim */}
+          <mesh position={[0, h * 0.38, -d * 0.08]} rotation={[-Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[w * 0.38, w * 0.075, 14, 40]} />
+            <meshPhysicalMaterial color="#f4f5f6" roughness={0.18} clearcoat={0.55} />
+          </mesh>
+          {/* 坐垫 */}
+          <mesh position={[0, h * 0.42, -d * 0.08]} rotation={[-Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[w * 0.4, w * 0.055, 14, 40]} />
+            <meshStandardMaterial color="#dfe3e8" roughness={0.35} />
+          </mesh>
+          {/* 底座（下宽） */}
+          {bowl(w * 0.36, w * 0.42, h * 0.1, h * 0.045)}
+          {/* 进水管 */}
+          <mesh position={[w * 0.5, h * 0.6, d * 0.27]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[w * 0.045, w * 0.045, w * 0.25, 14]} />
+            <meshStandardMaterial color="#c2c7cf" metalness={0.55} roughness={0.25} />
+          </mesh>
         </group>
       )
+    }
     case '空气净化器':
       return (
         <group>
-          {/* 圆柱机身 */}
+          {/* 机身（下宽上窄圆柱） */}
           <mesh position={[0, h * 0.4, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[w * 0.5, w * 0.5, h * 0.75, 32]} />
-            <meshPhysicalMaterial color="#f0f2f5" roughness={0.4} metalness={0.01} clearcoat={0.2} clearcoatRoughness={0.6} />
+            <cylinderGeometry args={[w * 0.46, w * 0.52, h * 0.8, 48]} />
+            <meshPhysicalMaterial color="#f2f4f7" roughness={0.32} metalness={0.02} clearcoat={0.28} clearcoatRoughness={0.5} />
           </mesh>
-          {/* 顶部出风口 */}
-          <mesh position={[0, h * 0.9, 0]}>
-            <cylinderGeometry args={[w * 0.56, w * 0.56, h * 0.1, 32]} />
-            <meshStandardMaterial color="#d8dde3" roughness={0.35} />
+          {/* 底部进气格栅环 */}
+          <mesh position={[0, h * 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[w * 0.3, w * 0.52, 48]} />
+            <meshStandardMaterial color="#d5dae0" roughness={0.32} />
           </mesh>
-          {/* 前面小屏 */}
-          <FBox position={[0, h * 0.45, -w * 0.5]} size={[w * 0.3, h * 0.12, 0.02]} color="#2a2f36" roughness={0.4} />
+          {/* 顶部出风盖 */}
+          <mesh position={[0, h * 0.84, 0]}>
+            <cylinderGeometry args={[w * 0.48, w * 0.5, h * 0.1, 48]} />
+            <meshStandardMaterial color="#dfe3e8" roughness={0.28} />
+          </mesh>
+          {/* 出风格栅（同心圆环） */}
+          {[0.14, 0.26, 0.38].map((rr) => (
+            <mesh key={`g${rr}`} position={[0, h * 0.89, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[w * rr, w * rr + 0.018, 40]} />
+              <meshStandardMaterial color="#c6cbd2" roughness={0.3} />
+            </mesh>
+          ))}
+          {/* OLED 圆屏 */}
+          <mesh position={[0, h * 0.42, -w * 0.47]}>
+            <circleGeometry args={[w * 0.27, 32]} />
+            <meshStandardMaterial color="#0d1015" roughness={0.18} metalness={0.3} />
+          </mesh>
+          {/* 屏幕数字光点 */}
+          <mesh position={[0, h * 0.43, -w * 0.485]}>
+            <circleGeometry args={[w * 0.05, 16]} />
+            <meshBasicMaterial color="#8fd9ff" />
+          </mesh>
         </group>
       )
     case '电视机':
       return (
         <group>
-          {/* 边框 */}
-          <FBox position={[0, h * 0.52, 0]} size={[w * 1.02, h * 0.82, 0.04]} color="#2a2e35" roughness={0.5} />
-          {/* 屏幕 */}
-          <FBox position={[0, h * 0.52, 0.01]} size={[w * 0.94, h * 0.74, 0.02]} color="#14161a" roughness={0.25} />
-          {/* 支架立柱 */}
-          <FBox position={[0, h * 0.12, 0]} size={[0.06, h * 0.2, 0.06]} color="#3a4048" roughness={0.5} />
-          {/* 底座 */}
-          <FBox position={[0, h * 0.025, 0]} size={[w * 0.4, h * 0.05, d * 0.9]} color="#2a2e35" roughness={0.5} />
+          {/* 超薄机身 */}
+          <mesh position={[0, h * 0.5, 0]} castShadow>
+            <boxGeometry args={[w, h * 0.86, 0.028]} />
+            <meshStandardMaterial color="#1a1d22" roughness={0.42} metalness={0.1} />
+          </mesh>
+          {/* 屏幕（反光） */}
+          <mesh position={[0, h * 0.5, 0.015]}>
+            <boxGeometry args={[w * 0.955, h * 0.8, 0.006]} />
+            <meshPhysicalMaterial color="#0b0d10" roughness={0.1} metalness={0.12} clearcoat={0.65} clearcoatRoughness={0.12} />
+          </mesh>
+          {/* 下边框 logo 条 */}
+          <mesh position={[0, h * 0.06, 0.015]}>
+            <boxGeometry args={[w * 0.86, h * 0.05, 0.01]} />
+            <meshStandardMaterial color="#33383f" roughness={0.5} />
+          </mesh>
+          {/* 两个八字支脚 */}
+          {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * w * 0.36, h * 0.025, 0]} castShadow>
+              <boxGeometry args={[0.05, h * 0.05, d * 0.72]} />
+              <meshStandardMaterial color="#272b31" roughness={0.45} metalness={0.35} />
+            </mesh>
+          ))}
         </group>
       )
     default:
