@@ -63,7 +63,7 @@ export default function App() {
         const settings = await api.settings()
         setState({
           settings,
-          quality: settings.quality || 'eco',
+          quality: settings.quality || 'high',
           shadows: settings.shadows !== undefined ? settings.shadows : true,
           autoRotate: !!settings.autoRotate,
           night: !!settings.night,

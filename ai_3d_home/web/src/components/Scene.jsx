@@ -588,7 +588,7 @@ export default function Scene({ onSelect, floorIndex }) {
       <directionalLight
         position={[8, 14, 9]} intensity={night ? 0.7 : Math.max(ml.sun, 1.6)} color={ml.sunColor}
         castShadow={shadows}
-        shadow-mapSize-width={1024} shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048} shadow-mapSize-height={2048}
         shadow-camera-left={-16} shadow-camera-right={16}
         shadow-camera-top={16} shadow-camera-bottom={-16}
         shadow-bias={-0.00016}

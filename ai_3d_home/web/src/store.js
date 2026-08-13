@@ -11,7 +11,7 @@ let state = {
   planRecenterKey: 0, // SVG 2D 编辑器「居中」信号，变化时重置 zoom/pan
   planZoomDelta: 0,   // SVG 2D 编辑器「放大/缩小」信号，+1 放大 / -1 缩小
   // 视图
-  quality: 'balanced',        // eco | smooth | balanced | high
+  quality: 'high',            // eco | smooth | balanced | high
   shadows: true,
   autoRotate: false,
   rotateDir: 1,              // 自动旋转方向：1=顺时针，-1=逆时针
