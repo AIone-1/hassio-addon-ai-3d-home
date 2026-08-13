@@ -141,26 +141,12 @@ const MODE_BG = {
   '环境': '#0e1a30', '安防': '#cfe4f5',
 }
 
-// 场景背景：自定义图片 > 安防渐变天蓝 > 模式纯色
-function SceneBackground({ mode, night, bgImage }) {
+// 场景背景：按 bgMode 切换 纯色/背景图/渐变/夜景
+function SceneBackground({ mode, night, bgImage, bgMode }) {
   const scene = useThree((s) => s.scene)
 
   useEffect(() => {
-    if (bgImage) {
-      // 背景图：加正确色彩空间，避免发白；加缓存破坏参数
-      const loader = new THREE.TextureLoader()
-      loader.crossOrigin = 'anonymous'
-      loader.load(bgImage + (bgImage.includes('?') ? '&' : '?') + 't=' + Date.now(), (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace
-        scene.background = tex
-        scene.backgroundIntensity = 1
-      }, undefined, () => {
-        scene.background = new THREE.Color(night ? '#0a1020' : '#1a2a40')
-      })
-      return
-    }
-    if (mode === '安防') {
-      // 渐变天蓝（上深下浅）
+    const skyGradient = () => {
       const canvas = document.createElement('canvas')
       canvas.width = 4
       canvas.height = 512
@@ -172,11 +158,27 @@ function SceneBackground({ mode, night, bgImage }) {
       ctx.fillRect(0, 0, 4, 512)
       const tex = new THREE.CanvasTexture(canvas)
       tex.needsUpdate = true
-      scene.background = tex
-      return
+      return tex
     }
-    scene.background = new THREE.Color(night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋']))
-  }, [mode, night, bgImage])
+
+    if (bgMode === 'image' && bgImage) {
+      const loader = new THREE.TextureLoader()
+      loader.crossOrigin = 'anonymous'
+      loader.load(bgImage + (bgImage.includes('?') ? '&' : '?') + 't=' + Date.now(), (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace
+        scene.background = tex
+      }, undefined, () => {
+        scene.background = new THREE.Color('#1a2a40')
+      })
+    } else if (bgMode === 'gradient') {
+      scene.background = skyGradient()
+    } else if (bgMode === 'night') {
+      scene.background = new THREE.Color('#0a1020')
+    } else {
+      // color：跟随模式颜色
+      scene.background = new THREE.Color(night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋']))
+    }
+  }, [mode, night, bgImage, bgMode])
 
   return null
 }
@@ -189,6 +191,7 @@ export default function Viewer({ onSelect, floorIndex }) {
   const view2d = useStore((s) => s.view2d)
   const floor = useStore((s) => s.project.floors[floorIndex])
   const bgImage = useStore((s) => s.bgImage)
+  const bgMode = useStore((s) => s.bgMode)
   const containerRef = useRef(null)
   const q = QUALITY[quality] || QUALITY.balanced
   const bg = night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋'])
@@ -221,7 +224,7 @@ export default function Viewer({ onSelect, floorIndex }) {
           }
         }}
       >
-        <SceneBackground mode={mode} night={night} bgImage={bgImage} />
+        <SceneBackground mode={mode} night={night} bgImage={bgImage} bgMode={bgMode} />
         <fog attach="fog" args={[bg, night ? 30 : 40, night ? 70 : 90]} />
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />

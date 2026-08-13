@@ -146,13 +146,25 @@ function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) 
 
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
-      {/* 地板：包围盒矩形平面，任何房间都渲染（绕开剖分问题） */}
+      {/* 地板：包围盒矩形平面，任何房间都渲染 */}
       <mesh position={[bb.cx, floorY, bb.cz]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[Math.max(bb.w, 0.2), Math.max(bb.d, 0.2)]} />
         {view2d
-          ? <meshBasicMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} />
+          ? <meshBasicMaterial color={room.color || floor.color || '#e6ddc9'} side={THREE.DoubleSide} />
           : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} roughness={0.9} />}
       </mesh>
+      {/* 2D 地板描边：让房间范围一目了然 */}
+      {view2d && (
+        <lineLoop position={[0, floorY + 0.02, 0]}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              args={[Float32Array.from(pts.flatMap((p) => [p[0], 0, p[1]])), 3]}
+            />
+          </bufferGeometry>
+          <lineBasicMaterial color="#6a7a90" />
+        </lineLoop>
+      )}
       {/* 墙（2D 深色实线；3D 毛玻璃材质对齐原版） */}
       {roomWallSegments(room).map((seg, i) => {
         const len = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1])
@@ -287,8 +299,8 @@ export default function Scene({ onSelect, floorIndex }) {
       />
 
       <group ref={rootRef}>
-        {/* 2D 模式：纯白画图平面（低于地板，不盖住房间地板） */}
-        {view2d && (
+        {/* 2D 模式：只有没有房间时才显示白色画图平面（有房间时地板就是表面，避免被盖） */}
+        {view2d && (floor.rooms || []).length === 0 && (
           <mesh position={[0, level - 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[80, 80]} />
             <meshBasicMaterial color={night ? '#1c2333' : '#f7fafc'} side={THREE.DoubleSide} />

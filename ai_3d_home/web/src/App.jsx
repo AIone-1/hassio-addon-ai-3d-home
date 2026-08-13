@@ -34,6 +34,7 @@ export default function App() {
           autoRotate: !!settings.autoRotate,
           night: !!settings.night,
           bgImage: settings.bgImage || '',
+          bgMode: settings.bgMode || 'color',
         })
       } catch (e) { /* 本地开发 */ }
       try {
@@ -202,8 +203,22 @@ export default function App() {
       {settingsOpen && (
         <div className="modal-mask" onClick={() => setState({ settingsOpen: false })}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="dname">设置 · 背景图</div>
+            <div className="dname">设置 · 背景</div>
             <div className="field" style={{ margin: '12px 0' }}>
+              <label>背景效果</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[['color', '纯色'], ['image', '背景图'], ['gradient', '渐变'], ['night', '夜景']].map(([v, l]) => (
+                  <button
+                    key={v}
+                    onClick={() => { setState({ bgMode: v }); api.saveSettings({ ...getState().settings, bgMode: v }).catch(() => {}) }}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: bgMode === v ? 'var(--accent)' : 'var(--panel2)', color: bgMode === v ? '#081018' : '#fff', cursor: 'pointer' }}
+                  >{l}</button>
+                ))}
+              </div>
+            </div>
+            {bgMode === 'image' && (
+              <>
+                <div className="field" style={{ margin: '12px 0' }}>
               <label>上传图片（推荐，本地图片用它）</label>
               <input
                 type="file" accept="image/*"
@@ -222,8 +237,8 @@ export default function App() {
                       const res = await r.json()
                       if (res.ok) {
                         const url = BASE + 'api/background'
-                        setState({ bgImage: url, settingsOpen: false })
-                        api.saveSettings({ ...getState().settings, bgImage: url }).catch(() => {})
+                        setState({ bgImage: url, bgMode: 'image', settingsOpen: false })
+                        api.saveSettings({ ...getState().settings, bgImage: url, bgMode: 'image' }).catch(() => {})
                         toast('背景图已上传')
                       }
                     } catch (err) { toast('上传失败') }
@@ -244,11 +259,13 @@ export default function App() {
               <button className="primary" onClick={() => {
                 const input = document.getElementById('bg-url')
                 const url = input ? input.value.trim() : ''
-                setState({ bgImage: url, settingsOpen: false })
-                api.saveSettings({ ...getState().settings, bgImage: url }).catch(() => {})
+                setState({ bgImage: url, bgMode: 'image', settingsOpen: false })
+                api.saveSettings({ ...getState().settings, bgImage: url, bgMode: 'image' }).catch(() => {})
               }}>应用 URL</button>
               <button className="close-btn" onClick={() => { setState({ bgImage: '', settingsOpen: false }); api.saveSettings({ ...getState().settings, bgImage: '' }).catch(() => {}) }}>清除</button>
             </div>
+              </>
+            )}
           </div>
         </div>
       )}

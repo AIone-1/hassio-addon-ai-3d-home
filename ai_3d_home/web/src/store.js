@@ -30,6 +30,7 @@ let state = {
   saved: true,
   toast: '',
   bgImage: '',           // 自定义背景图 URL
+  bgMode: 'color',       // 背景效果: color纯色 | image背景图 | gradient渐变 | night夜景
   settingsOpen: false,   // 设置面板
 }
 
