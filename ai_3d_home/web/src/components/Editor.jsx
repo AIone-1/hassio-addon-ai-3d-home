@@ -26,6 +26,7 @@ export default function Editor() {
   const showLabels = useStore((s) => s.showLabels)
   const showFurnitureLabels = useStore((s) => s.showFurnitureLabels)
   const planImage = useStore((s) => s.planImage)
+  const settings = useStore((s) => s.settings)
   const view2d = useStore((s) => s.view2d)
   const mode = useStore((s) => s.mode)
   const project = useStore((s) => s.project)
@@ -37,6 +38,7 @@ export default function Editor() {
   const [openCats, setOpenCats] = useState({})
   const [backups, setBackups] = useState([])
   const [backupOpen, setBackupOpen] = useState(false)
+  const [defaultOpen, setDefaultOpen] = useState(false)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -118,6 +120,11 @@ export default function Editor() {
     input.click()
   }
   const removePlanImage = () => { setState({ planImage: '' }); toast('底图已删除') }
+  const saveDefault = (patch) => {
+    const s = { ...getState().settings, ...patch }
+    setState({ settings: s })
+    api.saveSettings(s).catch(() => {})
+  }
 
   const importJson = () => {
     const input = document.createElement('input')
@@ -207,6 +214,7 @@ export default function Editor() {
         <button className="et-btn" onClick={() => setState({ mode: '全屋' })}>{mode}</button>
         <button className="et-btn" onClick={openBackups}>最近备份</button>
         <button className="et-btn" onClick={importPlanImage}>导入底图</button>
+        <button className="et-btn" onClick={() => setDefaultOpen(true)}>默认</button>
         {planImage && (
           <>
             <button className="et-btn" onClick={() => setState(s => ({ planImageScale: (s.planImageScale || 1) * 1.25 }))} title="放大底图">底图＋</button>
@@ -342,6 +350,35 @@ export default function Editor() {
               </div>
             )}
             <button className="close-btn" onClick={() => setBackupOpen(false)}>关闭</button>
+          </div>
+        </div>
+      )}
+      {/* 默认选项面板 */}
+      {defaultOpen && (
+        <div className="modal-mask" onClick={() => setDefaultOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="dname">默认选项（下次进入编辑生效）</div>
+            <div style={{ margin: '10px 0' }}>
+              {[['吸附', 'snap'], ['标签', 'showLabels'], ['名字', 'showFurnitureLabels']].map(([label, key]) => (
+                <div key={key} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 48 }}>{label}</span>
+                  <button onClick={() => saveDefault({ [key]: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings[key] !== false ? 'var(--accent)' : 'var(--panel2)', color: settings[key] !== false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                  <button onClick={() => saveDefault({ [key]: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings[key] === false ? 'var(--accent)' : 'var(--panel2)', color: settings[key] === false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 48 }}>默认视图</span>
+                <button onClick={() => saveDefault({ defaultView2d: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.defaultView2d ? 'var(--accent)' : 'var(--panel2)', color: settings.defaultView2d ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>2D</button>
+                <button onClick={() => saveDefault({ defaultView2d: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !settings.defaultView2d ? 'var(--accent)' : 'var(--panel2)', color: !settings.defaultView2d ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>3D</button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 48 }}>缩放</span>
+                {[0.6, 0.8, 1, 1.2, 1.5].map((s) => (
+                  <button key={s} onClick={() => saveDefault({ furnitureScale: s })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: (settings.furnitureScale || 1) === s ? 'var(--accent)' : 'var(--panel2)', color: (settings.furnitureScale || 1) === s ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>{Math.round(s * 100)}%</button>
+                ))}
+              </div>
+            </div>
+            <button className="close-btn" onClick={() => setDefaultOpen(false)}>关闭</button>
           </div>
         </div>
       )}

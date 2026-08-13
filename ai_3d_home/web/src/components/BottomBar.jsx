@@ -11,7 +11,7 @@ export default function BottomBar() {
   const shadows = useStore((s) => s.shadows)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
-  const deviceCount = project.floors.reduce((n, f) => n + (f.devices || []).length, 0)
+  const deviceCount = new Set(project.floors.flatMap((f) => (f.devices || []).map((d) => d.entity_id))).size
 
   const qLabel = { eco: '流畅', smooth: '均衡', balanced: '高清', high: '极致' }[quality] || '高清'
 
