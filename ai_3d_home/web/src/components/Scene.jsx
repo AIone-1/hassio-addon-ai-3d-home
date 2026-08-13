@@ -737,6 +737,7 @@ export default function Scene({ onSelect, floorIndex }) {
   const mode = useStore((s) => s.mode)
   const view2d = useStore((s) => s.view2d)
   const editing = useStore((s) => s.editing)
+  const showWalls = useStore((s) => s.showWalls)
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
   const interactive = tool === 'select' || tool === 'delete'
@@ -785,8 +786,8 @@ export default function Scene({ onSelect, floorIndex }) {
           />
         )}
 
-        {/* 墙（持久化线段，毛玻璃材质对齐原版；删除模式可点） */}
-        {(floor.walls || []).map((w, i) => {
+        {/* 墙（持久化线段，毛玻璃材质对齐原版；删除模式可点；showWalls 关闭则去除墙壁） */}
+        {showWalls && (floor.walls || []).map((w, i) => {
           const len = Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
           if (len < 0.001) return null
           const h = floor.height || 2.8

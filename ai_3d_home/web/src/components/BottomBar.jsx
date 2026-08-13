@@ -9,6 +9,7 @@ export default function BottomBar() {
   const rotateSpeed = useStore((s) => s.rotateSpeed)
   const quality = useStore((s) => s.quality)
   const shadows = useStore((s) => s.shadows)
+  const showWalls = useStore((s) => s.showWalls)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
   const deviceCount = new Set(project.floors.flatMap((f) => (f.devices || []).map((d) => d.entity_id))).size
@@ -54,6 +55,9 @@ export default function BottomBar() {
         </button>
         <button className={`bb-btn ${shadows ? 'active' : ''}`} onClick={() => setState({ shadows: !shadows })} title="切换投影">
           ☀️ 投影
+        </button>
+        <button className={`bb-btn ${showWalls ? 'active' : ''}`} onClick={() => setState({ showWalls: !showWalls })} title="去除/显示墙壁">
+          🧱 墙
         </button>
         <button className="bb-btn" disabled style={{ opacity: 0.4, cursor: 'not-allowed' }} title="玻璃效果（开发中）">璃玻璃</button>
       </div>
