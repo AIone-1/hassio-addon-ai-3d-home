@@ -20,6 +20,7 @@ let state = {
   mode: '全屋',               // 全屋 | 照明 | 遮阳 | 环境 | 安防
   view2d: false,              // 2D/3D
   snap: true,
+  snapStep: 0.5,            // 吸附精度（米），0.1/0.25/0.5/1
   showLabels: true,
   // 编辑状态
   editing: false,             // 是否在编辑器

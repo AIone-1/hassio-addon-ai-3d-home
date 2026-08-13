@@ -1,6 +1,6 @@
 import { useStore, setState } from '../store'
 
-const MODES = ['全屋', '照明', '遮阳', '环境', '安防']
+const MODES = ['全屋', '照明', '遮阳', '环境', '安防', '纯户型']
 
 export default function BottomBar() {
   const mode = useStore((s) => s.mode)
@@ -19,6 +19,11 @@ export default function BottomBar() {
     const order = ['eco', 'smooth', 'balanced', 'high']
     const next = order[(order.indexOf(quality) + 1) % order.length]
     setState({ quality: next })
+  }
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.()
+    else document.documentElement.requestFullscreen?.()
   }
 
   return (
@@ -42,6 +47,7 @@ export default function BottomBar() {
         <button className="bb-btn" onClick={() => setState((s) => ({ recenterKey: s.recenterKey + 1 }))} title="居中视角">
           ⌖ 居中
         </button>
+        <button className="bb-btn" onClick={toggleFullscreen} title="全屏">⛶ 全屏</button>
         <button className="bb-btn" onClick={cycleQuality} title="切换画质（流畅/均衡/高清/极致）">
           ⚙️ {qLabel}
         </button>

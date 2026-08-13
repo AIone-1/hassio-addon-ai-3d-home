@@ -22,6 +22,7 @@ export default function Editor() {
   const tool = useStore((s) => s.tool)
   const furnitureType = useStore((s) => s.furnitureType)
   const snap = useStore((s) => s.snap)
+  const snapStep = useStore((s) => s.snapStep)
   const showLabels = useStore((s) => s.showLabels)
   const view2d = useStore((s) => s.view2d)
   const mode = useStore((s) => s.mode)
@@ -205,6 +206,9 @@ export default function Editor() {
         <div className="et-sep" />
 
         <button className={`et-btn ${snap ? 'active' : ''}`} onClick={() => setState({ snap: !snap })}>吸附</button>
+        <button className="et-btn" title="吸附精度（点击切换）"
+          onClick={() => { const o = [0.1, 0.25, 0.5, 1]; setState({ snapStep: o[(o.indexOf(snapStep) + 1) % o.length] }) }}>
+          {snapStep}m</button>
         <button className={`et-btn ${showLabels ? 'active' : ''}`} onClick={() => setState({ showLabels: !showLabels })}>标签</button>
         <button className={`et-btn ${view2d ? 'active' : ''}`} onClick={() => setState({ view2d: !view2d })}>2D</button>
         <button className={`et-btn ${!view2d ? 'active' : ''}`} onClick={() => setState({ view2d: false })}>3D</button>

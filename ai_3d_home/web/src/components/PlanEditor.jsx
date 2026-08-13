@@ -6,7 +6,6 @@ import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, DOOR_COLORS, DO
 import { getCatalogItem } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
-const SNAP = 0.5       // 吸附 0.5m
 const CLOSE = 0.5      // 画墙闭合半径（点回起点 <0.5m 闭合）
 const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
@@ -56,6 +55,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const floor = useStore(s => s.project.floors[floorIndex])
   const tool = useStore(s => s.tool)
   const snapOn = useStore(s => s.snap)
+  const snapStep = useStore(s => s.snapStep)
   const selected = useStore(s => s.selected)
   const furnitureType = useStore(s => s.furnitureType)
   const pendingEntity = useStore(s => s.pendingEntity)
@@ -95,7 +95,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   // 网格吸附 + 画墙轴向吸附（水平/垂直，让房间规整）+ 端点吸附
   const snap = (pt) => {
     let [x, y] = pt
-    if (snapOn) { x = Math.round(x / SNAP) * SNAP; y = Math.round(y / SNAP) * SNAP }
+    if (snapOn) { x = Math.round(x / snapStep) * snapStep; y = Math.round(y / snapStep) * snapStep }
     if (tool === 'wall' && draft && draft.pts.length) {
       const last = draft.pts[draft.pts.length - 1]
       const dx = x - last[0], dy = y - last[1]
@@ -160,8 +160,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       return
     }
     const first = draft.pts[0]
-    const gx = snapOn ? Math.round(raw[0] / SNAP) * SNAP : raw[0]
-    const gy = snapOn ? Math.round(raw[1] / SNAP) * SNAP : raw[1]
+    const gx = snapOn ? Math.round(raw[0] / snapStep) * snapStep : raw[0]
+    const gy = snapOn ? Math.round(raw[1] / snapStep) * snapStep : raw[1]
     if (draft.pts.length >= 3 && Math.hypot(gx - first[0], gy - first[1]) < CLOSE) {
       closeDraft()
       return

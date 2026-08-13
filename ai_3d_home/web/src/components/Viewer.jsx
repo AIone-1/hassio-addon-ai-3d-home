@@ -21,6 +21,7 @@ function DeviceLabels({ floorIndex, containerRef }) {
   const haStates = useStore((s) => s.haStates)
   const showLabels = useStore((s) => s.showLabels)
   const night = useStore((s) => s.night)
+  const mode = useStore((s) => s.mode)
   const { camera } = useThree()
   const els = useRef(new Map())
 
@@ -52,8 +53,9 @@ function DeviceLabels({ floorIndex, containerRef }) {
       const el = els.current.get(dev.id)
       if (!el) return
       el.classList.toggle('light-theme', !night)
-      el.style.display = showLabels ? 'block' : 'none'
-      if (!showLabels) return
+      const hide = mode === '纯户型'
+      el.style.display = (showLabels && !hide) ? 'block' : 'none'
+      if (!showLabels || hide) return
       v.set(dev.pos[0], (dev.pos[1] || 1.4), dev.pos[2]).project(camera)
       if (v.z > 1) { el.style.display = 'none'; return }
       el.style.left = (v.x * 0.5 + 0.5) * rect.width + 'px'

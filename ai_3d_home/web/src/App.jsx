@@ -87,9 +87,12 @@ export default function App() {
             if ((!f.walls || f.walls.length === 0) && (f.rooms || []).length > 0) {
               f.walls = roomsToWalls(f.rooms)
             }
-            // 只要有墙，就重算房间（覆盖旧数据 + 房间为空的异常态）
+            // 只要有墙，就重算房间；重算失败（返回空）但原本有房间时，保留原房间避免户型丢失
             if (f.walls && f.walls.length > 0) {
-              f.rooms = recomputeRooms(f)
+              const recomputed = recomputeRooms(f)
+              if (recomputed.length > 0 || !(f.rooms && f.rooms.length > 0)) {
+                f.rooms = recomputed
+              }
             }
           })
           setState({ project: p, currentFloor: 0 })
