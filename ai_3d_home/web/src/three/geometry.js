@@ -24,6 +24,21 @@ export const FURNITURE_LIB = [
 // 挂墙家具默认离地高度（m）；挂顶用层高、地面为 0
 export const FURNITURE_WALL_HEIGHT = 1.2
 
+// 门颜色（5 色）+ 门/窗类型（key 存数据，label 面板显示）
+export const DOOR_COLORS = { 木色: '#a97c50', 白: '#e8ecef', 灰: '#8b9298', 黑: '#2c3035', 蓝: '#4a7ab5' }
+export const DOOR_STYLES = [
+  { key: 'swing', label: '平开门' },
+  { key: 'double', label: '双开门' },
+  { key: 'slide', label: '推拉门' },
+  { key: 'frame', label: '门框' },
+]
+export const WINDOW_STYLES = [
+  { key: 'standard', label: '普通窗' },
+  { key: 'floor_to_ceiling', label: '落地窗' },
+  { key: 'slide', label: '推拉窗' },
+  { key: 'bay', label: '飘窗' },
+]
+
 // 2D 平面图家具描边色（浅色系，对齐原版 floor plan 风格）
 export const FURNITURE_COLORS = {
   沙发: '#718b80', 床: '#a58b76', 餐桌: '#a67e5f', 书桌: '#a67e5f',

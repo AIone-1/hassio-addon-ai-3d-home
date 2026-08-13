@@ -3,7 +3,7 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useStore, setState } from '../store'
-import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, robustFloorGeometry } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, DOOR_COLORS, robustFloorGeometry } from '../three/geometry'
 import { getCatalogItem } from '../catalog'
 
 // 对齐原版主题（glass 视觉风格）：墙=半透明毛玻璃，地板=冷色调色板
@@ -505,7 +505,7 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   )
 }
 
-// ---------- 门窗（墙段上的开口，对齐原版） ----------
+// ---------- 门窗（墙段上的开口：门 4 类型 + 5 色 + 内开外开；窗 4 类型） ----------
 function Opening({ op, floor, level }) {
   const wall = (floor.walls || []).find((w) => w.id === op.wallId)
   if (!wall) return null
@@ -517,57 +517,133 @@ function Opening({ op, floor, level }) {
   const pz = a[1] + (b[1] - a[1]) * t
   const wd = op.width || 0.9
   const isDoor = op.type !== 'window'
-  const depth = WALL_THICK + 0.01
+  if (isDoor) return <Door3D op={op} px={px} pz={pz} level={level} ang={ang} h={h} wd={wd} />
+  return <Window3D op={op} px={px} pz={pz} level={level} ang={ang} h={h} wd={wd} />
+}
 
-  if (isDoor) {
-    // 门：门框（左右+上）+ 门扇（木色微开）+ 把手
-    const doorH = h * 0.75
-    const frameT = 0.06
-    const frame = (x, y, w, hh) => (
-      <mesh position={[x, y, 0]} receiveShadow>
-        <boxGeometry args={[w, hh, depth]} />
-        <meshStandardMaterial color="#e7ebef" roughness={0.56} metalness={0.01} />
+// 门：门框（左右上）+ 门扇（平开/双开/推拉/门框 + 颜色 + 内开外开 + 翻转）
+function Door3D({ op, px, pz, level, ang, h, wd }) {
+  const doorH = op.height || h * 0.75
+  const style = op.doorStyle || 'swing'
+  const color = DOOR_COLORS[op.color] || DOOR_COLORS['木色']
+  const frameT = 0.06
+  const frame = (x, y, w, hh) => (
+    <mesh position={[x, y, 0]} receiveShadow>
+      <boxGeometry args={[w, hh, WALL_THICK + 0.01]} />
+      <meshStandardMaterial color="#e7ebef" roughness={0.56} metalness={0.01} />
+    </mesh>
+  )
+  // 单扇门：铰链在 hingeX，门扇沿 leafDir 方向延伸，绕铰链微开 openAngle
+  const leaf = (hingeX, leafDir, openAngle, leafW) => (
+    <group position={[hingeX, 0, 0]} rotation={[0, openAngle, 0]}>
+      <mesh position={[leafDir * leafW / 2, doorH / 2, 0.03]} castShadow>
+        <boxGeometry args={[leafW, doorH * 0.97, 0.045]} />
+        <meshStandardMaterial color={color} roughness={0.72} metalness={0.012} />
       </mesh>
-    )
+      <mesh position={[leafDir * leafW * 0.82, doorH * 0.54, 0.065]}>
+        <sphereGeometry args={[0.035, 16, 8]} />
+        <meshStandardMaterial color="#71604d" metalness={0.55} roughness={0.28} />
+      </mesh>
+    </group>
+  )
+
+  if (style === 'frame') {
+    // 纯门框：只有框，无门扇
     return (
       <group position={[px, level, pz]} rotation={[0, -ang, 0]}>
         {frame(-wd / 2, doorH / 2, frameT, doorH)}
         {frame(wd / 2, doorH / 2, frameT, doorH)}
         {frame(0, doorH - frameT / 2, wd, frameT)}
-        {/* 门扇（以左侧为轴，微开） */}
-        <group position={[-wd / 2, 0, 0]} rotation={[0, -0.58, 0]}>
-          <mesh position={[wd / 2, doorH / 2, 0.03]} castShadow>
-            <boxGeometry args={[wd * 0.96, doorH * 0.97, 0.045]} />
-            <meshStandardMaterial color="#4a7ab5" roughness={0.72} metalness={0.012} />
-          </mesh>
-          {/* 把手 */}
-          <mesh position={[wd * 0.8, doorH * 0.54, 0.065]}>
-            <sphereGeometry args={[0.035, 16, 8]} />
-            <meshStandardMaterial color="#71604d" metalness={0.55} roughness={0.28} />
-          </mesh>
-        </group>
       </group>
     )
   }
-  // 窗：玻璃（透光）+ 边框（上下左右 4 条）
-  const winH = 0.9
-  const winY = h - 1.4
+  if (style === 'slide') {
+    // 推拉门：两扇重叠滑板
+    return (
+      <group position={[px, level, pz]} rotation={[0, -ang, 0]}>
+        {frame(0, doorH - frameT / 2, wd, frameT)}
+        <mesh position={[-wd * 0.18, doorH / 2, 0.02]} castShadow>
+          <boxGeometry args={[wd * 0.55, doorH * 0.94, 0.04]} />
+          <meshStandardMaterial color={color} roughness={0.6} metalness={0.02} />
+        </mesh>
+        <mesh position={[wd * 0.18, doorH / 2, 0.05]} castShadow>
+          <boxGeometry args={[wd * 0.55, doorH * 0.94, 0.04]} />
+          <meshStandardMaterial color={color} roughness={0.6} metalness={0.02} />
+        </mesh>
+      </group>
+    )
+  }
+  const swingDir = (op.swing || 'inward') === 'inward' ? 1 : -1
+  if (style === 'double') {
+    // 双开门：两扇对称微开
+    return (
+      <group position={[px, level, pz]} rotation={[0, -ang, 0]}>
+        {frame(-wd / 2, doorH / 2, frameT, doorH)}
+        {frame(wd / 2, doorH / 2, frameT, doorH)}
+        {frame(0, doorH - frameT / 2, wd, frameT)}
+        {leaf(-wd / 2, 1, -0.5 * swingDir, wd * 0.48)}
+        {leaf(wd / 2, -1, 0.5 * swingDir, wd * 0.48)}
+      </group>
+    )
+  }
+  // 平开门（单扇）：hinge 决定铰链左/右，swing 决定内/外开
+  const hingeLeft = (op.hinge || 'start') === 'start'
+  const hingeX = hingeLeft ? -wd / 2 : wd / 2
+  const leafDir = hingeLeft ? 1 : -1
+  const openAngle = 0.5 * leafDir * swingDir
+  return (
+    <group position={[px, level, pz]} rotation={[0, -ang, 0]}>
+      {frame(-wd / 2, doorH / 2, frameT, doorH)}
+      {frame(wd / 2, doorH / 2, frameT, doorH)}
+      {frame(0, doorH - frameT / 2, wd, frameT)}
+      {leaf(hingeX, leafDir, openAngle, wd * 0.96)}
+    </group>
+  )
+}
+
+// 窗：玻璃 + 边框（普通/落地/推拉/飘窗）
+function Window3D({ op, px, pz, level, ang, h, wd }) {
+  const style = op.windowStyle || 'standard'
+  const isFull = style === 'floor_to_ceiling'
+  const bottom = isFull ? 0 : (op.bottom ?? 0.9)
+  const winH = isFull ? h : (op.height || 0.9)
+  const winY = bottom + winH / 2
+  const glass = () => (
+    <meshPhysicalMaterial color="#d8f2ff" transmission={0.72} transparent opacity={0.5} roughness={0.08} metalness={0.02} side={THREE.DoubleSide} depthWrite={false} />
+  )
   const bar = (x, y, w, hh) => (
     <mesh position={[x, y, 0]}>
       <boxGeometry args={[w, hh, 0.04]} />
       <meshBasicMaterial color="#ffffff" transparent opacity={0.58} depthWrite={false} toneMapped={false} />
     </mesh>
   )
+
   return (
-    <group position={[px, level + winY + winH / 2, pz]} rotation={[0, -ang, 0]}>
-      <mesh>
-        <planeGeometry args={[wd, winH]} />
-        <meshPhysicalMaterial color="#d8f2ff" transmission={0.72} transparent opacity={0.5} roughness={0.08} metalness={0.02} side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
-      {bar(0, winH / 2, wd, 0.03)}
-      {bar(0, -winH / 2, wd, 0.03)}
-      {bar(-wd / 2, 0, 0.03, winH)}
-      {bar(wd / 2, 0, 0.03, winH)}
+    <group position={[px, level + winY, pz]} rotation={[0, -ang, 0]}>
+      {style === 'bay' ? (
+        <>
+          {/* 飘窗：前面玻璃 + 左右斜玻璃 + 窗台板 */}
+          <mesh position={[0, 0, -0.18]}><planeGeometry args={[wd, winH]} />{glass()}</mesh>
+          <mesh position={[-wd / 2, 0, -0.09]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[0.18, winH]} />{glass()}</mesh>
+          <mesh position={[wd / 2, 0, -0.09]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[0.18, winH]} />{glass()}</mesh>
+          <mesh position={[0, -winH / 2 - 0.02, -0.09]}><boxGeometry args={[wd, 0.04, 0.2]} /><meshStandardMaterial color="#e7ebef" roughness={0.5} /></mesh>
+        </>
+      ) : style === 'slide' ? (
+        <>
+          {/* 推拉窗：两扇玻璃错位重叠 */}
+          <mesh position={[-wd * 0.25, 0, 0]}><planeGeometry args={[wd * 0.52, winH]} />{glass()}</mesh>
+          <mesh position={[wd * 0.25, 0, 0.02]}><planeGeometry args={[wd * 0.52, winH]} />{glass()}</mesh>
+        </>
+      ) : (
+        <>
+          {/* 普通/落地：单扇玻璃 + 四边框 */}
+          <mesh><planeGeometry args={[wd, winH]} />{glass()}</mesh>
+          {bar(0, winH / 2, wd, 0.03)}
+          {bar(0, -winH / 2, wd, 0.03)}
+          {bar(-wd / 2, 0, 0.03, winH)}
+          {bar(wd / 2, 0, 0.03, winH)}
+        </>
+      )}
     </group>
   )
 }

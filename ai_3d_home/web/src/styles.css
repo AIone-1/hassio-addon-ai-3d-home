@@ -190,3 +190,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .plan-props-unit { font-size: 11px; color: var(--muted); }
 .plan-props-seg { flex: 1; text-align: center; }
 .plan-props-seg.active { background: var(--accent) !important; color: #081018 !important; font-weight: 600; border-color: var(--accent) !important; }
+.plan-props-swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); cursor: pointer; flex-shrink: 0; padding: 0 !important; }
+.plan-props-swatch.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(90,162,255,0.4); }
+.opening-line.selected { stroke: #2f7fe0; stroke-width: 0.22; }

@@ -2,7 +2,7 @@
 // 墙是线段（floor.walls 持久化），房间由墙段的封闭环自动检测（recomputeRooms）——这就是"共用墙/相交也封闭"的机制
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
-import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, polygonArea, recomputeRooms, pointToSeg } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg } from '../three/geometry'
 import { getCatalogItem } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
@@ -284,12 +284,16 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       if (best) {
         const fl = getState().project.floors[floorIndex]
         fl.openings = fl.openings || []
+        const isDoor = tool === 'door'
         fl.openings.push({
           id: uid(), wallId: best.wall.id, offset: best.t,
-          width: tool === 'door' ? 0.9 : 1.2, type: tool === 'door' ? 'door' : 'window',
+          width: isDoor ? 0.9 : 1.2, type: isDoor ? 'door' : 'window',
+          ...(isDoor
+            ? { doorStyle: 'swing', color: '木色', swing: 'inward', hinge: 'start', height: 2.1 }
+            : { windowStyle: 'standard', bottom: 0.9, height: 0.9 }),
         })
         setState({ project: { ...getState().project }, saved: false })
-        toast(tool === 'door' ? '已放置门' : '已放置窗')
+        toast(isDoor ? '已放置门' : '已放置窗')
       } else {
         toast('请点击墙体放置门窗')
       }
@@ -383,6 +387,24 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setState({ project: { ...st.project }, saved: false, selected: null })
     toast('已删除家具')
   }
+
+  // ---------- 门窗属性编辑（类型 / 颜色 / 内开外开 / 翻转 / 删除） ----------
+  const selOpening = selected && selected.type === 'opening' ? selected.ref : null
+
+  const patchOpening = (o, patch) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.openings || []).find(x => x.id === o.id)
+    if (!target) return
+    Object.assign(target, patch)
+    setState({ project: { ...getState().project }, saved: false })
+  }
+  const deleteOpening = (o) => {
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
+    fl.openings = (fl.openings || []).filter(x => x.id !== o.id)
+    setState({ project: { ...st.project }, saved: false, selected: null })
+    toast('已删除')
+  }
   const rooms = floor?.rooms || []
   const walls = floor?.walls || []
   const openings = floor?.openings || []
@@ -465,15 +487,32 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0]) * 180 / Math.PI
         const wd = op.width || 0.9
         const isDoor = op.type === 'door'
+        const doorColor = DOOR_COLORS[op.color] || DOOR_COLORS['木色']
+        const doorStyle = op.doorStyle || 'swing'
+        const selO = isSel('opening', op.id)
         return (
           <g key={op.id} transform={`translate(${px} ${py}) rotate(${ang})`} className="plan-opening"
-            onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'opening', ref: op }) } : undefined}>
+            onClick={e => clickEl(e, 'opening', op)}>
             <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className="opening-track" />
-            <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className={`opening-line ${isDoor ? 'door' : 'window'}`} />
-            {isDoor && (
+            <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className={`opening-line ${isDoor ? 'door' : 'window'} ${selO ? 'selected' : ''}`} />
+            {isDoor && doorStyle === 'swing' && (
               <>
-                <line x1={-wd / 2} y1={0} x2={wd / 2} y2={-wd} className="door-leaf" />
+                <line x1={-wd / 2} y1={0} x2={wd / 2} y2={-wd} className="door-leaf" stroke={doorColor} />
                 <path d={`M ${-wd / 2} 0 A ${wd} ${wd} 0 0 1 ${wd / 2} ${-wd}`} className="door-swing" />
+              </>
+            )}
+            {isDoor && doorStyle === 'double' && (
+              <>
+                <line x1={-wd / 2} y1={0} x2={0} y2={-wd / 2} className="door-leaf" stroke={doorColor} />
+                <line x1={wd / 2} y1={0} x2={0} y2={-wd / 2} className="door-leaf" stroke={doorColor} />
+                <path d={`M ${-wd / 2} 0 A ${wd / 2} ${wd / 2} 0 0 1 0 ${-wd / 2}`} className="door-swing" />
+                <path d={`M ${wd / 2} 0 A ${wd / 2} ${wd / 2} 0 0 0 0 ${-wd / 2}`} className="door-swing" />
+              </>
+            )}
+            {isDoor && doorStyle === 'slide' && (
+              <>
+                <line x1={-wd / 2} y1={-0.06} x2={wd / 2} y2={-0.06} className="door-leaf" stroke={doorColor} />
+                <line x1={-wd / 2} y1={0.06} x2={wd / 2} y2={0.06} className="door-leaf" stroke={doorColor} />
               </>
             )}
           </g>
@@ -568,6 +607,56 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             <input type="number" step="0.1" min="0" max="6" value={Math.round((selFurniture.pos[1] || 0) * 10) / 10}
               onChange={(e) => setFurnitureHeight(selFurniture, Number(e.target.value) || 0)} />
             <span className="plan-props-unit">m</span>
+          </div>
+        )}
+      </div>
+    )}
+    {selOpening && (
+      <div className="plan-props">
+        <div className="plan-props-head">
+          <span>{selOpening.type === 'door' ? '门' : '窗'}</span>
+          <button className="plan-props-del" onClick={() => deleteOpening(selOpening)}>删除</button>
+        </div>
+        {selOpening.type === 'door' ? (
+          <>
+            <div className="plan-props-row">
+              <span className="plan-props-label">类型</span>
+              {DOOR_STYLES.map(s => (
+                <button key={s.key} className={`plan-props-seg ${(selOpening.doorStyle || 'swing') === s.key ? 'active' : ''}`}
+                  onClick={() => patchOpening(selOpening, { doorStyle: s.key })}>{s.label}</button>
+              ))}
+            </div>
+            <div className="plan-props-row">
+              <span className="plan-props-label">颜色</span>
+              {Object.entries(DOOR_COLORS).map(([name, hex]) => (
+                <button key={name} title={name} className={`plan-props-swatch ${(selOpening.color || '木色') === name ? 'active' : ''}`}
+                  style={{ background: hex }}
+                  onClick={() => patchOpening(selOpening, { color: name })} />
+              ))}
+            </div>
+            {(selOpening.doorStyle || 'swing') !== 'frame' && (selOpening.doorStyle || 'swing') !== 'slide' && (
+              <div className="plan-props-row">
+                <span className="plan-props-label">开向</span>
+                <button className={`plan-props-seg ${(selOpening.swing || 'inward') === 'inward' ? 'active' : ''}`}
+                  onClick={() => patchOpening(selOpening, { swing: 'inward' })}>内开</button>
+                <button className={`plan-props-seg ${(selOpening.swing || 'inward') === 'outward' ? 'active' : ''}`}
+                  onClick={() => patchOpening(selOpening, { swing: 'outward' })}>外开</button>
+                <button onClick={() => patchOpening(selOpening, { hinge: (selOpening.hinge || 'start') === 'start' ? 'end' : 'start' })}>翻转门扇</button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="plan-props-row">
+            <span className="plan-props-label">类型</span>
+            {WINDOW_STYLES.map(s => (
+              <button key={s.key} className={`plan-props-seg ${(selOpening.windowStyle || 'standard') === s.key ? 'active' : ''}`}
+                onClick={() => {
+                  const floorH = getState().project.floors[floorIndex].height || 2.8
+                  if (s.key === 'floor_to_ceiling') patchOpening(selOpening, { windowStyle: s.key, bottom: 0, height: floorH })
+                  else if (s.key === 'standard') patchOpening(selOpening, { windowStyle: s.key, bottom: 0.9, height: 0.9 })
+                  else patchOpening(selOpening, { windowStyle: s.key })
+                }}>{s.label}</button>
+            ))}
           </div>
         )}
       </div>
