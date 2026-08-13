@@ -256,8 +256,18 @@ class Handler(BaseHTTPRequestHandler):
             # 背景图：有则返回图片，无则 404
             bg = os.path.join(DATA_DIR, "background.png")
             if os.path.isfile(bg):
-                with open(bg, "rb") as f:
-                    return self._send(200, f.read(), "image/png")
+                try:
+                    with open(bg, "rb") as f:
+                        raw = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/png")
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    self.wfile.write(raw)
+                    return
+                except Exception:
+                    return self._send(500, {"error": "read failed"})
             return self._send(404, {"error": "no background"})
         return self._send(404, {"error": "not found"})
 

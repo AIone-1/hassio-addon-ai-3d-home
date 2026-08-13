@@ -91,7 +91,7 @@ export default function EditorController() {
                 height: floor.height || 2.8, color: '#d8cbb2', points: pts,
               })
               floor.walls = [] // 房间自带墙
-              toast('房间已生成！')
+              toast(`房间已生成（当前共 ${floor.rooms.length} 个）`)
             }
           }
           window.__wallDraft = null

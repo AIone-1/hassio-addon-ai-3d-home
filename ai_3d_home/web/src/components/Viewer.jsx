@@ -147,10 +147,15 @@ function SceneBackground({ mode, night, bgImage }) {
 
   useEffect(() => {
     if (bgImage) {
-      new THREE.TextureLoader().load(bgImage, (tex) => {
+      // 背景图：加正确色彩空间，避免发白；加缓存破坏参数
+      const loader = new THREE.TextureLoader()
+      loader.crossOrigin = 'anonymous'
+      loader.load(bgImage + (bgImage.includes('?') ? '&' : '?') + 't=' + Date.now(), (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace
         scene.background = tex
+        scene.backgroundIntensity = 1
       }, undefined, () => {
-        scene.background = new THREE.Color(night ? '#0a1020' : '#e9eef2')
+        scene.background = new THREE.Color(night ? '#0a1020' : '#1a2a40')
       })
       return
     }
