@@ -6,6 +6,7 @@ let state = {
   settings: {},
   currentFloor: 0,
   camTarget: [0, 0, 2],
+  recenterKey: 0,
   // 视图
   quality: 'balanced',        // eco | smooth | balanced | high
   shadows: true,

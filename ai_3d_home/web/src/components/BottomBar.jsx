@@ -24,6 +24,9 @@ export default function BottomBar() {
         <button className={`bb-btn ${autoRotate ? 'active' : ''}`} onClick={() => setState({ autoRotate: !autoRotate })}>
           🔄 旋转
         </button>
+        <button className="bb-btn" onClick={() => setState((s) => ({ recenterKey: s.recenterKey + 1 }))} title="居中视角">
+          ⌖ 居中
+        </button>
         <button className="bb-btn" onClick={cycleQuality} title="切换画质">
           {qLabel}
         </button>

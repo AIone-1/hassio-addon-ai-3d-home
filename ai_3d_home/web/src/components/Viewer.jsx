@@ -116,6 +116,7 @@ function CameraFocus({ floorIndex }) {
   const project = useStore((s) => s.project)
   const floor = project.floors[floorIndex]
   const view2d = useStore((s) => s.view2d)
+  const recenterKey = useStore((s) => s.recenterKey)
   const { camera } = useThree()
 
   useEffect(() => {
@@ -131,7 +132,7 @@ function CameraFocus({ floorIndex }) {
       camera.position.set(c.x, (has ? c.y : 0) + 15, c.z + 8)
       camera.lookAt(c.x, 0, c.z)
     }
-  }, [floorIndex, view2d, JSON.stringify(floor?.rooms), JSON.stringify(floor?.furniture)])
+  }, [floorIndex, view2d, recenterKey, JSON.stringify(floor?.rooms), JSON.stringify(floor?.furniture)])
 
   return null
 }

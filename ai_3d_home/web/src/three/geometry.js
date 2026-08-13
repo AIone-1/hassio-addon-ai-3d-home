@@ -65,7 +65,8 @@ export function polygonArea(points) {
   return Math.abs(area) / 2
 }
 
-// 万能地板几何：用 triangulateShape 剖分，失败则扇形剖分（保证任何房间都有地板）
+// 万能地板几何：按多边形实际形状，直接铺在水平面 (x, 0, z)，法线朝上
+// 用 triangulateShape 剖分，失败则扇形剖分（保证任何形状都有地板）
 export function robustFloorGeometry(points, THREE) {
   const verts = points.map((p) => new THREE.Vector2(p[0], p[1]))
   let faces = []
@@ -74,7 +75,6 @@ export function robustFloorGeometry(points, THREE) {
   } catch (e) {
     faces = []
   }
-  // 失败或点数不足：扇形剖分（从第一个顶点连到其余顶点）
   if (!faces.length && points.length >= 3) {
     faces = []
     for (let i = 1; i < points.length - 1; i++) {
@@ -84,7 +84,7 @@ export function robustFloorGeometry(points, THREE) {
   const positions = []
   for (const f of faces) {
     for (const idx of f) {
-      positions.push(points[idx][0], points[idx][1], 0)
+      positions.push(points[idx][0], 0, points[idx][1])  // 直接水平：x, 0, z
     }
   }
   const geo = new THREE.BufferGeometry()

@@ -134,24 +134,16 @@ function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) 
   // 每个房间地板明显高度差（0.05m），彻底避免重叠房间 z-fighting 互相盖住
   const floorY = level + roomIdx * 0.05
 
-  // 地板：用房间包围盒矩形，保证任何房间都有可见地板（绕开多边形剖分的坑）
-  const bb = useMemo(() => {
-    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
-    pts.forEach((p) => {
-      if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]
-      if (p[1] < minZ) minZ = p[1]; if (p[1] > maxZ) maxZ = p[1]
-    })
-    return { cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, w: maxX - minX, d: maxZ - minZ }
-  }, [JSON.stringify(pts)])
+  // 地板：按房间多边形实际形状（万能三角剖分，直接水平铺设，法线朝上）
+  const floorGeo = useMemo(() => robustFloorGeometry(pts, THREE), [JSON.stringify(pts)])
 
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
-      {/* 地板：包围盒矩形平面，法线朝上（-π/2），renderOrder 强制绘制在前 */}
-      <mesh position={[bb.cx, floorY, bb.cz]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
-        <planeGeometry args={[Math.max(bb.w, 0.2), Math.max(bb.d, 0.2)]} />
+      {/* 地板：多边形形状，法线朝上，renderOrder 强制绘制在前 */}
+      <mesh geometry={floorGeo} position={[0, floorY, 0]} renderOrder={1}>
         {view2d
-          ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} />
-          : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} roughness={0.9} />}
+          ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} side={THREE.DoubleSide} />
+          : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} roughness={0.9} side={THREE.DoubleSide} />}
       </mesh>
       {/* 2D 地板描边：让房间范围一目了然 */}
       {view2d && (
