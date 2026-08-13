@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useStore, setState, currentFloor, toast } from '../store'
+import { useStore, setState, currentFloor, getState, toast } from '../store'
+import { api } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS } from '../three/geometry'
 
 const LEFT_TOOLS = [
@@ -68,6 +69,23 @@ export default function Editor() {
     setState({ project: { ...project }, saved: false })
   }
 
+  const clearAll = () => {
+    if (!confirm('一键清空图纸？将删除所有楼层和房间（不可撤销）。')) return
+    setState({
+      project: { version: 1, floors: [{ id: Math.random().toString(36).slice(2, 10), name: '一层', level: 0, height: 2.8, color: '#e6dcc8', rooms: [], walls: [], furniture: [], devices: [], openings: [] }] },
+      currentFloor: 0, selected: null, saved: false,
+    })
+    toast('图纸已清空')
+  }
+
+  const saveNow = async () => {
+    try {
+      await api.saveProject(getState().project)
+      setState({ saved: true })
+      toast('已保存 ✓')
+    } catch (e) { toast('保存失败') }
+  }
+
   const duplicateFloor = () => {
     const idx = project.floors.findIndex((f) => f === floor)
     const copy = JSON.parse(JSON.stringify(floor))
@@ -96,6 +114,8 @@ export default function Editor() {
         <button className="et-btn" onClick={exportJson}>导出 JSON</button>
         <button className="et-btn" title="最近备份（开发中）">最近备份</button>
         <button className="et-btn" onClick={resetFloor} style={{ color: 'var(--danger)' }}>重置当前户型</button>
+        <button className="et-btn" onClick={clearAll} style={{ color: 'var(--danger)' }}>清空图纸</button>
+        <button className="et-btn" onClick={saveNow} style={{ color: 'var(--accent)' }}>保存</button>
         <div className="et-sep" />
 
         {/* 家具库 */}
