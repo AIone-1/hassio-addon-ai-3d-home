@@ -20,12 +20,12 @@ export function Controls({ enabled = true }) {
   const view2d = useStore((s) => s.view2d)
   const tool = useStore((s) => s.tool)
   const autoRotate = useStore((s) => s.autoRotate)
+  const rotateDir = useStore((s) => s.rotateDir)
 
   useEffect(() => {
     const c = new ThreeOrbitControls(camera, gl.domElement)
     c.enableDamping = true
     c.dampingFactor = 0.08
-    c.autoRotateSpeed = 1.2
     // 限制极角：相机不能翻到地面以下（否则户型图底面朝上、穿模）
     c.minPolarAngle = 0.05
     c.maxPolarAngle = Math.PI / 2 - 0.05
@@ -36,6 +36,7 @@ export function Controls({ enabled = true }) {
     c.enableRotate = !st.view2d && st.tool !== 'pan'
     c.mouseButtons = mouseButtons(st.view2d, st.tool)
     c.autoRotate = st.autoRotate
+    c.autoRotateSpeed = 1.2 * st.rotateDir
     ref.current = c
     return () => c.dispose()
   }, [camera, gl])
@@ -48,10 +49,13 @@ export function Controls({ enabled = true }) {
     }
   }, [view2d, tool])
 
-  // 自动旋转（绕 target=户型中心，不再绕原点偏移）
+  // 自动旋转（绕 target=户型中心，不再绕原点偏移）；方向按 rotateDir 切换顺/逆时针
   useEffect(() => {
-    if (ref.current) ref.current.autoRotate = autoRotate
-  }, [autoRotate])
+    if (ref.current) {
+      ref.current.autoRotate = autoRotate
+      ref.current.autoRotateSpeed = 1.2 * rotateDir
+    }
+  }, [autoRotate, rotateDir])
 
   useEffect(() => {
     if (ref.current && target) ref.current.target.set(target[0], target[1], target[2])

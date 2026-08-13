@@ -174,8 +174,8 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   const pts = room.points || []
   const view2d = useStore((s) => s.view2d)
   if (pts.length < 3) return null
-  // 每个房间地板明显高度差（0.05m），彻底避免重叠房间 z-fighting 互相盖住
-  const floorY = level + roomIdx * 0.05
+  // 所有房间地板同一高度（对齐原版 0.025m；房间不重叠，无需高度差）
+  const floorY = level + 0.025
 
   // 地板：按房间多边形实际形状（万能三角剖分，直接水平铺设，法线朝上）
   const floorGeo = useMemo(() => robustFloorGeometry(pts, THREE), [JSON.stringify(pts)])
@@ -204,17 +204,13 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   )
 }
 
-// ---------- 门窗 ----------
+// ---------- 门窗（墙段上的开口） ----------
 function Opening({ op, floor, level }) {
-  const room = (floor.rooms || []).find((r) => r.id === op.roomId)
-  if (!room || op.wallIndex == null) return null
-  const pts = room.points || []
-  const a = pts[op.wallIndex % pts.length]
-  const b = pts[(op.wallIndex + 1) % pts.length]
-  if (!a || !b) return null
-  const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+  const wall = (floor.walls || []).find((w) => w.id === op.wallId)
+  if (!wall) return null
+  const a = wall.start, b = wall.end
   const ang = Math.atan2(b[1] - a[1], b[0] - a[0])
-  const h = room.height || floor.height || 2.8
+  const h = floor.height || 2.8
   const t = Math.max(0, Math.min(1, op.offset || 0.5))
   const px = a[0] + (b[0] - a[0]) * t
   const pz = a[1] + (b[1] - a[1]) * t

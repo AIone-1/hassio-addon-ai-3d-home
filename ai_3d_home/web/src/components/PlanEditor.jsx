@@ -2,7 +2,7 @@
 // 墙是线段（floor.walls 持久化），房间由墙段的封闭环自动检测（recomputeRooms）——这就是"共用墙/相交也封闭"的机制
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
-import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, recomputeRooms } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, recomputeRooms, pointToSeg } from '../three/geometry'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
 const SNAP = 0.5       // 吸附 0.5m
@@ -70,7 +70,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const panRef = useRef(null)                   // { w:[x,y], p:[x,y] } 平移起点
   const planMoveRef = useRef(null)              // 移动户型的起点世界坐标
 
-  const bounds = useMemo(() => floorBounds(floor), [floor?.rooms, floor?.walls, floor?.furniture, floor?.devices])
+  // 用 JSON.stringify 做依赖：floor.walls/rooms 原地 push 时数组引用不变，useMemo 不会重算
+  const bounds = useMemo(() => floorBounds(floor),
+    [JSON.stringify(floor?.rooms), JSON.stringify(floor?.walls), JSON.stringify(floor?.furniture), JSON.stringify(floor?.devices)])
   const aspect = size.w / size.h
   const fitted = useMemo(() => fitBounds(bounds, aspect), [bounds, aspect])
   const vbW = fitted.width / zoom
@@ -263,6 +265,28 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setState({ project: { ...getState().project }, saved: false })
       return
     }
+    if (tool === 'door' || tool === 'window') {
+      // 点墙放置门/窗：找最近的墙段，沿墙计算 offset
+      const p = toWorld(e)
+      let best = null, bd = 0.5
+      for (const w of (floor?.walls || [])) {
+        const r = pointToSeg(p, w.start, w.end)
+        if (r.dist < bd) { bd = r.dist; best = { wall: w, t: r.t } }
+      }
+      if (best) {
+        const fl = getState().project.floors[floorIndex]
+        fl.openings = fl.openings || []
+        fl.openings.push({
+          id: uid(), wallId: best.wall.id, offset: best.t,
+          width: tool === 'door' ? 0.9 : 1.2, type: tool === 'door' ? 'door' : 'window',
+        })
+        setState({ project: { ...getState().project }, saved: false })
+        toast(tool === 'door' ? '已放置门' : '已放置窗')
+      } else {
+        toast('请点击墙体放置门窗')
+      }
+      return
+    }
     if (tool === 'device') {
       if (!pendingEntity) return
       const [x, y] = snap(toWorld(e))
@@ -322,6 +346,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const isSel = (type, id) => selected && selected.type === type && selected.ref && selected.ref.id === id
   const rooms = floor?.rooms || []
   const walls = floor?.walls || []
+  const openings = floor?.openings || []
   const furniture = floor?.furniture || []
   const devices = floor?.devices || []
 
@@ -389,6 +414,23 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) } : undefined}
         />
       ))}
+
+      {/* 门窗（沿墙的开口标记） */}
+      {openings.map(op => {
+        const w = walls.find(x => x.id === op.wallId)
+        if (!w) return null
+        const t = Math.max(0, Math.min(1, op.offset || 0.5))
+        const px = w.start[0] + (w.end[0] - w.start[0]) * t
+        const py = w.start[1] + (w.end[1] - w.start[1]) * t
+        const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0]) * 180 / Math.PI
+        const wd = op.width || 0.9
+        return (
+          <g key={op.id} transform={`translate(${px} ${py}) rotate(${ang})`}
+            onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'opening', ref: op }) } : undefined}>
+            <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className={op.type === 'door' ? 'plan-door' : 'plan-window'} />
+          </g>
+        )
+      })}
 
       {/* 家具 */}
       {furniture.map(f => {

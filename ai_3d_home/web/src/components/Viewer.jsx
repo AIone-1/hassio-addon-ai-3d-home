@@ -123,14 +123,15 @@ function SceneBackground({ mode, night, bgImage, bgMode }) {
   const scene = useThree((s) => s.scene)
 
   useEffect(() => {
+    // 天空渐变（对齐原版采样：顶 #253962 → 底 #46618d 垂直渐变）
     const skyGradient = () => {
       const canvas = document.createElement('canvas')
       canvas.width = 4
       canvas.height = 512
       const ctx = canvas.getContext('2d')
       const g = ctx.createLinearGradient(0, 0, 0, 512)
-      g.addColorStop(0, '#9cc8e8')
-      g.addColorStop(1, '#e8f4fc')
+      g.addColorStop(0, '#253962')
+      g.addColorStop(1, '#46618d')
       ctx.fillStyle = g
       ctx.fillRect(0, 0, 4, 512)
       const tex = new THREE.CanvasTexture(canvas)
@@ -147,13 +148,11 @@ function SceneBackground({ mode, night, bgImage, bgMode }) {
       }, undefined, () => {
         scene.background = new THREE.Color('#1a2a40')
       })
-    } else if (bgMode === 'gradient') {
-      scene.background = skyGradient()
     } else if (bgMode === 'night') {
       scene.background = new THREE.Color('#0a1020')
     } else {
-      // color：跟随模式颜色
-      scene.background = new THREE.Color(night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋']))
+      // 默认（color/gradient）都用蓝色天空渐变
+      scene.background = night ? new THREE.Color('#0a1020') : skyGradient()
     }
   }, [mode, night, bgImage, bgMode])
 

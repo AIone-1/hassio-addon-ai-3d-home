@@ -5,6 +5,7 @@ const MODES = ['全屋', '照明', '遮阳', '环境', '安防']
 export default function BottomBar() {
   const mode = useStore((s) => s.mode)
   const autoRotate = useStore((s) => s.autoRotate)
+  const rotateDir = useStore((s) => s.rotateDir)
   const quality = useStore((s) => s.quality)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
@@ -21,8 +22,13 @@ export default function BottomBar() {
   return (
     <div className="bottom-bar">
       <div className="bb-group">
-        <button className={`bb-btn ${autoRotate ? 'active' : ''}`} onClick={() => setState({ autoRotate: !autoRotate })}>
-          🔄 旋转
+        <button className={`bb-btn ${autoRotate ? 'active' : ''}`} onClick={() => {
+          // 循环：停止 → 顺时针 → 逆时针 → 停止
+          if (!autoRotate) setState({ autoRotate: true, rotateDir: 1 })
+          else if (rotateDir === 1) setState({ rotateDir: -1 })
+          else setState({ autoRotate: false })
+        }}>
+          {autoRotate ? (rotateDir === 1 ? '🔄 顺时针' : '🔄 逆时针') : '🔄 旋转'}
         </button>
         <button className="bb-btn" onClick={() => setState((s) => ({ recenterKey: s.recenterKey + 1 }))} title="居中视角">
           ⌖ 居中

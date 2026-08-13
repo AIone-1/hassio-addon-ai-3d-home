@@ -121,6 +121,17 @@ export function segmentIntersect(a, b, c, d) {
   return [a[0] + t * ab[0], a[1] + t * ab[1]]
 }
 
+// 点到线段的最短距离 + 投影参数 t（0-1，沿线段位置）
+export function pointToSeg(p, a, b) {
+  const ab = [b[0] - a[0], b[1] - a[1]]
+  const ap = [p[0] - a[0], p[1] - a[1]]
+  const len2 = ab[0] * ab[0] + ab[1] * ab[1]
+  if (len2 < 1e-10) return { dist: Math.hypot(ap[0], ap[1]), t: 0 }
+  const t = Math.max(0, Math.min(1, (ap[0] * ab[0] + ap[1] * ab[1]) / len2))
+  const proj = [a[0] + t * ab[0], a[1] + t * ab[1]]
+  return { dist: Math.hypot(p[0] - proj[0], p[1] - proj[1]), t }
+}
+
 // 点是否在线段上
 export function pointOnSeg(p, a, b) {
   const ab = [b[0] - a[0], b[1] - a[1]]

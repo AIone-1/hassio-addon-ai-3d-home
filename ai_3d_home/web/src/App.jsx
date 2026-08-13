@@ -106,6 +106,7 @@ export default function App() {
       if (sel.type === 'room') floor.rooms = floor.rooms.filter((r) => r.id !== sel.ref.id)
       else if (sel.type === 'furniture') floor.furniture = floor.furniture.filter((f) => f.id !== sel.ref.id)
       else if (sel.type === 'device') floor.devices = floor.devices.filter((d) => d.id !== sel.ref.id)
+      else if (sel.type === 'opening') floor.openings = (floor.openings || []).filter((o) => o.id !== sel.ref.id)
       else if (sel.type === 'wall' && sel.index != null) {
         floor.walls.splice(sel.index, 1)
         floor.rooms = recomputeRooms(floor)

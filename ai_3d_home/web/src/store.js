@@ -14,6 +14,7 @@ let state = {
   quality: 'balanced',        // eco | smooth | balanced | high
   shadows: true,
   autoRotate: false,
+  rotateDir: 1,              // 自动旋转方向：1=顺时针，-1=逆时针
   night: false,
   mode: '全屋',               // 全屋 | 照明 | 遮阳 | 环境 | 安防
   view2d: false,              // 2D/3D
