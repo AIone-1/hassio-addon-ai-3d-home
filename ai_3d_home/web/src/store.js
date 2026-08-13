@@ -10,6 +10,8 @@ let state = {
   recenterKey: 0,
   planRecenterKey: 0, // SVG 2D 编辑器「居中」信号，变化时重置 zoom/pan
   planZoomDelta: 0,   // SVG 2D 编辑器「放大/缩小」信号，+1 放大 / -1 缩小
+  planImage: '',      // 2D 编辑器参考底图（data URL，空=无底图）
+  planImageOpacity: 0.4,  // 底图透明度
   // 视图
   quality: 'high',            // eco | smooth | balanced | high
   shadows: true,

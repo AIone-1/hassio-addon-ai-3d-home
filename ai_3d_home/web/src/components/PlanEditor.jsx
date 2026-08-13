@@ -57,6 +57,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const snapOn = useStore(s => s.snap)
   const snapStep = useStore(s => s.snapStep)
   const showFurnitureLabels = useStore(s => s.showFurnitureLabels)
+  const planImage = useStore(s => s.planImage)
+  const planImageOpacity = useStore(s => s.planImageOpacity)
   const selected = useStore(s => s.selected)
   const furnitureType = useStore(s => s.furnitureType)
   const pendingEntity = useStore(s => s.pendingEntity)
@@ -541,6 +543,17 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         className="plan-grid-bg"
         fill="url(#plan-major-grid)"
       />
+
+      {/* 参考底图（照着画户型，半透明不可交互） */}
+      {planImage && (
+        <image
+          href={planImage}
+          x={vbX} y={vbY} width={vbW} height={vbH}
+          opacity={planImageOpacity}
+          preserveAspectRatio="xMidYMid meet"
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
 
       {/* 中心点标记（原点 = 3D 旋转中心，帮助对齐） */}
       <g className="plan-origin">

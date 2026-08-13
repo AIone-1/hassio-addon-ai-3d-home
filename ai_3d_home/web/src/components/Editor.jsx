@@ -25,6 +25,7 @@ export default function Editor() {
   const snapStep = useStore((s) => s.snapStep)
   const showLabels = useStore((s) => s.showLabels)
   const showFurnitureLabels = useStore((s) => s.showFurnitureLabels)
+  const planImage = useStore((s) => s.planImage)
   const view2d = useStore((s) => s.view2d)
   const mode = useStore((s) => s.mode)
   const project = useStore((s) => s.project)
@@ -61,9 +62,62 @@ export default function Editor() {
     const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `ai3d_home_${Date.now()}.json`
+    a.download = `户型图.json`
     a.click()
   }
+  // 导出 SVG 矢量平面图
+  const exportSVG = () => {
+    const svg = document.querySelector('.plan-editor')
+    if (!svg) return toast('请先进 2D 编辑模式')
+    const clone = svg.cloneNode(true)
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    const xml = new XMLSerializer().serializeToString(clone)
+    const blob = new Blob([xml], { type: 'image/svg+xml' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = '户型图.svg'
+    a.click()
+  }
+  // 导出 PNG 图片（2D 平面图截图）
+  const exportPNG = () => {
+    const svg = document.querySelector('.plan-editor')
+    if (!svg) return toast('请先进 2D 编辑模式')
+    const xml = new XMLSerializer().serializeToString(svg)
+    const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }))
+    const img = new Image()
+    img.onload = () => {
+      const scale = 2
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
+      const ctx = canvas.getContext('2d')
+      ctx.scale(scale, scale)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, img.width, img.height)
+      ctx.drawImage(img, 0, 0)
+      URL.revokeObjectURL(url)
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = '户型图.png'
+      a.click()
+    }
+    img.src = url
+  }
+  // 导入底图（照着画户型）
+  const importPlanImage = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = () => {
+      const f = input.files[0]
+      if (!f) return
+      const reader = new FileReader()
+      reader.onload = () => { setState({ planImage: reader.result }); toast('底图已导入，可拖拽缩放对齐后照着画') }
+      reader.readAsDataURL(f)
+    }
+    input.click()
+  }
+  const removePlanImage = () => { setState({ planImage: '' }); toast('底图已删除') }
 
   const importJson = () => {
     const input = document.createElement('input')
@@ -152,6 +206,11 @@ export default function Editor() {
       <div className="editor-top">
         <button className="et-btn" onClick={() => setState({ mode: '全屋' })}>{mode}</button>
         <button className="et-btn" onClick={openBackups}>最近备份</button>
+        <button className="et-btn" onClick={importPlanImage}>导入底图</button>
+        {planImage && <button className="et-btn" onClick={removePlanImage} style={{ color: 'var(--danger)' }}>删除底图</button>}
+        <button className="et-btn" onClick={exportPNG}>导出图</button>
+        <button className="et-btn" onClick={exportSVG}>导出 SVG</button>
+        <button className="et-btn" onClick={exportJson}>导出 JSON</button>
         <button className="et-btn" onClick={resetFloor} style={{ color: 'var(--danger)' }}>清空当前层</button>
         <button className="et-btn" onClick={clearAll} style={{ color: 'var(--danger)' }}>清空全部</button>
         <button className="et-btn" onClick={() => { saveNow(); createBackup() }} style={{ color: 'var(--accent)' }}>保存</button>
