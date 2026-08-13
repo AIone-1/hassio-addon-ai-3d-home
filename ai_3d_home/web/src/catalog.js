@@ -70,5 +70,26 @@ export async function loadCatalog() {
 
 export function getCatalog() { return catalog }
 export function getCatalogItem(type) { return catalog.find((m) => m.type === type) }
+
+// 根据实体域/名推断设备默认模型（返回 model name，即 catalog 项的 type；找不到返回 null 用小球兜底）
+export function inferDeviceModel(entityId, name = '') {
+  const domain = (entityId || '').split('.')[0]
+  const s = `${name} ${entityId}`.toLowerCase()
+  const find = (label) => {
+    const m = catalog.find((x) => x.label === label)
+    return m ? m.type : null
+  }
+  if (domain === 'light' || domain === 'switch') {
+    if (/(吊灯|chandelier|pendant)/.test(s)) return find('吊灯')
+    if (/(吸顶灯|ceiling)/.test(s)) return find('吸顶灯')
+    if (/(台灯|table ?lamp)/.test(s)) return find('台灯')
+    if (/(落地灯|floor ?lamp)/.test(s)) return find('落地灯')
+    if (/(筒灯|射灯|downlight|spotlight)/.test(s)) return find('筒灯')
+    if (/(壁灯|wall ?lamp)/.test(s)) return find('壁灯')
+    return find('吸顶灯') || find('吊灯')
+  }
+  if (domain === 'climate') return find('空调')
+  return null
+}
 export function glbUrl(name) { return modelBase() + 'models/' + name }
 export function thumbUrl(name) { return modelBase() + 'models/thumbs/' + name }

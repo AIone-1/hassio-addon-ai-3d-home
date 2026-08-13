@@ -24,6 +24,7 @@ let state = {
   showLabels: true,
   showFurnitureLabels: true,   // 显示家具名字标签
   immersive: false,           // 纯净沉浸模式（隐藏所有 UI，双击退出）
+  deviceListOpen: false,      // 设备列表弹窗（查看已绑定设备）
   // 编辑状态
   editing: false,             // 是否在编辑器
   tool: 'select',             // select|pan|wall|door|window|furniture|device|texture|delete

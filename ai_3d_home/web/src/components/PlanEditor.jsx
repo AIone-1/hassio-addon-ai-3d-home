@@ -309,7 +309,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       const [x, y] = snap(toWorld(e))
       const fl = getState().project.floors[floorIndex]
       fl.devices = fl.devices || []
-      fl.devices.push({ id: uid(), name: pendingEntity.name || pendingEntity.entity_id, entity_id: pendingEntity.entity_id, pos: [x, 1.4, y] })
+      fl.devices.push({ id: uid(), name: pendingEntity.name || pendingEntity.entity_id, entity_id: pendingEntity.entity_id, modelId: pendingEntity.modelId, pos: [x, 1.4, y] })
       setState({ project: { ...getState().project }, pendingEntity: null, bindOpen: false, saved: false })
       return
     }

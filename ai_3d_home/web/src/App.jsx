@@ -4,6 +4,7 @@ import PlanEditor from './components/PlanEditor'
 import BottomBar from './components/BottomBar'
 import Editor from './components/Editor'
 import BindDrawer from './components/BindDrawer'
+import DeviceList from './components/DeviceList'
 import { useStore, setState, getState, toast } from './store'
 import { api, TOGGLE_DOMAINS, BASE } from './api'
 import { roomsToWalls, recomputeRooms } from './three/geometry'
@@ -13,6 +14,7 @@ export default function App() {
   const project = useStore((s) => s.project)
   const editing = useStore((s) => s.editing)
   const bindOpen = useStore((s) => s.bindOpen)
+  const deviceListOpen = useStore((s) => s.deviceListOpen)
   const currentFloor = useStore((s) => s.currentFloor)
   const selected = useStore((s) => s.selected)
   const haConnected = useStore((s) => s.haConnected)
@@ -23,6 +25,12 @@ export default function App() {
   const bgMode = useStore((s) => s.bgMode)
   const view2d = useStore((s) => s.view2d)
   const immersive = useStore((s) => s.immersive)
+  const settings = useStore((s) => s.settings)
+  const quality = useStore((s) => s.quality)
+  const shadows = useStore((s) => s.shadows)
+  const autoRotate = useStore((s) => s.autoRotate)
+  const rotateDir = useStore((s) => s.rotateDir)
+  const rotateSpeed = useStore((s) => s.rotateSpeed)
   const [deviceModal, setDeviceModal] = useState(null)
   const saveTimer = useRef(null)
   const fpsRef = useRef(null)
@@ -67,10 +75,17 @@ export default function App() {
           quality: settings.quality || 'high',
           shadows: settings.shadows !== undefined ? settings.shadows : true,
           autoRotate: !!settings.autoRotate,
+          rotateDir: settings.rotateDir || 1,
+          rotateSpeed: settings.rotateSpeed || 1,
+          immersive: !!settings.immersive,
           night: !!settings.night,
           bgImage: settings.bgImage || '',
           bgMode: settings.bgMode || 'color',
         })
+        // 默认全屏：打开即自动进入浏览器全屏
+        if (settings.fullscreen) {
+          try { document.documentElement.requestFullscreen?.() } catch (e) {}
+        }
       } catch (e) { /* 本地开发 */ }
       try {
         const p = await api.project()
@@ -185,6 +200,13 @@ export default function App() {
     toast(`已发送 ${dev.name} 切换指令`)
   }
 
+  // 保存默认选项到 settings（下次打开生效）
+  const saveDefault = (patch) => {
+    const s = { ...getState().settings, ...patch }
+    setState({ settings: s })
+    api.saveSettings(s).catch(() => {})
+  }
+
   // ---------- 键盘快捷键 ----------
   useEffect(() => {
     const onKey = (e) => {
@@ -225,6 +247,8 @@ export default function App() {
 
       {bindOpen && <BindDrawer />}
 
+      {deviceListOpen && <DeviceList />}
+
       {/* 设备控制弹窗 */}
       {deviceModal && (
         <div className="modal-mask" onClick={() => setDeviceModal(null)}>
@@ -248,7 +272,43 @@ export default function App() {
       {settingsOpen && (
         <div className="modal-mask" onClick={() => setState({ settingsOpen: false })}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="dname">设置 · 背景</div>
+            <div className="dname">设置</div>
+            {/* 默认选项 */}
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>默认选项（下次打开生效）</label>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>旋转</span>
+                {[['none', '停止', !settings.autoRotate], ['cw', '顺时针', !!settings.autoRotate && settings.rotateDir === 1], ['ccw', '逆时针', !!settings.autoRotate && settings.rotateDir === -1]].map(([v, l, active]) => (
+                  <button key={v} onClick={() => saveDefault(v === 'none' ? { autoRotate: false } : { autoRotate: true, rotateDir: v === 'cw' ? 1 : -1 })}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: active ? 'var(--accent)' : 'var(--panel2)', color: active ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>{l}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>速度</span>
+                <input type="number" step="0.1" min="0.5" max="5" value={settings.rotateSpeed || 1}
+                  onChange={(e) => saveDefault({ rotateSpeed: parseFloat(e.target.value) || 1 })}
+                  style={{ width: 64, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12 }} />
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>×</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>画质</span>
+                {[['eco', '流畅'], ['smooth', '均衡'], ['balanced', '高清'], ['high', '极致']].map(([v, l]) => (
+                  <button key={v} onClick={() => saveDefault({ quality: v })}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: (settings.quality || 'high') === v ? 'var(--accent)' : 'var(--panel2)', color: (settings.quality || 'high') === v ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>{l}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>投影</span>
+                <button onClick={() => saveDefault({ shadows: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.shadows !== false ? 'var(--accent)' : 'var(--panel2)', color: settings.shadows !== false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                <button onClick={() => saveDefault({ shadows: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.shadows === false ? 'var(--accent)' : 'var(--panel2)', color: settings.shadows === false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>全屏</span>
+                <button onClick={() => saveDefault({ fullscreen: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.fullscreen ? 'var(--accent)' : 'var(--panel2)', color: settings.fullscreen ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                <button onClick={() => saveDefault({ fullscreen: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !settings.fullscreen ? 'var(--accent)' : 'var(--panel2)', color: !settings.fullscreen ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>沉浸</span>
+                <button onClick={() => saveDefault({ immersive: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.immersive ? 'var(--accent)' : 'var(--panel2)', color: settings.immersive ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                <button onClick={() => saveDefault({ immersive: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !settings.immersive ? 'var(--accent)' : 'var(--panel2)', color: !settings.immersive ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+              </div>
+            </div>
             <div className="field" style={{ margin: '12px 0' }}>
               <label>背景效果</label>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

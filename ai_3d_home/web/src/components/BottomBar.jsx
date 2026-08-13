@@ -58,8 +58,7 @@ export default function BottomBar() {
         <button className="bb-btn" disabled style={{ opacity: 0.4, cursor: 'not-allowed' }} title="玻璃效果（开发中）">璃玻璃</button>
       </div>
       <div className="bb-group">
-        <span className="bb-btn" style={{ cursor: 'default' }}>设备{deviceCount}</span>
-        <button className="bb-btn" onClick={() => setState({ bindOpen: true })}>绑定</button>
+        <button className="bb-btn" onClick={() => setState({ deviceListOpen: true })} title="查看已绑定设备">设备{deviceCount}</button>
         <button className={`bb-btn ${editing ? 'active' : ''}`} onClick={() => {
           if (editing) setState({ editing: false, view2d: false, tool: 'select' })
           else setState({ editing: true, view2d: true })

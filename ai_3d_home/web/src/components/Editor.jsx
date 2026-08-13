@@ -197,6 +197,7 @@ export default function Editor() {
 
         {/* 设备分类 */}
         <button className="et-btn" onClick={() => setFurnOpen(false) + setCatOpen(!catOpen)}>设备</button>
+        <button className="et-btn" onClick={() => { setState({ tool: 'device', bindOpen: true }); setFurnOpen(false); setCatOpen(false) }}>绑定设备</button>
         {catOpen && (
           <div className="furn-picker">
             {['全部', '灯光', '开关', '窗帘', '空调', '传感器', '感应器', '摄像机', '风扇', '安防'].map((c) => (

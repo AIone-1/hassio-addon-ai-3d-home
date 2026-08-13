@@ -654,6 +654,8 @@ function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
   const state = useStore((s) => s.haStates[dev.entity_id])
   const domain = (dev.entity_id || '').split('.')[0]
   const isOn = state && state.state === 'on'
+  const cat = dev.modelId ? getCatalogItem(dev.modelId) : null
+  const isLight = domain === 'light' || domain === 'switch'
 
   let color = '#556677', emissive = '#334455'
   if (domain === 'light' || domain === 'switch') {
@@ -670,11 +672,24 @@ function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
   }
 
   return (
-    <group position={[dev.pos[0], level + (dev.pos[1] || 1.4), dev.pos[2]]}>
-      <mesh onClick={interactive ? (e) => { e.stopPropagation(); onSelect(dev) } : undefined}>
-        <sphereGeometry args={[0.13, 16, 12]} />
-        <meshStandardMaterial color={color} emissive={emissive} emissiveIntensity={0.6} />
-      </mesh>
+    <group
+      position={[dev.pos[0], level + (dev.pos[1] || 1.4), dev.pos[2]]}
+      onClick={interactive ? (e) => { e.stopPropagation(); onSelect(dev) } : undefined}
+    >
+      {cat ? (
+        // 有绑定的模型：用下载的 GLB 模型渲染（灯/热水器/空调等）
+        <GltfModel name={cat.glb} height={cat.h} />
+      ) : (
+        // 无模型：小球兜底
+        <mesh>
+          <sphereGeometry args={[0.13, 16, 12]} />
+          <meshStandardMaterial color={color} emissive={emissive} emissiveIntensity={0.6} />
+        </mesh>
+      )}
+      {/* 灯/开关亮时加点光源，模型发光 */}
+      {isLight && isOn && (
+        <pointLight color="#ffd08a" intensity={1.5} distance={2.5} />
+      )}
       {selected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.25, 0.35, 24]} />

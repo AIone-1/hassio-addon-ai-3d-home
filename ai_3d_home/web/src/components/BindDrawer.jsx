@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore, setState } from '../store'
 import { DOMAIN_ICON } from '../api'
+import { inferDeviceModel } from '../catalog'
 
 const CATS = [
   { id: '全部', match: () => true },
@@ -31,8 +32,9 @@ export default function BindDrawer() {
   }).slice(0, 150)
 
   const pick = (e) => {
+    const name = e.attributes?.friendly_name || e.entity_id
     setState({
-      pendingEntity: { entity_id: e.entity_id, name: e.attributes?.friendly_name || e.entity_id },
+      pendingEntity: { entity_id: e.entity_id, name, modelId: inferDeviceModel(e.entity_id, name) },
       bindOpen: false,
       tool: 'device',
     })
