@@ -36,8 +36,7 @@ export function Controls({ enabled = true }) {
     if (st.camTarget) c.target.set(st.camTarget[0], st.camTarget[1], st.camTarget[2])
     c.enableRotate = !st.view2d && st.tool !== 'pan'
     c.mouseButtons = mouseButtons(st.view2d, st.tool)
-    c.autoRotate = st.autoRotate
-    c.autoRotateSpeed = 1.2 * st.rotateSpeed * st.rotateDir
+    c.autoRotate = false  // 自动旋转改为手动 deltaTime 缩放，见 useFrame
     ref.current = c
     return () => c.dispose()
   }, [camera, gl])
@@ -50,14 +49,6 @@ export function Controls({ enabled = true }) {
     }
   }, [view2d, tool])
 
-  // 自动旋转（绕 target=户型中心，不再绕原点偏移）；方向按 rotateDir、速度按 rotateSpeed
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.autoRotate = autoRotate
-      ref.current.autoRotateSpeed = 1.2 * rotateSpeed * rotateDir
-    }
-  }, [autoRotate, rotateDir, rotateSpeed])
-
   useEffect(() => {
     if (ref.current && target) ref.current.target.set(target[0], target[1], target[2])
   }, [target && target[0], target && target[1], target && target[2]])
@@ -66,6 +57,14 @@ export function Controls({ enabled = true }) {
     if (ref.current) ref.current.enabled = enabled
   }, [enabled])
 
-  useFrame(() => ref.current?.update())
+  // 手动自动旋转：按 deltaTime 缩放，帧率无关（避免 OrbitControls 内置 autoRotate 固定步长导致卡顿）
+  useFrame((_, delta) => {
+    const c = ref.current
+    if (!c) return
+    if (autoRotate) {
+      c.rotateLeft(0.13 * rotateSpeed * rotateDir * Math.min(delta, 0.05))
+    }
+    c.update()
+  })
   return null
 }
