@@ -74,20 +74,26 @@ export default function App() {
       }
       pollEntities()
       setInterval(pollEntities, 30000)
-      // 状态轮询（状态变化时才更新 haStates，避免每 3 秒全量重渲染导致 3D 转动卡顿）
+      // 状态轮询（只比较 state 字段做轻量指纹，避免 JSON.stringify 大对象阻塞主线程导致卡顿）
+      const stateFp = (o) => {
+        if (!o) return ''
+        let s = ''
+        for (const k in o) { const v = o[k]; s += k + '=' + (v && v.state) + ';' }
+        return s
+      }
       const pollStates = async () => {
         try {
           const st = await api.states()
           if (st && typeof st === 'object') {
             const prev = getState().haStates
-            if (!prev || JSON.stringify(prev) !== JSON.stringify(st)) {
+            if (!prev || stateFp(prev) !== stateFp(st)) {
               setState({ haStates: st, haConnected: true })
             }
           }
         } catch (e) { setState({ haConnected: false }) }
       }
       pollStates()
-      setInterval(pollStates, 3000)
+      setInterval(pollStates, 5000)
     })()
   }, [])
 
