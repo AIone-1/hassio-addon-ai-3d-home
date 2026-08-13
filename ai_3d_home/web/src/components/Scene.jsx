@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore, setState } from '../store'
-import { roomWallSegments, FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK, robustFloorGeometry } from '../three/geometry'
+import { roomWallSegments, FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK, robustFloorGeometry, wallKey } from '../three/geometry'
 
 // 加粗画图网格（用细长方体做线，比 gridHelper 的 1px 清晰得多）
 function DrawingGrid({ size = 20, cell = 1, level, night }) {
@@ -154,14 +154,11 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
   )
 }
 
-// ---------- 房间（地板 + 墙） ----------
-function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) {
+// ---------- 房间（地板 + 2D 描边；墙在 Scene 层统一去重渲染） ----------
+function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   const pts = room.points || []
   const view2d = useStore((s) => s.view2d)
   if (pts.length < 3) return null
-  const h = room.height || floor.height || 2.8
-  // 2D 用深色清晰实线（floor plan 感），3D 用浅色墙
-  const wallColor = selected ? '#2f7fe0' : (view2d ? '#3a4a66' : '#f5f2ec')
   // 每个房间地板明显高度差（0.05m），彻底避免重叠房间 z-fighting 互相盖住
   const floorY = level + roomIdx * 0.05
 
@@ -188,22 +185,6 @@ function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) 
           <lineBasicMaterial color="#6a7a90" />
         </lineLoop>
       )}
-      {/* 墙（2D 深色实线；3D 毛玻璃材质对齐原版） */}
-      {roomWallSegments(room).map((seg, i) => {
-        const len = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1])
-        if (len < 0.001) return null
-        const mx = (seg.a[0] + seg.b[0]) / 2
-        const mz = (seg.a[1] + seg.b[1]) / 2
-        const ang = Math.atan2(seg.b[1] - seg.a[1], seg.b[0] - seg.a[0])
-        return (
-          <mesh key={i} position={[mx, h / 2 + level, mz]} rotation={[0, -ang, 0]}>
-            <boxGeometry args={[len, view2d ? 0.01 : h, view2d ? WALL_THICK : WALL_THICK]} />
-            {view2d
-              ? <meshBasicMaterial color={wallColor} />
-              : <meshPhysicalMaterial color={wallColor} transparent opacity={selected ? 0.6 : 0.35} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />}
-          </mesh>
-        )
-      })}
     </group>
   )
 }
@@ -295,7 +276,7 @@ export default function Scene({ onSelect, floorIndex }) {
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
   const interactive = tool === 'select' || tool === 'delete'
-  const canDrag = tool === 'select' && view2d
+  const canDrag = tool === 'move' && editing
   const ml = MODE_LIGHT[mode] || MODE_LIGHT['全屋']
 
   // 家具移动：更新位置 + 触发保存
@@ -303,8 +284,24 @@ export default function Scene({ onSelect, floorIndex }) {
     setState({ project: { ...project }, saved: false })
   }
 
+  // 收集所有房间的墙段并去重共享墙（相邻房间共用一堵墙只渲染一次，记录归属房间用于选中高亮）
+  const wallSegs = useMemo(() => {
+    const seen = new Map()
+    for (const room of (floor?.rooms || [])) {
+      for (const seg of roomWallSegments(room)) {
+        const k = wallKey(seg)
+        if (seen.has(k)) {
+          seen.get(k).roomIds.add(room.id)
+        } else {
+          seen.set(k, { seg, roomIds: new Set([room.id]), h: room.height || floor.height || 2.8 })
+        }
+      }
+    }
+    return Array.from(seen.values())
+  }, [JSON.stringify((floor?.rooms || []).map((r) => r.points))])
+
   useFrame((_, delta) => {
-    if (autoRotate && rootRef.current) {
+    if (autoRotate && !view2d && rootRef.current) {
       rootRef.current.rotation.y += (20 * Math.PI / 180) * Math.min(delta, 0.1)
     }
   })
@@ -371,10 +368,28 @@ export default function Scene({ onSelect, floorIndex }) {
         {/* 房间 */}
         {(floor.rooms || []).map((room, idx) => (
           <Room key={room.id} room={room} roomIdx={idx} floor={floor} level={level}
-            selected={sel && sel.type === 'room' && sel.ref.id === room.id}
             interactive={interactive}
             onSelect={(r) => onSelect({ type: 'room', ref: r })} />
         ))}
+
+        {/* 墙（去重共享墙；2D 深色实线，3D 毛玻璃材质对齐原版；选中房间的墙高亮） */}
+        {wallSegs.map(({ seg, roomIds, h }, i) => {
+          const len = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1])
+          if (len < 0.001) return null
+          const mx = (seg.a[0] + seg.b[0]) / 2
+          const mz = (seg.a[1] + seg.b[1]) / 2
+          const ang = Math.atan2(seg.b[1] - seg.a[1], seg.b[0] - seg.a[0])
+          const isSel = sel && sel.type === 'room' && roomIds.has(sel.ref.id)
+          const wallColor = isSel ? '#2f7fe0' : (view2d ? '#3a4a66' : '#f5f2ec')
+          return (
+            <mesh key={`wall${i}`} position={[mx, h / 2 + level, mz]} rotation={[0, -ang, 0]}>
+              <boxGeometry args={[len, view2d ? 0.01 : h, WALL_THICK]} />
+              {view2d
+                ? <meshBasicMaterial color={wallColor} />
+                : <meshPhysicalMaterial color={wallColor} transparent opacity={isSel ? 0.6 : 0.35} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />}
+            </mesh>
+          )
+        })}
 
         {/* 门窗 */}
         {(floor.openings || []).map((op) => <Opening key={op.id} op={op} floor={floor} level={level} />)}

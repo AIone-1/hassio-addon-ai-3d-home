@@ -148,10 +148,10 @@ export default function App() {
         // ESC：退出编辑 + 清草稿/选中/弹窗
         window.__wallDraft = null
         setDeviceModal(null)
-        setState({ editing: false, bindOpen: false, pendingEntity: null, selected: null, view2d: false, settingsOpen: false })
+        setState({ editing: false, bindOpen: false, pendingEntity: null, selected: null, view2d: false, settingsOpen: false, tool: 'select' })
       }
       // 工具快捷键 V/H/W/D/N/F/E/B
-      const map = { v: 'select', h: 'pan', w: 'wall', d: 'door', n: 'window', f: 'furniture', e: 'device', b: 'texture' }
+      const map = { v: 'select', m: 'move', h: 'pan', w: 'wall', d: 'door', n: 'window', f: 'furniture', e: 'device', b: 'texture' }
       if (map[e.key.toLowerCase()] && editing) {
         setState({ tool: map[e.key.toLowerCase()] })
       }

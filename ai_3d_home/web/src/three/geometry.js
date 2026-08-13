@@ -35,6 +35,15 @@ export function roomWallSegments(room) {
   return segs
 }
 
+// 墙段唯一 key（忽略方向），用于去重共享墙
+export function wallKey(seg) {
+  const a = [Math.round(seg.a[0] * 100), Math.round(seg.a[1] * 100)]
+  const b = [Math.round(seg.b[0] * 100), Math.round(seg.b[1] * 100)]
+  const lo = (a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])) ? a : b
+  const hi = lo === a ? b : a
+  return `${lo[0]},${lo[1]}-${hi[0]},${hi[1]}`
+}
+
 // 清洗多边形：去掉连续重复点和共线点，避免生成退化地板
 export function cleanPolygon(points) {
   if (!points || points.length < 3) return points
