@@ -15,6 +15,7 @@ let state = {
   shadows: true,
   autoRotate: false,
   rotateDir: 1,              // 自动旋转方向：1=顺时针，-1=逆时针
+  rotateSpeed: 1,            // 自动旋转速度倍率（0.5~3）
   night: false,
   mode: '全屋',               // 全屋 | 照明 | 遮阳 | 环境 | 安防
   view2d: false,              // 2D/3D

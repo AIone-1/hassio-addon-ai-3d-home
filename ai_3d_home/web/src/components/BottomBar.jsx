@@ -6,6 +6,7 @@ export default function BottomBar() {
   const mode = useStore((s) => s.mode)
   const autoRotate = useStore((s) => s.autoRotate)
   const rotateDir = useStore((s) => s.rotateDir)
+  const rotateSpeed = useStore((s) => s.rotateSpeed)
   const quality = useStore((s) => s.quality)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
@@ -30,6 +31,13 @@ export default function BottomBar() {
         }}>
           {autoRotate ? (rotateDir === 1 ? '🔄 顺时针' : '🔄 逆时针') : '🔄 旋转'}
         </button>
+        {autoRotate && (
+          <span className="bb-speed" title="转速">
+            <input type="range" min="0.5" max="3" step="0.1" value={rotateSpeed}
+              onChange={(e) => setState({ rotateSpeed: parseFloat(e.target.value) })} />
+            <span className="bb-speed-val">{rotateSpeed.toFixed(1)}×</span>
+          </span>
+        )}
         <button className="bb-btn" onClick={() => setState((s) => ({ recenterKey: s.recenterKey + 1 }))} title="居中视角">
           ⌖ 居中
         </button>
