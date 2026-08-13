@@ -112,7 +112,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   background: #eef1f6; touch-action: none; cursor: crosshair; }
 .plan-grid-minor { stroke: #dde3ec; stroke-width: 0.015; }
 .plan-grid-major { stroke: #c6d0dd; stroke-width: 0.03; }
-.plan-room { fill: #e6e0d2; stroke: #b9ae98; stroke-width: 0.04; cursor: pointer; }
+.plan-room { fill: #f7f8f6; stroke: #d9ded8; stroke-width: 0.04; cursor: pointer; }
 .plan-room.selected { fill: #d4e6ff; stroke: #2f7fe0; stroke-width: 0.05; }
 .plan-room-name { font-size: 0.26px; fill: #4a5560; font-weight: 700; text-anchor: middle; dominant-baseline: middle;
   paint-order: stroke; stroke: #fff; stroke-width: 0.08; stroke-linejoin: round; pointer-events: none; }
