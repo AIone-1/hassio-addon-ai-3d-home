@@ -485,7 +485,7 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
       {/* 地板：多边形形状，法线朝上，renderOrder 强制绘制在前 */}
-      <mesh geometry={floorGeo} position={[0, floorY, 0]} renderOrder={1}>
+      <mesh geometry={floorGeo} position={[0, floorY, 0]} renderOrder={1} receiveShadow>
         {view2d
           ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} side={THREE.DoubleSide} />
           : <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.46} metalness={0.02} clearcoat={0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} />}
