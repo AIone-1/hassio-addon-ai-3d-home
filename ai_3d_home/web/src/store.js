@@ -12,6 +12,7 @@ let state = {
   planZoomDelta: 0,   // SVG 2D 编辑器「放大/缩小」信号，+1 放大 / -1 缩小
   planImage: '',      // 2D 编辑器参考底图（data URL，空=无底图）
   planImageOpacity: 0.4,  // 底图透明度
+  planImageScale: 1,  // 底图缩放倍数（1=铺满）
   // 视图
   quality: 'high',            // eco | smooth | balanced | high
   shadows: true,

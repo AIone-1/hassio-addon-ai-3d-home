@@ -207,7 +207,13 @@ export default function Editor() {
         <button className="et-btn" onClick={() => setState({ mode: '全屋' })}>{mode}</button>
         <button className="et-btn" onClick={openBackups}>最近备份</button>
         <button className="et-btn" onClick={importPlanImage}>导入底图</button>
-        {planImage && <button className="et-btn" onClick={removePlanImage} style={{ color: 'var(--danger)' }}>删除底图</button>}
+        {planImage && (
+          <>
+            <button className="et-btn" onClick={() => setState(s => ({ planImageScale: (s.planImageScale || 1) * 1.25 }))} title="放大底图">底图＋</button>
+            <button className="et-btn" onClick={() => setState(s => ({ planImageScale: (s.planImageScale || 1) / 1.25 }))} title="缩小底图">底图−</button>
+            <button className="et-btn" onClick={removePlanImage} style={{ color: 'var(--danger)' }}>删除底图</button>
+          </>
+        )}
         <button className="et-btn" onClick={exportPNG}>导出图</button>
         <button className="et-btn" onClick={exportSVG}>导出 SVG</button>
         <button className="et-btn" onClick={exportJson}>导出 JSON</button>

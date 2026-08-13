@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
 import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg } from '../three/geometry'
-import { getCatalogItem } from '../catalog'
+import { getCatalogItem, thumbUrl } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
 const CLOSE = 0.5      // 画墙闭合半径（点回起点 <0.5m 闭合）
@@ -59,6 +59,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const showFurnitureLabels = useStore(s => s.showFurnitureLabels)
   const planImage = useStore(s => s.planImage)
   const planImageOpacity = useStore(s => s.planImageOpacity)
+  const planImageScale = useStore(s => s.planImageScale)
   const selected = useStore(s => s.selected)
   const furnitureType = useStore(s => s.furnitureType)
   const pendingEntity = useStore(s => s.pendingEntity)
@@ -544,16 +545,23 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         fill="url(#plan-major-grid)"
       />
 
-      {/* 参考底图（照着画户型，半透明不可交互） */}
-      {planImage && (
-        <image
-          href={planImage}
-          x={vbX} y={vbY} width={vbW} height={vbH}
-          opacity={planImageOpacity}
-          preserveAspectRatio="xMidYMid meet"
-          style={{ pointerEvents: 'none' }}
-        />
-      )}
+      {/* 参考底图（照着画户型，半透明不可交互，可缩放） */}
+      {planImage && (() => {
+        const s = planImageScale || 1
+        const imgW = vbW * s
+        const imgH = vbH * s
+        const imgX = vbX + (vbW - imgW) / 2
+        const imgY = vbY + (vbH - imgH) / 2
+        return (
+          <image
+            href={planImage}
+            x={imgX} y={imgY} width={imgW} height={imgH}
+            opacity={planImageOpacity}
+            preserveAspectRatio="xMidYMid meet"
+            style={{ pointerEvents: 'none' }}
+          />
+        )
+      })()}
 
       {/* 中心点标记（原点 = 3D 旋转中心，帮助对齐） */}
       <g className="plan-origin">
@@ -830,18 +838,25 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <span>{selDevice.name || selDevice.entity_id}</span>
           <button className="plan-props-del" onClick={() => deleteDevice(selDevice)}>删除</button>
         </div>
-        <div className="plan-props-row">
-          <span className="plan-props-label">模型</span>
-          <select value={selDevice.modelId || ''}
-            onChange={(e) => patchDevice(selDevice, { modelId: e.target.value || undefined })}
-            style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12 }}>
-            <option value="">无（圆球）</option>
+        <div className="plan-props-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+          <span className="plan-props-label">模型（点缩略图选）</span>
+          <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <button onClick={() => patchDevice(selDevice, { modelId: undefined })}
+              style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', background: !selDevice.modelId ? 'var(--accent)' : 'var(--panel2)', color: !selDevice.modelId ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12, alignSelf: 'flex-start' }}>无（圆球）</button>
             {groupedCatalog.map(([label, items]) => (
-              <optgroup key={label} label={label}>
-                {items.map((m) => <option key={m.type} value={m.type}>{m.label}</option>)}
-              </optgroup>
+              <div key={label}>
+                <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 3px' }}>{label}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {items.map((m) => (
+                    <button key={m.type} title={m.label} onClick={() => patchDevice(selDevice, { modelId: m.type })}
+                      style={{ padding: 3, borderRadius: 6, border: selDevice.modelId === m.type ? '2px solid var(--accent)' : '1px solid var(--border)', background: 'var(--panel2)', cursor: 'pointer' }}>
+                      <img src={thumbUrl(m.thumb)} alt={m.label} style={{ width: 36, height: 36, objectFit: 'contain', display: 'block', borderRadius: 4 }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
-          </select>
+          </div>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">实体</span>

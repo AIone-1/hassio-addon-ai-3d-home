@@ -81,6 +81,12 @@ export default function App() {
           night: !!settings.night,
           bgImage: settings.bgImage || '',
           bgMode: settings.bgMode || 'color',
+          // 编辑器默认选项
+          snap: settings.snap !== undefined ? settings.snap : true,
+          showLabels: settings.showLabels !== undefined ? settings.showLabels : true,
+          showFurnitureLabels: settings.showFurnitureLabels !== undefined ? settings.showFurnitureLabels : true,
+          furnitureScale: settings.furnitureScale || 1,
+          view2d: !!settings.defaultView2d,
         })
         // 默认全屏：打开即自动进入浏览器全屏
         if (settings.fullscreen) {
@@ -307,6 +313,29 @@ export default function App() {
                 <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>沉浸</span>
                 <button onClick={() => saveDefault({ immersive: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.immersive ? 'var(--accent)' : 'var(--panel2)', color: settings.immersive ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
                 <button onClick={() => saveDefault({ immersive: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !settings.immersive ? 'var(--accent)' : 'var(--panel2)', color: !settings.immersive ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+              </div>
+            </div>
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>编辑器默认（下次进入编辑生效）</label>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>吸附</span>
+                <button onClick={() => saveDefault({ snap: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.snap !== false ? 'var(--accent)' : 'var(--panel2)', color: settings.snap !== false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                <button onClick={() => saveDefault({ snap: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.snap === false ? 'var(--accent)' : 'var(--panel2)', color: settings.snap === false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>标签</span>
+                <button onClick={() => saveDefault({ showLabels: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.showLabels !== false ? 'var(--accent)' : 'var(--panel2)', color: settings.showLabels !== false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                <button onClick={() => saveDefault({ showLabels: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.showLabels === false ? 'var(--accent)' : 'var(--panel2)', color: settings.showLabels === false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>名字</span>
+                <button onClick={() => saveDefault({ showFurnitureLabels: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.showFurnitureLabels !== false ? 'var(--accent)' : 'var(--panel2)', color: settings.showFurnitureLabels !== false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                <button onClick={() => saveDefault({ showFurnitureLabels: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.showFurnitureLabels === false ? 'var(--accent)' : 'var(--panel2)', color: settings.showFurnitureLabels === false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>默认视图</span>
+                <button onClick={() => saveDefault({ defaultView2d: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.defaultView2d ? 'var(--accent)' : 'var(--panel2)', color: settings.defaultView2d ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>2D</button>
+                <button onClick={() => saveDefault({ defaultView2d: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !settings.defaultView2d ? 'var(--accent)' : 'var(--panel2)', color: !settings.defaultView2d ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>3D</button>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>缩放</span>
+                {[0.6, 0.8, 1, 1.2, 1.5].map((s) => (
+                  <button key={s} onClick={() => saveDefault({ furnitureScale: s })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: (settings.furnitureScale || 1) === s ? 'var(--accent)' : 'var(--panel2)', color: (settings.furnitureScale || 1) === s ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>{Math.round(s * 100)}%</button>
+                ))}
               </div>
             </div>
             <div className="field" style={{ margin: '12px 0' }}>
