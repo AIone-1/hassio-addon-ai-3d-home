@@ -8,8 +8,8 @@ import { useStore, setState } from '../store'
 export const QUALITY = {
   eco: { dprMax: 1.0, shadow: 256, aa: false },
   smooth: { dprMax: 1.25, shadow: 512, aa: false },
-  balanced: { dprMax: 1.5, shadow: 1024, aa: true },
-  high: { dprMax: 2.0, shadow: 2048, aa: true },
+  balanced: { dprMax: 1.25, shadow: 1024, aa: false },
+  high: { dprMax: 1.5, shadow: 2048, aa: true },
 }
 
 // 设备标签投影（HTML 覆盖在画布上）

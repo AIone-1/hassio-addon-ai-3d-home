@@ -201,8 +201,8 @@ export default function App() {
         <span style={{ color: 'var(--accent2)' }}>
           {editing ? `· 房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
         </span>
-        <span style={{ color: fps >= 50 ? 'var(--ok)' : fps >= 30 ? 'var(--accent2)' : 'var(--danger)' }}>
-          {fps > 0 ? `· ${fps} FPS` : ''}
+        <span style={{ color: fps >= 50 ? 'var(--ok)' : fps >= 30 ? 'var(--accent2)' : 'var(--danger)', fontSize: '16px', fontWeight: 700 }}>
+          {fps > 0 ? ` ${fps} FPS` : ''}
         </span>
       </div>
 
