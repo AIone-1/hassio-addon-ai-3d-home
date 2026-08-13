@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useStore } from '../store'
+import { useStore, setState } from '../store'
 import { roomWallSegments, FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK, robustFloorGeometry } from '../three/geometry'
 
 // 加粗画图网格（用细长方体做线，比 gridHelper 的 1px 清晰得多）
@@ -102,20 +102,51 @@ function SelectBox({ center, size, rot }) {
   )
 }
 
-// ---------- 单个家具 ----------
-function Furniture({ item, level, selected, onSelect, interactive }) {
+// ---------- 单个家具（支持选择工具下拖动移动） ----------
+function Furniture({ item, level, selected, onSelect, onMove, interactive, canDrag }) {
   const pos = item.pos || [0, 0, 0]
   const rot = item.rot || 0
   const scale = item.scale || [1, 1, 1]
   const lib = FURNITURE_LIB.find((f) => f.type === item.type)
   const w = (lib ? lib.w : 1) * (scale[0] || 1)
   const d = (lib ? lib.d : 0.6) * (scale[2] || 1)
+  const { camera, gl } = useThree()
+  const raycaster = useMemo(() => new THREE.Raycaster(), [])
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -level), [level])
+  const dragRef = useRef(false)
+
+  const toWorld = (e) => {
+    const rect = gl.domElement.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
+    const p = new THREE.Vector3()
+    return raycaster.ray.intersectPlane(plane, p) ? p : null
+  }
+
   return (
     <group
       position={[pos[0], level + (pos[1] || 0), pos[2]]}
       rotation={[0, rot * Math.PI / 180, 0]}
       scale={scale}
       onClick={interactive ? (e) => { e.stopPropagation(); onSelect(item) } : undefined}
+      onPointerDown={canDrag ? (e) => {
+        e.stopPropagation()
+        onSelect(item)
+        dragRef.current = true
+        e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId)
+      } : undefined}
+      onPointerMove={canDrag ? (e) => {
+        if (!dragRef.current) return
+        e.stopPropagation()
+        const p = toWorld(e)
+        if (p) {
+          item.pos[0] = Math.round(p.x * 10) / 10
+          item.pos[2] = Math.round(p.z * 10) / 10
+          onMove(item)
+        }
+      } : undefined}
+      onPointerUp={canDrag ? () => { dragRef.current = false } : undefined}
     >
       <FurnitureModel type={item.type} />
       {selected && <SelectBox center={[0, (lib && lib.type === '床' ? 1 : 0.6), 0]} size={[w + 0.3, 1.4, d + 0.3]} rot={0} />}
@@ -264,7 +295,13 @@ export default function Scene({ onSelect, floorIndex }) {
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
   const interactive = tool === 'select' || tool === 'delete'
+  const canDrag = tool === 'select' && view2d
   const ml = MODE_LIGHT[mode] || MODE_LIGHT['全屋']
+
+  // 家具移动：更新位置 + 触发保存
+  const handleMoveFurniture = () => {
+    setState({ project: { ...project }, saved: false })
+  }
 
   useFrame((_, delta) => {
     if (autoRotate && rootRef.current) {
@@ -347,7 +384,9 @@ export default function Scene({ onSelect, floorIndex }) {
           <Furniture key={f.id} item={f} level={level}
             selected={sel && sel.type === 'furniture' && sel.ref.id === f.id}
             interactive={interactive}
-            onSelect={(f) => onSelect({ type: 'furniture', ref: f })} />
+            canDrag={canDrag}
+            onSelect={(f) => onSelect({ type: 'furniture', ref: f })}
+            onMove={handleMoveFurniture} />
         ))}
 
         {/* 设备 */}
