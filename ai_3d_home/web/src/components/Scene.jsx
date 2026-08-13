@@ -99,18 +99,18 @@ function FBox({ position, size, color, roughness = 0.72 }) {
 }
 
 // ---------- 家具模型（对齐原版：每个家具用多个盒子拼出具体造型，统一蓝灰主题色） ----------
-function FurnitureModel({ type }) {
+function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
   const lib = FURNITURE_LIB.find((f) => f.type === type)
   // 网上下载的 GLB 模型：直接加载渲染（自动缩放对齐）
-  if (lib && lib.glb) return <GltfModel name={lib.glb} height={lib.h || 0.7} />
+  if (lib && lib.glb) return <GltfModel name={lib.glb} height={ch || lib.h || 0.7} />
   const cat = getCatalogItem(type)
-  if (cat) return <GltfModel name={cat.glb} height={cat.h} />
-  const w = lib ? lib.w : 1
-  const d = lib ? lib.d : 0.6
-  const h = lib ? lib.h : 0.6
-  const M = FURNITURE_MAIN
-  const D = FURNITURE_DETAIL
-  const A = FURNITURE_ACCENT
+  if (cat) return <GltfModel name={cat.glb} height={ch || cat.h} />
+  const w = cw || (lib ? lib.w : 1)
+  const d = cd || (lib ? lib.d : 0.6)
+  const h = ch || (lib ? lib.h : 0.6)
+  const M = color || FURNITURE_MAIN
+  const D = color ? mixColor(color, '#000000', 0.28) : FURNITURE_DETAIL
+  const A = color ? mixColor(color, '#ffffff', 0.35) : FURNITURE_ACCENT
   const q = Math.min(0.12, h * 0.16)  // 桌面厚度
   const legs = (V) => [-1, 1].flatMap(x => [-1, 1].map(z => (
     <FBox key={`${x}${z}`} position={[x * (w / 2 - 0.09), V / 2, z * (d / 2 - 0.09)]} size={[0.08, V, 0.08]} color={D} />
@@ -424,8 +424,9 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
   const scale = item.scale || [1, 1, 1]
   const lib = FURNITURE_LIB.find((f) => f.type === item.type)
   const cat = getCatalogItem(item.type)
-  const w = (lib ? lib.w : cat ? cat.w : 1) * (scale[0] || 1)
-  const d = (lib ? lib.d : cat ? cat.d : 0.6) * (scale[2] || 1)
+  const w = item.width != null ? item.width : (lib ? lib.w : cat ? cat.w : 1) * (scale[0] || 1)
+  const d = item.depth != null ? item.depth : (lib ? lib.d : cat ? cat.d : 0.6) * (scale[2] || 1)
+  const h = item.height != null ? item.height : (lib ? lib.h : cat ? cat.h : 0.6)
   const { camera, gl } = useThree()
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -level), [level])
@@ -464,8 +465,8 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
       } : undefined}
       onPointerUp={canDrag ? () => { dragRef.current = false } : undefined}
     >
-      <FurnitureModel type={item.type} />
-      {selected && <SelectBox center={[0, (lib && lib.type === '床' ? 1 : 0.6), 0]} size={[w + 0.3, 1.4, d + 0.3]} rot={0} />}
+      <FurnitureModel type={item.type} color={item.color} w={w} d={d} h={h} />
+      {selected && <SelectBox center={[0, (lib && lib.type === '床' ? 1 : h / 2 + 0.1), 0]} size={[w + 0.3, h + 0.3, d + 0.3]} rot={0} />}
     </group>
   )
 }

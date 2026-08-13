@@ -2,7 +2,7 @@
 // 墙是线段（floor.walls 持久化），房间由墙段的封闭环自动检测（recomputeRooms）——这就是"共用墙/相交也封闭"的机制
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
-import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg } from '../three/geometry'
 import { getCatalogItem } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
@@ -56,6 +56,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const tool = useStore(s => s.tool)
   const snapOn = useStore(s => s.snap)
   const snapStep = useStore(s => s.snapStep)
+  const showFurnitureLabels = useStore(s => s.showFurnitureLabels)
   const selected = useStore(s => s.selected)
   const furnitureType = useStore(s => s.furnitureType)
   const pendingEntity = useStore(s => s.pendingEntity)
@@ -359,6 +360,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
 
   // ---------- 家具属性编辑（旋转 / 放置面 / 高度 / 删除） ----------
   const selFurniture = selected && selected.type === 'furniture' ? selected.ref : null
+  const selLib = selFurniture ? FURNITURE_LIB.find(x => x.type === selFurniture.type) : null
+  const curW = selFurniture ? (selFurniture.width != null ? selFurniture.width : (selLib ? selLib.w : 1)) : 1
+  const curD = selFurniture ? (selFurniture.depth != null ? selFurniture.depth : (selLib ? selLib.d : 0.6)) : 0.6
+  const curH = selFurniture ? (selFurniture.height != null ? selFurniture.height : (selLib ? selLib.h : 0.6)) : 0.6
 
   const curFurniture = (f) => {
     const fl = getState().project.floors[floorIndex]
@@ -386,6 +391,18 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     fl.furniture = (fl.furniture || []).filter(x => x.id !== f.id)
     setState({ project: { ...st.project }, saved: false, selected: null })
     toast('已删除家具')
+  }
+  const duplicateFurniture = (f) => {
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
+    const copy = JSON.parse(JSON.stringify(f))
+    copy.id = uid()
+    copy.pos = [f.pos[0] + 0.3, f.pos[1], f.pos[2] + 0.3]
+    fl.furniture = fl.furniture || []
+    const idx = fl.furniture.findIndex(x => x.id === f.id)
+    fl.furniture.splice(idx + 1, 0, copy)
+    setState({ project: { ...st.project }, saved: false, selected: { type: 'furniture', ref: copy } })
+    toast('已复制家具')
   }
 
   // ---------- 门窗属性编辑（类型 / 颜色 / 内开外开 / 翻转 / 删除） ----------
@@ -523,9 +540,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       {furniture.map(f => {
         const lib = FURNITURE_LIB.find(x => x.type === f.type)
         const cat = getCatalogItem(f.type)
-        const w = (lib ? lib.w : cat ? cat.w : 1) * (f.scale ? f.scale[0] : 1)
-        const d = (lib ? lib.d : cat ? cat.d : 0.6) * (f.scale ? f.scale[2] : 1)
-        const label = lib ? f.type : (cat ? cat.label : f.type)
+        const w = f.width != null ? f.width : (lib ? lib.w : cat ? cat.w : 1) * (f.scale ? f.scale[0] : 1)
+        const d = f.depth != null ? f.depth : (lib ? lib.d : cat ? cat.d : 0.6) * (f.scale ? f.scale[2] : 1)
+        const label = f.name || (lib ? f.type : (cat ? cat.label : f.type))
         const selF = isSel('furniture', f.id)
         const placement = f.placement || (lib && lib.placement) || 'floor'
         return (
@@ -538,9 +555,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             <rect
               x={-w / 2} y={-d / 2} width={w} height={d}
               className={`plan-furniture ${placement !== 'floor' ? 'plan-furniture-' + placement : ''} ${selF ? 'selected' : ''}`}
-              stroke={selF ? '#2f7fe0' : (FURNITURE_COLORS[lib ? f.type : (cat ? cat.label : f.type)] || '#9aa7b5')}
+              stroke={selF ? '#2f7fe0' : (f.color || FURNITURE_COLORS[lib ? f.type : (cat ? cat.label : f.type)] || '#9aa7b5')}
             />
-            <text y="0.06" className="plan-furniture-label">{label}</text>
+            {showFurnitureLabels && <text y="0.06" className="plan-furniture-label">{label}</text>}
           </g>
         )
       })}
@@ -583,8 +600,23 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     {selFurniture && (
       <div className="plan-props">
         <div className="plan-props-head">
-          <span>{selFurniture.type}</span>
+          <span>{selFurniture.name || selFurniture.type}</span>
           <button className="plan-props-del" onClick={() => deleteFurniture(selFurniture)}>删除</button>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">名字</span>
+          <input type="text" value={selFurniture.name || ''} placeholder={selFurniture.type}
+            onChange={(e) => patchFurniture(selFurniture, { name: e.target.value })} />
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">大小</span>
+          <input type="number" step="0.1" min="0.1" value={Math.round(curW * 100) / 100} title="宽"
+            onChange={(e) => patchFurniture(selFurniture, { width: Number(e.target.value) || undefined })} />
+          <input type="number" step="0.1" min="0.1" value={Math.round(curD * 100) / 100} title="深"
+            onChange={(e) => patchFurniture(selFurniture, { depth: Number(e.target.value) || undefined })} />
+          <input type="number" step="0.1" min="0.1" value={Math.round(curH * 100) / 100} title="高"
+            onChange={(e) => patchFurniture(selFurniture, { height: Number(e.target.value) || undefined })} />
+          <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">旋转</span>
@@ -601,6 +633,15 @@ export default function PlanEditor({ onSelect, floorIndex }) {
               onClick={() => setFurniturePlacement(selFurniture, p)}>{label}</button>
           ))}
         </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          <button title="默认" className={`plan-props-swatch ${!selFurniture.color ? 'active' : ''}`} style={{ background: '#8f9fbb' }}
+            onClick={() => patchFurniture(selFurniture, { color: '' })} />
+          {Object.entries(FURNITURE_COLOR_PALETTE).map(([name, hex]) => (
+            <button key={name} title={name} className={`plan-props-swatch ${selFurniture.color === name ? 'active' : ''}`} style={{ background: hex }}
+              onClick={() => patchFurniture(selFurniture, { color: name })} />
+          ))}
+        </div>
         {(selFurniture.placement || 'floor') !== 'floor' && (
           <div className="plan-props-row">
             <span className="plan-props-label">高度</span>
@@ -609,6 +650,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             <span className="plan-props-unit">m</span>
           </div>
         )}
+        <div className="plan-props-row">
+          <button className="plan-props-seg" onClick={() => duplicateFurniture(selFurniture)}>⧉ 复制</button>
+        </div>
       </div>
     )}
     {selOpening && (

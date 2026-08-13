@@ -22,6 +22,7 @@ let state = {
   snap: true,
   snapStep: 0.5,            // 吸附精度（米），0.1/0.25/0.5/1
   showLabels: true,
+  showFurnitureLabels: true,   // 显示家具名字标签
   // 编辑状态
   editing: false,             // 是否在编辑器
   tool: 'select',             // select|pan|wall|door|window|furniture|device|texture|delete

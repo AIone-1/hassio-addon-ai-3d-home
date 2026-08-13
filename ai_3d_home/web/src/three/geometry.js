@@ -26,6 +26,9 @@ export const FURNITURE_WALL_HEIGHT = 1.2
 
 // 门颜色（5 色）+ 门/窗类型（key 存数据，label 面板显示）
 export const DOOR_COLORS = { 木色: '#a97c50', 白: '#e8ecef', 灰: '#8b9298', 黑: '#2c3035', 蓝: '#4a7ab5' }
+
+// 家具自定义颜色（8 色，选空=默认蓝灰主题色）
+export const FURNITURE_COLOR_PALETTE = { 木色: '#a97c50', 白: '#e8ecef', 灰: '#8b9298', 黑: '#2c3035', 蓝: '#4a7ab5', 红: '#c0504d', 绿: '#5a9c6a', 橙: '#d08a4a' }
 export const DOOR_STYLES = [
   { key: 'swing', label: '平开门' },
   { key: 'double', label: '双开门' },
