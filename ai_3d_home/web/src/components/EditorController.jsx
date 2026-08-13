@@ -79,8 +79,8 @@ export default function EditorController() {
         if (!window.__wallDraft) window.__wallDraft = { pts: [] }
         const draft = window.__wallDraft
         const first = draft.pts[0]
-        // 点回起点（<0.3m）闭合 → 生成房间
-        if (first && Math.hypot(x - first[0], z - first[1]) < 0.3) {
+        // 点回起点（<0.5m）闭合 → 生成房间
+        if (first && Math.hypot(x - first[0], z - first[1]) < 0.5) {
           if (draft.pts.length >= 3) {
             // 清洗退化点（保留 >=3 点即创建，地板用万能剖分保证显示）
             const pts = cleanPolygon(draft.pts)

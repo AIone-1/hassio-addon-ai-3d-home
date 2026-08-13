@@ -19,6 +19,7 @@ export default function App() {
   const toastMsg = useStore((s) => s.toast)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const bgImage = useStore((s) => s.bgImage)
+  const bgMode = useStore((s) => s.bgMode)
   const [deviceModal, setDeviceModal] = useState(null)
   const saveTimer = useRef(null)
 
