@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useStore, setState } from '../store'
 import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, robustFloorGeometry } from '../three/geometry'
+import { getCatalogItem } from '../catalog'
 
 // 对齐原版主题（glass 视觉风格）：墙=半透明毛玻璃，地板=冷色调色板
 const THEME = {
@@ -102,6 +103,8 @@ function FurnitureModel({ type }) {
   const lib = FURNITURE_LIB.find((f) => f.type === type)
   // 网上下载的 GLB 模型：直接加载渲染（自动缩放对齐）
   if (lib && lib.glb) return <GltfModel name={lib.glb} height={lib.h || 0.7} />
+  const cat = getCatalogItem(type)
+  if (cat) return <GltfModel name={cat.glb} height={cat.h} />
   const w = lib ? lib.w : 1
   const d = lib ? lib.d : 0.6
   const h = lib ? lib.h : 0.6
@@ -356,8 +359,9 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
   const rot = item.rot || 0
   const scale = item.scale || [1, 1, 1]
   const lib = FURNITURE_LIB.find((f) => f.type === item.type)
-  const w = (lib ? lib.w : 1) * (scale[0] || 1)
-  const d = (lib ? lib.d : 0.6) * (scale[2] || 1)
+  const cat = getCatalogItem(item.type)
+  const w = (lib ? lib.w : cat ? cat.w : 1) * (scale[0] || 1)
+  const d = (lib ? lib.d : cat ? cat.d : 0.6) * (scale[2] || 1)
   const { camera, gl } = useThree()
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -level), [level])

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore, setState, currentFloor, getState, toast } from '../store'
 import { api } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS } from '../three/geometry'
+import { thumbUrl } from '../catalog'
 
 const LEFT_TOOLS = [
   { id: 'select', label: '选择', k: 'V' },
@@ -25,6 +26,7 @@ export default function Editor() {
   const view2d = useStore((s) => s.view2d)
   const mode = useStore((s) => s.mode)
   const project = useStore((s) => s.project)
+  const modelCatalog = useStore((s) => s.modelCatalog)
   const floor = currentFloor()
   const [furnOpen, setFurnOpen] = useState(false)
   const [catOpen, setCatOpen] = useState(false)
@@ -131,6 +133,14 @@ export default function Editor() {
                 <span className="furn-swatch" style={{ background: FURNITURE_COLORS[f.type] || '#888' }} />
                 {f.type}
                 <span className="furn-dim"> {f.w}×{f.d}m</span>
+              </button>
+            ))}
+            {modelCatalog.map((m) => (
+              <button key={m.type}
+                className={`furn-item ${furnitureType === m.type ? 'active' : ''}`}
+                onClick={() => { setState({ furnitureType: m.type, tool: 'furniture' }); setFurnOpen(false) }}>
+                <img className="furn-thumb" src={thumbUrl(m.thumb)} alt={m.label} loading="lazy" />
+                <span>{m.label}</span>
               </button>
             ))}
           </div>

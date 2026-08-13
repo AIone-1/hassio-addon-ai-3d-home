@@ -7,6 +7,7 @@ import BindDrawer from './components/BindDrawer'
 import { useStore, setState, getState, toast } from './store'
 import { api, TOGGLE_DOMAINS, BASE } from './api'
 import { roomsToWalls, recomputeRooms } from './three/geometry'
+import { loadCatalog } from './catalog'
 
 export default function App() {
   const project = useStore((s) => s.project)
@@ -27,6 +28,7 @@ export default function App() {
   // ---------- 启动 ----------
   useEffect(() => {
     (async () => {
+      loadCatalog().then((cat) => setState({ modelCatalog: cat }))  // 加载网上家具模型目录
       try {
         const settings = await api.settings()
         setState({

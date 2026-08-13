@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
 import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, recomputeRooms, pointToSeg } from '../three/geometry'
+import { getCatalogItem } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
 const SNAP = 0.5       // 吸附 0.5m
@@ -444,8 +445,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       {/* 家具 */}
       {furniture.map(f => {
         const lib = FURNITURE_LIB.find(x => x.type === f.type)
-        const w = (lib ? lib.w : 1) * (f.scale ? f.scale[0] : 1)
-        const d = (lib ? lib.d : 0.6) * (f.scale ? f.scale[2] : 1)
+        const cat = getCatalogItem(f.type)
+        const w = (lib ? lib.w : cat ? cat.w : 1) * (f.scale ? f.scale[0] : 1)
+        const d = (lib ? lib.d : cat ? cat.d : 0.6) * (f.scale ? f.scale[2] : 1)
+        const label = lib ? f.type : (cat ? cat.label : f.type)
         const selF = isSel('furniture', f.id)
         return (
           <g
@@ -457,9 +460,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             <rect
               x={-w / 2} y={-d / 2} width={w} height={d}
               className={`plan-furniture ${selF ? 'selected' : ''}`}
-              stroke={selF ? '#2f7fe0' : (FURNITURE_COLORS[f.type] || '#9aa7b5')}
+              stroke={selF ? '#2f7fe0' : (FURNITURE_COLORS[lib ? f.type : (cat ? cat.label : f.type)] || '#9aa7b5')}
             />
-            <text y="0.06" className="plan-furniture-label">{f.type}</text>
+            <text y="0.06" className="plan-furniture-label">{label}</text>
           </g>
         )
       })}

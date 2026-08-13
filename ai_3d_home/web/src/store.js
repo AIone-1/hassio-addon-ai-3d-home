@@ -32,6 +32,7 @@ let state = {
   haStates: {},               // entity_id -> state
   haEntities: [],             // 全量实体
   haConnected: false,
+  modelCatalog: [],           // 网上下载的家具模型目录
   saved: true,
   toast: '',
   bgImage: '',           // 自定义背景图 URL
