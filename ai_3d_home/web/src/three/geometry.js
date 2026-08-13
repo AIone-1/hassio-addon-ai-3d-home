@@ -64,3 +64,31 @@ export function polygonArea(points) {
   }
   return Math.abs(area) / 2
 }
+
+// 万能地板几何：用 triangulateShape 剖分，失败则扇形剖分（保证任何房间都有地板）
+export function robustFloorGeometry(points, THREE) {
+  const verts = points.map((p) => new THREE.Vector2(p[0], p[1]))
+  let faces = []
+  try {
+    faces = THREE.ShapeUtils.triangulateShape(verts, [])
+  } catch (e) {
+    faces = []
+  }
+  // 失败或点数不足：扇形剖分（从第一个顶点连到其余顶点）
+  if (!faces.length && points.length >= 3) {
+    faces = []
+    for (let i = 1; i < points.length - 1; i++) {
+      faces.push([0, i, i + 1])
+    }
+  }
+  const positions = []
+  for (const f of faces) {
+    for (const idx of f) {
+      positions.push(points[idx][0], points[idx][1], 0)
+    }
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geo.computeVertexNormals()
+  return geo
+}

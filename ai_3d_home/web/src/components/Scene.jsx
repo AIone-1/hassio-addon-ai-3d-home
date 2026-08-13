@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore } from '../store'
-import { roomWallSegments, FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK } from '../three/geometry'
+import { roomWallSegments, FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK, robustFloorGeometry } from '../three/geometry'
 
 // 加粗画图网格（用细长方体做线，比 gridHelper 的 1px 清晰得多）
 function DrawingGrid({ size = 20, cell = 1, level, night }) {
@@ -134,18 +134,14 @@ function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) 
   // 每个房间地板微小高度差，避免重叠房间 z-fighting 互相盖住
   const floorY = level + roomIdx * 0.002
 
-  const shape = useMemo(() => {
-    const s = new THREE.Shape()
-    pts.forEach((p, i) => (i === 0 ? s.moveTo(p[0], p[1]) : s.lineTo(p[0], p[1])))
-    s.closePath()
-    return s
-  }, [JSON.stringify(pts)])
+  // 万能地板几何（triangulateShape + 扇形兜底，保证任何房间都有地板）
+  const floorGeo = useMemo(() => robustFloorGeometry(pts, THREE), [JSON.stringify(pts)])
 
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
-      {/* 地板：2D 用不受光材质保证始终可见；3D 用受光材质 */}
+      {/* 地板：万能剖分 + 2D 不受光材质保证始终可见 */}
       <mesh position={[0, floorY, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <shapeGeometry args={[shape]} />
+        <bufferGeometry {...floorGeo} />
         {view2d
           ? <meshBasicMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} />
           : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} side={THREE.DoubleSide} roughness={0.9} />}

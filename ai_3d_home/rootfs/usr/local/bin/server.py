@@ -252,6 +252,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, _read_json(PROJECT_FILE, {"floors": []}))
         if p == "/api/settings":
             return self._send(200, _read_json(SETTINGS_FILE, {}))
+        if p == "/api/background":
+            # 背景图：有则返回图片，无则 404
+            bg = os.path.join(DATA_DIR, "background.png")
+            if os.path.isfile(bg):
+                with open(bg, "rb") as f:
+                    return self._send(200, f.read(), "image/png")
+            return self._send(404, {"error": "no background"})
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -277,6 +284,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "bad json"})
             _write_json(SETTINGS_FILE, body)
             return self._send(200, {"ok": True})
+
+        if p == "/api/background":
+            # 上传背景图（base64 data URL）
+            body = self._json_body() or {}
+            data = body.get("data", "")
+            if data.startswith("data:"):
+                import base64
+                idx = data.find(",")
+                if idx > 0:
+                    raw = base64.b64decode(data[idx + 1:])
+                    with open(os.path.join(DATA_DIR, "background.png"), "wb") as f:
+                        f.write(raw)
+                    return self._send(200, {"ok": True, "url": "/api/background"})
+            return self._send(400, {"error": "bad image"})
 
         if p == "/api/ha/service":
             body = self._json_body() or {}

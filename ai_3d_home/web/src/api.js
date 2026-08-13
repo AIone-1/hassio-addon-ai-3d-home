@@ -8,6 +8,7 @@ function apiBase() {
   return p
 }
 const BASE = apiBase()
+export { BASE }
 
 async function req(path, opts = {}) {
   const r = await fetch(BASE + path, {

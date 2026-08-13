@@ -5,8 +5,8 @@ import Editor from './components/Editor'
 import EditorController from './components/EditorController'
 import BindDrawer from './components/BindDrawer'
 import { useStore, setState, getState, toast } from './store'
-import { api, TOGGLE_DOMAINS } from './api'
-import { cleanPolygon, polygonArea } from './three/geometry'
+import { api, TOGGLE_DOMAINS, BASE } from './api'
+import { cleanPolygon } from './three/geometry'
 
 export default function App() {
   const project = useStore((s) => s.project)
@@ -127,7 +127,7 @@ export default function App() {
           const draft = window.__wallDraft
           const floor = getState().project.floors[getState().currentFloor]
           const pts = cleanPolygon(draft.pts)
-          if (pts.length >= 3 && polygonArea(pts) > 0.05) {
+          if (pts.length >= 3) {
             floor.rooms = floor.rooms || []
             floor.rooms.push({
               id: Math.random().toString(36).slice(2, 10), name: `房间${floor.rooms.length + 1}`,
@@ -136,8 +136,6 @@ export default function App() {
             floor.walls = [] // 房间自带墙
             setState({ project: { ...getState().project }, saved: false })
             toast('房间已生成！')
-          } else {
-            toast('房间无效，请重新画')
           }
           window.__wallDraft = null
         } else if (window.__wallDraft) {
@@ -201,24 +199,52 @@ export default function App() {
       {settingsOpen && (
         <div className="modal-mask" onClick={() => setState({ settingsOpen: false })}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="dname">设置</div>
-            <div className="field" style={{ margin: '10px 0' }}>
-              <label>背景图片 URL（留空=默认背景；安防模式为渐变天蓝）</label>
+            <div className="dname">设置 · 背景图</div>
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>上传图片（推荐，本地图片用它）</label>
               <input
-                type="text"
-                defaultValue={bgImage}
+                type="file" accept="image/*"
+                style={{ width: '100%', padding: '6px', color: '#fff' }}
+                onChange={async (e) => {
+                  const file = e.target.files[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = async () => {
+                    try {
+                      const r = await fetch(BASE + 'api/background', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ data: reader.result }),
+                      })
+                      const res = await r.json()
+                      if (res.ok) {
+                        const url = BASE + 'api/background'
+                        setState({ bgImage: url, settingsOpen: false })
+                        api.saveSettings({ ...getState().settings, bgImage: url }).catch(() => {})
+                        toast('背景图已上传')
+                      }
+                    } catch (err) { toast('上传失败') }
+                  }
+                  reader.readAsDataURL(file)
+                }}
+              />
+            </div>
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>或填图片 URL（网络图片）</label>
+              <input
+                type="text" id="bg-url"
                 placeholder="https://example.com/bg.jpg"
                 style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: '#0e1628', color: '#fff' }}
               />
             </div>
             <div className="dev-actions">
               <button className="primary" onClick={() => {
-                const input = document.querySelector('.modal-box input')
+                const input = document.getElementById('bg-url')
                 const url = input ? input.value.trim() : ''
                 setState({ bgImage: url, settingsOpen: false })
                 api.saveSettings({ ...getState().settings, bgImage: url }).catch(() => {})
-              }}>应用</button>
-              <button className="close-btn" onClick={() => setState({ settingsOpen: false })}>取消</button>
+              }}>应用 URL</button>
+              <button className="close-btn" onClick={() => { setState({ bgImage: '', settingsOpen: false }); api.saveSettings({ ...getState().settings, bgImage: '' }).catch(() => {}) }}>清除</button>
             </div>
           </div>
         </div>

@@ -82,9 +82,9 @@ export default function EditorController() {
         // 点回起点（<0.3m）闭合 → 生成房间
         if (first && Math.hypot(x - first[0], z - first[1]) < 0.3) {
           if (draft.pts.length >= 3) {
-            // 清洗退化点，保证地板能渲染
+            // 清洗退化点（保留 >=3 点即创建，地板用万能剖分保证显示）
             const pts = cleanPolygon(draft.pts)
-            if (pts.length >= 3 && polygonArea(pts) > 0.05) {
+            if (pts.length >= 3) {
               floor.rooms = floor.rooms || []
               floor.rooms.push({
                 id: uid(), name: `房间${floor.rooms.length + 1}`,
@@ -92,8 +92,6 @@ export default function EditorController() {
               })
               floor.walls = [] // 房间自带墙
               toast('房间已生成！')
-            } else {
-              toast('房间无效，请重新画')
             }
           }
           window.__wallDraft = null
