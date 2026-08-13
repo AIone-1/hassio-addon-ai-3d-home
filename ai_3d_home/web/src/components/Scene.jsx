@@ -291,7 +291,7 @@ export default function Scene({ onSelect, floorIndex }) {
       />
 
       <group ref={rootRef}>
-        {/* 2D 模式：只有没有房间时才显示白色画图平面（有房间时地板就是表面，避免被盖） */}
+        {/* 2D 模式：无房间时显示白色画图平面（编辑界面用干净表面，背景图不在这里生效） */}
         {view2d && (floor.rooms || []).length === 0 && (
           <mesh position={[0, level - 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[80, 80]} />

@@ -39,6 +39,7 @@ function DashedPreview({ a, b, level }) {
 export default function EditorController() {
   const tool = useStore((s) => s.tool)
   const editing = useStore((s) => s.editing)
+  const view2d = useStore((s) => s.view2d)
   const furnitureType = useStore((s) => s.furnitureType)
   const pendingEntity = useStore((s) => s.pendingEntity)
   const snapOn = useStore((s) => s.snap)
@@ -71,6 +72,11 @@ export default function EditorController() {
       return
     }
     if (event.button !== 0) return  // 非左键忽略
+    // 3D 模式（非 2D）禁止编辑类操作
+    if (!view2d && ['wall', 'furniture', 'device', 'door', 'window', 'texture', 'delete'].includes(tool)) {
+      toast('请在 2D 模式下编辑')
+      return
+    }
     const [x, z] = pointOnFloor(event)
 
     switch (tool) {

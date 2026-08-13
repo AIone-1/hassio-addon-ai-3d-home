@@ -76,20 +76,21 @@ function DeviceLabels({ floorIndex, containerRef }) {
 }
 
 // 真正的 2D 正交相机（对齐原版：2D 是平面视图，不是 3D 俯视）
-function CameraSwitcher({ view2d, bounds }) {
+function CameraSwitcher({ view2d }) {
   const perspective = useThree((s) => s.camera)
   const set = useThree((s) => s.set)
   const gl = useThree((s) => s.gl)
   const camTarget = useStore((s) => s.camTarget)
+  const camDist = useStore((s) => s.camDist)
   const orthoRef = useRef()
 
   useEffect(() => {
     if (view2d) {
       if (!orthoRef.current) orthoRef.current = new THREE.OrthographicCamera(-10, 10, 6, -6, 0.1, 300)
       const ortho = orthoRef.current
-      const half = (bounds && bounds > 5) ? bounds : 10
+      // 按户型尺寸框住
+      const half = Math.max(camDist, 6)
       const aspect = gl.domElement.width / gl.domElement.height
-      // 居中到楼层中心，和 3D 视角对齐，避免 2D↔3D 切换偏移
       const cx = (camTarget && camTarget[0]) || 0
       const cz = (camTarget && camTarget[2]) || 0
       ortho.left = cx - half
@@ -106,7 +107,7 @@ function CameraSwitcher({ view2d, bounds }) {
       set({ camera: perspective })
       if (window.__dbg3d) window.__dbg3d.activeCam = 'persp'
     }
-  }, [view2d, bounds, camTarget && camTarget[0], camTarget && camTarget[2]])
+  }, [view2d, camDist, camTarget && camTarget[0], camTarget && camTarget[2]])
 
   return null
 }
@@ -126,10 +127,13 @@ function CameraFocus({ floorIndex }) {
     ;(floor?.rooms || []).forEach((r) => (r.points || []).forEach((p) => add(p[0], p[1])))
     ;(floor?.furniture || []).forEach((f) => { add(f.pos[0], f.pos[2]) })
     const c = has ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 2)
-    setState({ camTarget: [c.x, 0, c.z] })
+    // 户型最大尺寸，用于取景框住
+    const size = has ? Math.max(box.max.x - box.min.x, box.max.z - box.min.z) : 8
+    setState({ camTarget: [c.x, 0, c.z], camDist: Math.max(size, 4) })
     if (!view2d) {
-      // 更俯视的默认视角：地板接近水平，便于整体看户型
-      camera.position.set(c.x, (has ? c.y : 0) + 15, c.z + 8)
+      // 按户型大小定距离，让户型居中且框住
+      const dist = size * 1.6 + 12
+      camera.position.set(c.x, c.y + dist, c.z + dist * 0.5)
       camera.lookAt(c.x, 0, c.z)
     }
   }, [floorIndex, view2d, recenterKey, JSON.stringify(floor?.rooms), JSON.stringify(floor?.furniture)])
@@ -230,7 +234,7 @@ export default function Viewer({ onSelect, floorIndex }) {
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />
         <CameraFocus floorIndex={floorIndex} />
-        <CameraSwitcher view2d={view2d} bounds={floorBounds} />
+        <CameraSwitcher view2d={view2d} />
         <DeviceLabels floorIndex={floorIndex} containerRef={containerRef} />
         <EditorController />
       </Canvas>

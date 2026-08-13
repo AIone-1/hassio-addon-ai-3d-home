@@ -35,7 +35,10 @@ export default function BottomBar() {
       <div className="bb-group">
         <span className="bb-btn" style={{ cursor: 'default' }}>设备{deviceCount}</span>
         <button className="bb-btn" onClick={() => setState({ bindOpen: true })}>绑定</button>
-        <button className={`bb-btn ${editing ? 'active' : ''}`} onClick={() => setState({ editing: !editing })}>
+        <button className={`bb-btn ${editing ? 'active' : ''}`} onClick={() => {
+          if (editing) setState({ editing: false, view2d: false })
+          else setState({ editing: true, view2d: true })
+        }}>
           {editing ? '退出编辑' : '编辑'}
         </button>
         <button className="bb-btn" onClick={() => setState({ settingsOpen: true })}>设置</button>

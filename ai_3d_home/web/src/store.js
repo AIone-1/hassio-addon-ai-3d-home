@@ -6,6 +6,7 @@ let state = {
   settings: {},
   currentFloor: 0,
   camTarget: [0, 0, 2],
+  camDist: 10,        // 户型最大尺寸（取景用）
   recenterKey: 0,
   // 视图
   quality: 'balanced',        // eco | smooth | balanced | high
