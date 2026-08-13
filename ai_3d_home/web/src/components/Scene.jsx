@@ -131,8 +131,8 @@ function Room({ room, roomIdx, floor, level, selected, onSelect, interactive }) 
   const h = room.height || floor.height || 2.8
   // 2D 用深色清晰实线（floor plan 感），3D 用浅色墙
   const wallColor = selected ? '#2f7fe0' : (view2d ? '#3a4a66' : '#f5f2ec')
-  // 每个房间地板微小高度差，避免重叠房间 z-fighting 互相盖住
-  const floorY = level + roomIdx * 0.002
+  // 每个房间地板明显高度差（0.05m），彻底避免重叠房间 z-fighting 互相盖住
+  const floorY = level + roomIdx * 0.05
 
   // 地板：用房间包围盒矩形，保证任何房间都有可见地板（绕开多边形剖分的坑）
   const bb = useMemo(() => {

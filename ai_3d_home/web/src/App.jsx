@@ -168,6 +168,9 @@ export default function App() {
       <div className="status-tl">
         <span className="dot" style={{ background: haConnected ? 'var(--ok)' : 'var(--danger)' }} />
         {haConnected ? 'Home Assistant 已连接' : '未连接'}
+        <span style={{ color: 'var(--accent2)' }}>
+          {editing ? `· 房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
+        </span>
       </div>
 
       <BottomBar />
