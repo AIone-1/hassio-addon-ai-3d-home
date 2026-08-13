@@ -24,18 +24,26 @@ export default function App() {
   const view2d = useStore((s) => s.view2d)
   const [deviceModal, setDeviceModal] = useState(null)
   const [fps, setFps] = useState(0)
+  const [maxStutter, setMaxStutter] = useState(0)
   const saveTimer = useRef(null)
 
-  // FPS 计数（诊断卡顿用）
+  // FPS + 最大卡顿计数（诊断卡顿用：最大卡顿=最近一秒最慢一帧的间隔，能测出瞬时卡）
   useEffect(() => {
     let frames = 0
     let last = performance.now()
+    let prev = performance.now()
+    let maxGap = 0
     let raf
     const loop = (now) => {
+      const gap = now - prev
+      if (gap > maxGap) maxGap = gap
+      prev = now
       frames++
-      if (now - last >= 500) {
+      if (now - last >= 1000) {
         setFps(Math.round(frames * 1000 / (now - last)))
+        setMaxStutter(Math.round(maxGap))
         frames = 0
+        maxGap = 0
         last = now
       }
       raf = requestAnimationFrame(loop)
@@ -204,6 +212,11 @@ export default function App() {
         <span style={{ color: fps >= 50 ? 'var(--ok)' : fps >= 30 ? 'var(--accent2)' : 'var(--danger)', fontSize: '16px', fontWeight: 700 }}>
           {fps > 0 ? ` ${fps} FPS` : ''}
         </span>
+        {maxStutter > 0 && (
+          <span style={{ color: maxStutter > 50 ? 'var(--danger)' : 'var(--accent2)', fontSize: '13px', fontWeight: 700 }}>
+            最大卡顿 {maxStutter}ms
+          </span>
+        )}
       </div>
 
       <BottomBar />
