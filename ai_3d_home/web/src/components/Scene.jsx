@@ -1,6 +1,7 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useStore, setState } from '../store'
 import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, robustFloorGeometry } from '../three/geometry'
 
@@ -49,6 +50,43 @@ function DrawingGrid({ size = 20, cell = 1, level, night }) {
 // 颜色混合（对齐原版 _ 函数）
 function mixColor(a, b, t) { return '#' + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString() }
 
+// 模型文件基础路径（相对页面，HA ingress 下也正确）
+const MODEL_BASE = (() => {
+  let p = window.location.pathname
+  if (p.endsWith('index.html')) p = p.slice(0, -'index.html'.length)
+  if (!p.endsWith('/')) p += '/'
+  return p
+})()
+
+// 加载网上 GLB 模型：自动缩放对齐到目标高度，水平居中、底部贴地、开阴影
+function GltfModel({ name, height }) {
+  const url = MODEL_BASE + 'models/' + name
+  const [scene, setScene] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    const loader = new GLTFLoader()
+    loader.load(url, (gltf) => {
+      if (!alive) return
+      const s = gltf.scene.clone(true)
+      const box = new THREE.Box3().setFromObject(s)
+      const size = box.getSize(new THREE.Vector3())
+      const scale = height / (size.y || 1)
+      s.scale.setScalar(scale)
+      s.updateMatrixWorld(true)
+      const b2 = new THREE.Box3().setFromObject(s)
+      const center = b2.getCenter(new THREE.Vector3())
+      s.position.set(-center.x, -b2.min.y, -center.z)
+      s.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+      setScene(s)
+    }, undefined, () => { /* 加载失败静默 */ })
+    return () => { alive = false }
+  }, [url, height])
+
+  if (!scene) return null
+  return <primitive object={scene} />
+}
+
 // 家具盒子（对齐原版 uA：boxGeometry + physical 材质 clearcoat）
 function FBox({ position, size, color, roughness = 0.72 }) {
   return (
@@ -62,6 +100,8 @@ function FBox({ position, size, color, roughness = 0.72 }) {
 // ---------- 家具模型（对齐原版：每个家具用多个盒子拼出具体造型，统一蓝灰主题色） ----------
 function FurnitureModel({ type }) {
   const lib = FURNITURE_LIB.find((f) => f.type === type)
+  // 网上下载的 GLB 模型：直接加载渲染（自动缩放对齐）
+  if (lib && lib.glb) return <GltfModel name={lib.glb} height={lib.h || 0.7} />
   const w = lib ? lib.w : 1
   const d = lib ? lib.d : 0.6
   const h = lib ? lib.h : 0.6

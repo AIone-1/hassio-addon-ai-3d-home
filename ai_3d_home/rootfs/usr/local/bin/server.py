@@ -35,6 +35,8 @@ MIME = {
     ".map": "application/json",
     ".woff": "font/woff",
     ".woff2": "font/woff2",
+    ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json",
 }
 
 # ---------------------------------------------------------------- options
@@ -229,6 +231,8 @@ class Handler(BaseHTTPRequestHandler):
         if p in ("/", "/index.html"):
             return self._send_file("/index.html")
         if p.startswith("/assets/"):
+            return self._send_file(p)
+        if p.startswith("/models/"):
             return self._send_file(p)
         if p == "/api/health":
             code, data = ha_request("GET", "/")
