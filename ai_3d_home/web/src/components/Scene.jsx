@@ -59,8 +59,8 @@ const MODEL_BASE = (() => {
   return p
 })()
 
-// 加载网上 GLB 模型：自动缩放对齐到目标高度，水平居中、底部贴地、开阴影
-function GltfModel({ name, height }) {
+// 加载网上 GLB 模型：等比缩放放进目标 w/d/h 盒子（不拉伸），横竖方向对齐，水平居中、底部贴地、开阴影
+function GltfModel({ name, w, d, h }) {
   const url = MODEL_BASE + 'models/' + name
   const [scene, setScene] = useState(null)
 
@@ -70,10 +70,27 @@ function GltfModel({ name, height }) {
     loader.load(url, (gltf) => {
       if (!alive) return
       const s = gltf.scene.clone(true)
+      const b0 = new THREE.Box3().setFromObject(s)
+      const sz0 = b0.getSize(new THREE.Vector3())
+      // 方向对齐：模型竖着（深度>宽度）但目标横着（宽度>深度），或反之，旋转 90°
+      if (w && d && sz0.x > 0.001 && sz0.z > 0.001) {
+        const modelVertical = sz0.z > sz0.x
+        const targetVertical = d > w
+        if (modelVertical !== targetVertical) {
+          s.rotation.y = Math.PI / 2
+          s.updateMatrixWorld(true)
+        }
+      }
       const box = new THREE.Box3().setFromObject(s)
-      const size = box.getSize(new THREE.Vector3())
-      const scale = height / (size.y || 1)
-      s.scale.setScalar(scale)
+      const sz = box.getSize(new THREE.Vector3())
+      // 等比缩放：保证放进目标 w/d/h（不拉伸，比例正确）
+      let scale = 1
+      if (w && d && h) {
+        scale = Math.min(w / (sz.x || 1), d / (sz.z || 1), h / (sz.y || 1))
+      } else if (h) {
+        scale = h / (sz.y || 1)
+      }
+      s.scale.multiplyScalar(scale)
       s.updateMatrixWorld(true)
       const b2 = new THREE.Box3().setFromObject(s)
       const center = b2.getCenter(new THREE.Vector3())
@@ -82,7 +99,7 @@ function GltfModel({ name, height }) {
       setScene(s)
     }, undefined, () => { /* 加载失败静默 */ })
     return () => { alive = false }
-  }, [url, height])
+  }, [url, w, d, h])
 
   if (!scene) return null
   return <primitive object={scene} />
@@ -102,9 +119,9 @@ function FBox({ position, size, color, roughness = 0.72 }) {
 function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
   const lib = FURNITURE_LIB.find((f) => f.type === type)
   // 网上下载的 GLB 模型：直接加载渲染（自动缩放对齐）
-  if (lib && lib.glb) return <GltfModel name={lib.glb} height={ch || lib.h || 0.7} />
+  if (lib && lib.glb) return <GltfModel name={lib.glb} w={cw || lib.w} d={cd || lib.d} h={ch || lib.h} />
   const cat = getCatalogItem(type)
-  if (cat) return <GltfModel name={cat.glb} height={ch || cat.h} />
+  if (cat) return <GltfModel name={cat.glb} w={cw || cat.w} d={cd || cat.d} h={ch || cat.h} />
   const w = cw || (lib ? lib.w : 1)
   const d = cd || (lib ? lib.d : 0.6)
   const h = ch || (lib ? lib.h : 0.6)
@@ -678,7 +695,7 @@ function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
     >
       {cat ? (
         // 有绑定的模型：用下载的 GLB 模型渲染（灯/热水器/空调等）
-        <GltfModel name={cat.glb} height={cat.h} />
+        <GltfModel name={cat.glb} w={cat.w} d={cat.d} h={cat.h} />
       ) : (
         // 无模型：小球兜底
         <mesh>

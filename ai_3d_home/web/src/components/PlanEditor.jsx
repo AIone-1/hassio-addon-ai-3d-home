@@ -60,6 +60,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const selected = useStore(s => s.selected)
   const furnitureType = useStore(s => s.furnitureType)
   const pendingEntity = useStore(s => s.pendingEntity)
+  const modelCatalog = useStore(s => s.modelCatalog)
   const haStates = useStore(s => s.haStates)
   const recenterKey = useStore(s => s.planRecenterKey)
   const zoomDelta = useStore(s => s.planZoomDelta)
@@ -72,6 +73,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const [cursor, setCursor] = useState(null)    // [x,y] 世界坐标（已吸附）
   const dragRef = useRef(null)                  // 拖动的家具/设备对象
   const openingDragRef = useRef(null)           // 拖动的门窗对象（沿墙移动）
+  const wallDragRef = useRef(null)              // 拖动的墙端点 { wall, which: 'start'|'end' }
   const panRef = useRef(null)                   // { w:[x,y], p:[x,y] } 平移起点
   const planMoveRef = useRef(null)              // 移动户型的起点世界坐标
 
@@ -330,6 +332,15 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setState({ project: { ...getState().project }, saved: false })
       return
     }
+    if (wallDragRef.current) {
+      const [x, y] = snap(w)
+      const { wall, which } = wallDragRef.current
+      wall[which] = [x, y]
+      const fl = getState().project.floors[floorIndex]
+      fl.rooms = recomputeRooms(fl)
+      setState({ project: { ...getState().project }, saved: false })
+      return
+    }
     if (openingDragRef.current) {
       // 门窗沿墙移动：找最近墙，更新 wallId + offset
       let best = null, bd = 0.6
@@ -359,6 +370,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     panRef.current = null
     dragRef.current = null
     openingDragRef.current = null
+    wallDragRef.current = null
     planMoveRef.current = null
   }
 
@@ -374,6 +386,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     if (type !== 'furniture' && type !== 'device' && type !== 'opening') return
     e.stopPropagation()
     setState({ selected: { type, ref: obj }, tool: 'move' })
+  }
+  // 拖动墙端点拉伸墙段
+  const startWallDrag = (e, wall, which) => {
+    e.stopPropagation()
+    wallDragRef.current = { wall, which }
+    svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
   }
   const clickEl = (e, type, ref) => {
     if (tool !== 'select' && tool !== 'delete') return
@@ -451,6 +469,42 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setState({ project: { ...st.project }, saved: false, selected: null })
     toast('已删除')
   }
+
+  // ---------- 设备属性编辑（选模型 / 删除） ----------
+  const selDevice = selected && selected.type === 'device' ? selected.ref : null
+  const patchDevice = (d, patch) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.devices || []).find(x => x.id === d.id)
+    if (!target) return
+    Object.assign(target, patch)
+    setState({ project: { ...getState().project }, saved: false })
+  }
+  const deleteDevice = (d) => {
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
+    fl.devices = (fl.devices || []).filter(x => x.id !== d.id)
+    setState({ project: { ...st.project }, saved: false, selected: null })
+    toast('已删除设备')
+  }
+  // 下载模型按分类分组（设备选模型用）
+  const groupedCatalog = useMemo(() => {
+    const m = {}
+    for (const it of modelCatalog) {
+      if (!m[it.label]) m[it.label] = []
+      m[it.label].push(it)
+    }
+    return Object.entries(m)
+  }, [modelCatalog])
+
+  // ---------- 房间属性编辑（改名） ----------
+  const selRoom = selected && selected.type === 'room' ? selected.ref : null
+  const patchRoom = (r, patch) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.rooms || []).find(x => x.id === r.id)
+    if (!target) return
+    Object.assign(target, patch)
+    setState({ project: { ...getState().project }, saved: false })
+  }
   const rooms = floor?.rooms || []
   const walls = floor?.walls || []
   const openings = floor?.openings || []
@@ -512,16 +566,29 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         )
       })}
 
-      {/* 墙（持久化线段，删除模式可点） */}
-      {walls.map((w, i) => (
-        <line
-          key={w.id || `w${i}`}
-          x1={w.start[0]} y1={w.start[1]} x2={w.end[0]} y2={w.end[1]}
-          className="plan-wall"
-          strokeWidth={WALL_T}
-          onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) } : undefined}
-        />
-      ))}
+      {/* 墙（持久化线段：select 选中可拉伸端点，delete 删除） */}
+      {walls.map((w, i) => {
+        const selW = isSel('wall', w.id)
+        return (
+          <g key={w.id || `w${i}`}>
+            <line
+              x1={w.start[0]} y1={w.start[1]} x2={w.end[0]} y2={w.end[1]}
+              className={`plan-wall ${selW ? 'selected' : ''}`}
+              strokeWidth={WALL_T}
+              onClick={(e) => {
+                if (tool === 'delete') { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
+                else if (tool === 'select') { e.stopPropagation(); onSelect({ type: 'wall', ref: w }) }
+              }}
+            />
+            {selW && tool === 'select' && (
+              <>
+                <circle cx={w.start[0]} cy={w.start[1]} r={0.16} className="plan-wall-handle" onPointerDown={(e) => startWallDrag(e, w, 'start')} />
+                <circle cx={w.end[0]} cy={w.end[1]} r={0.16} className="plan-wall-handle" onPointerDown={(e) => startWallDrag(e, w, 'end')} />
+              </>
+            )}
+          </g>
+        )
+      })}
 
       {/* 门窗（对齐原版：墙洞白线 + 门扇 + 开启弧） */}
       {openings.map(op => {
@@ -742,6 +809,43 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             ))}
           </div>
         )}
+      </div>
+    )}
+    {selDevice && (
+      <div className="plan-props">
+        <div className="plan-props-head">
+          <span>{selDevice.name || selDevice.entity_id}</span>
+          <button className="plan-props-del" onClick={() => deleteDevice(selDevice)}>删除</button>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">模型</span>
+          <select value={selDevice.modelId || ''}
+            onChange={(e) => patchDevice(selDevice, { modelId: e.target.value || undefined })}
+            style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12 }}>
+            <option value="">无（圆球）</option>
+            {groupedCatalog.map(([label, items]) => (
+              <optgroup key={label} label={label}>
+                {items.map((m) => <option key={m.type} value={m.type}>{m.label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">实体</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selDevice.entity_id}</span>
+        </div>
+      </div>
+    )}
+    {selRoom && (
+      <div className="plan-props">
+        <div className="plan-props-head">
+          <span>房间</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">名字</span>
+          <input type="text" value={selRoom.name || ''}
+            onChange={(e) => patchRoom(selRoom, { name: e.target.value })} />
+        </div>
       </div>
     )}
     </div>

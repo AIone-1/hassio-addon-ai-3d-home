@@ -34,6 +34,8 @@ export default function Editor() {
   const [furnOpen, setFurnOpen] = useState(false)
   const [catOpen, setCatOpen] = useState(false)
   const [openCats, setOpenCats] = useState({})
+  const [backups, setBackups] = useState([])
+  const [backupOpen, setBackupOpen] = useState(false)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -103,6 +105,28 @@ export default function Editor() {
       toast('已保存 ✓')
     } catch (e) { toast('保存失败') }
   }
+  // 存档：创建带时间戳的副本
+  const createBackup = async () => {
+    try { await api.backup() } catch (e) {}
+  }
+  const openBackups = async () => {
+    try {
+      const r = await api.backups()
+      setBackups(r.backups || [])
+    } catch (e) { setBackups([]) }
+    setBackupOpen(true)
+  }
+  const restoreBackup = async (name) => {
+    if (!confirm(`恢复存档 ${name}？将覆盖当前户型。`)) return
+    try {
+      const r = await api.backupRestore(name)
+      if (r.ok && r.project) {
+        setState({ project: r.project, currentFloor: 0, selected: null, saved: true })
+        toast('已恢复存档')
+        setBackupOpen(false)
+      }
+    } catch (e) { toast('恢复失败') }
+  }
 
   const duplicateFloor = () => {
     const idx = project.floors.findIndex((f) => f === floor)
@@ -127,13 +151,17 @@ export default function Editor() {
       {/* 顶部工具栏 */}
       <div className="editor-top">
         <button className="et-btn" onClick={() => setState({ mode: '全屋' })}>{mode}</button>
-        <button className="et-btn" title="参考底图（开发中）">参考底图</button>
-        <button className="et-btn" onClick={importJson}>导入 JSON</button>
-        <button className="et-btn" onClick={exportJson}>导出 JSON</button>
-        <button className="et-btn" title="最近备份（开发中）">最近备份</button>
-        <button className="et-btn" onClick={resetFloor} style={{ color: 'var(--danger)' }}>重置当前户型</button>
-        <button className="et-btn" onClick={clearAll} style={{ color: 'var(--danger)' }}>清空图纸</button>
-        <button className="et-btn" onClick={saveNow} style={{ color: 'var(--accent)' }}>保存</button>
+        <button className="et-btn" onClick={openBackups}>最近备份</button>
+        <button className="et-btn" onClick={resetFloor} style={{ color: 'var(--danger)' }}>清空当前层</button>
+        <button className="et-btn" onClick={clearAll} style={{ color: 'var(--danger)' }}>清空全部</button>
+        <button className="et-btn" onClick={() => { saveNow(); createBackup() }} style={{ color: 'var(--accent)' }}>保存</button>
+        <div className="et-sep" />
+        <button className="et-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta - 1 }))} title="缩小">−</button>
+        <button className="et-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta + 1 }))} title="放大">＋</button>
+        <button className="et-btn" onClick={() => setState(s => ({ planRecenterKey: s.planRecenterKey + 1 }))} title="居中">居中</button>
+        <div className="et-sep" />
+        <button className="et-btn" onClick={duplicateFloor}>复制当前层</button>
+        <button className="et-btn" onClick={deleteFloor} style={{ color: 'var(--danger)' }}>删除楼层</button>
         <div className="et-sep" />
 
         {/* 家具库 */}
@@ -231,15 +259,27 @@ export default function Editor() {
         ))}
       </div>
 
-      {/* 底部右侧：缩放/楼层 */}
-      <div className="editor-bottom">
-        <button className="eb-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta - 1 }))}>−</button>
-        <button className="eb-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta + 1 }))}>＋</button>
-        <button className="eb-btn" onClick={() => setState(s => ({ planRecenterKey: s.planRecenterKey + 1 }))} title="居中">居中</button>
-        <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
-        <button className="eb-btn" onClick={duplicateFloor}>复制当前层</button>
-        <button className="eb-btn" onClick={deleteFloor} style={{ color: 'var(--danger)' }}>删除楼层</button>
-      </div>
+      {/* 存档列表弹窗 */}
+      {backupOpen && (
+        <div className="modal-mask" onClick={() => setBackupOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="dname">历史存档</div>
+            {backups.length === 0 ? (
+              <p style={{ color: 'var(--muted)', fontSize: '12px', margin: '10px 0' }}>还没有存档。点「保存」会自动创建一份存档。</p>
+            ) : (
+              <div style={{ maxHeight: '52vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px', margin: '10px 0' }}>
+                {backups.map((b) => (
+                  <div key={b.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 9px', borderRadius: '8px', background: 'var(--panel2)' }}>
+                    <span style={{ flex: 1, fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{new Date(b.time * 1000).toLocaleString()}</span>
+                    <button style={{ padding: '3px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--accent)', color: '#081018', fontSize: '11px', cursor: 'pointer' }} onClick={() => restoreBackup(b.name)}>恢复</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="close-btn" onClick={() => setBackupOpen(false)}>关闭</button>
+          </div>
+        </div>
+      )}
     </>
   )
 }

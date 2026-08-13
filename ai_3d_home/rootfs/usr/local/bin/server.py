@@ -23,6 +23,7 @@ OPTIONS_FILE = os.environ.get("OPTIONS_FILE", "/data/options.json")
 DATA_DIR = os.environ.get("DATA_DIR", "/share/ai_3d_home")
 PROJECT_FILE = os.path.join(DATA_DIR, "project.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+BACKUP_DIR = os.path.join(DATA_DIR, "backups")
 
 MIME = {
     ".html": "text/html; charset=utf-8",
@@ -260,6 +261,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, _read_json(PROJECT_FILE, {"floors": []}))
         if p == "/api/settings":
             return self._send(200, _read_json(SETTINGS_FILE, {}))
+        if p == "/api/backups":
+            # 列出所有存档（文件名 + 修改时间）
+            try:
+                items = []
+                for f in sorted(os.listdir(BACKUP_DIR), reverse=True):
+                    if f.endswith(".json"):
+                        fp = os.path.join(BACKUP_DIR, f)
+                        items.append({"name": f, "time": os.path.getmtime(fp)})
+                return self._send(200, {"backups": items})
+            except Exception:
+                return self._send(200, {"backups": []})
         if p == "/api/background":
             # 背景图：有则返回图片，无则 404
             bg = os.path.join(DATA_DIR, "background.png")
@@ -302,6 +314,27 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "bad json"})
             _write_json(SETTINGS_FILE, body)
             return self._send(200, {"ok": True})
+
+        if p == "/api/backup":
+            # 创建存档：把当前 project 存成带时间戳的副本
+            import datetime
+            os.makedirs(BACKUP_DIR, exist_ok=True)
+            name = "backup_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ".json"
+            _write_json(os.path.join(BACKUP_DIR, name), _read_json(PROJECT_FILE, {"floors": []}))
+            return self._send(200, {"ok": True, "name": name})
+
+        if p == "/api/backup/restore":
+            # 恢复存档：body 带 name（文件名）
+            body = self._json_body() or {}
+            name = body.get("name", "")
+            fp = os.path.join(BACKUP_DIR, os.path.basename(name))
+            if not name.endswith(".json") or not os.path.isfile(fp):
+                return self._send(400, {"error": "bad backup name"})
+            data = _read_json(fp, None)
+            if data is None:
+                return self._send(400, {"error": "backup read failed"})
+            _write_json(PROJECT_FILE, data)
+            return self._send(200, {"ok": True, "project": data})
 
         if p == "/api/background":
             # 上传背景图（base64 data URL）
