@@ -34,6 +34,7 @@ let state = {
   roomDraft: null,            // 画房间/墙的草稿
   pendingEntity: null,        // 待绑定实体
   bindOpen: false,            // 绑定抽屉
+  bindCat: '全部',            // 绑定抽屉的分类筛选
   // 数据
   haStates: {},               // entity_id -> state
   haEntities: [],             // 全量实体

@@ -18,8 +18,9 @@ const CATS = [
 
 export default function BindDrawer() {
   const haEntities = useStore((s) => s.haEntities)
+  const bindCat = useStore((s) => s.bindCat)
   const [search, setSearch] = useState('')
-  const [cat, setCat] = useState('全部')
+  const [cat, setCat] = useState(bindCat)
 
   const filtered = haEntities.filter((e) => {
     const domain = e.entity_id.split('.')[0]
