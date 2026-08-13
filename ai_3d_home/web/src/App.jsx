@@ -74,11 +74,16 @@ export default function App() {
       }
       pollEntities()
       setInterval(pollEntities, 30000)
-      // 状态轮询
+      // 状态轮询（状态变化时才更新 haStates，避免每 3 秒全量重渲染导致 3D 转动卡顿）
       const pollStates = async () => {
         try {
           const st = await api.states()
-          if (st && typeof st === 'object') setState({ haStates: st, haConnected: true })
+          if (st && typeof st === 'object') {
+            const prev = getState().haStates
+            if (!prev || JSON.stringify(prev) !== JSON.stringify(st)) {
+              setState({ haStates: st, haConnected: true })
+            }
+          }
         } catch (e) { setState({ haConnected: false }) }
       }
       pollStates()

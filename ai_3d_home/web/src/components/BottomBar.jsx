@@ -33,7 +33,7 @@ export default function BottomBar() {
         </button>
         {autoRotate && (
           <span className="bb-speed" title="转速">
-            <input type="range" min="0.5" max="3" step="0.1" value={rotateSpeed}
+            <input type="range" min="0.5" max="5" step="0.1" value={rotateSpeed}
               onChange={(e) => setState({ rotateSpeed: parseFloat(e.target.value) })} />
             <span className="bb-speed-val">{rotateSpeed.toFixed(1)}×</span>
           </span>
