@@ -424,8 +424,8 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
   const scale = item.scale || [1, 1, 1]
   const lib = FURNITURE_LIB.find((f) => f.type === item.type)
   const cat = getCatalogItem(item.type)
-  const w = item.width != null ? item.width : (lib ? lib.w : cat ? cat.w : 1) * (scale[0] || 1)
-  const d = item.depth != null ? item.depth : (lib ? lib.d : cat ? cat.d : 0.6) * (scale[2] || 1)
+  const w = item.width != null ? item.width : (lib ? lib.w : cat ? cat.w : 1)
+  const d = item.depth != null ? item.depth : (lib ? lib.d : cat ? cat.d : 0.6)
   const h = item.height != null ? item.height : (lib ? lib.h : cat ? cat.h : 0.6)
   const { camera, gl } = useThree()
   const raycaster = useMemo(() => new THREE.Raycaster(), [])

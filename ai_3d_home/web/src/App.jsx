@@ -22,6 +22,7 @@ export default function App() {
   const bgImage = useStore((s) => s.bgImage)
   const bgMode = useStore((s) => s.bgMode)
   const view2d = useStore((s) => s.view2d)
+  const immersive = useStore((s) => s.immersive)
   const [deviceModal, setDeviceModal] = useState(null)
   const saveTimer = useRef(null)
   const fpsRef = useRef(null)
@@ -205,20 +206,20 @@ export default function App() {
   const devState = deviceModal ? haStates[deviceModal.entity_id] : null
 
   return (
-    <div className="app">
+    <div className="app" onDoubleClick={() => immersive && setState({ immersive: false })}>
       {view2d ? <PlanEditor onSelect={handleSelect} floorIndex={currentFloor} /> : <Viewer onSelect={handleSelect} floorIndex={currentFloor} />}
 
-      {/* 左上角状态 */}
-      <div className="status-tl">
+      {/* 左上角状态（沉浸模式隐藏） */}
+      {!immersive && <div className="status-tl">
         <span className="dot" style={{ background: haConnected ? 'var(--ok)' : 'var(--danger)' }} />
         {haConnected ? 'Home Assistant 已连接' : '未连接'}
         <span style={{ color: 'var(--accent2)' }}>
           {editing ? `· 房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
         </span>
         <span ref={fpsRef} style={{ fontSize: '16px', fontWeight: 700 }} />
-      </div>
+      </div>}
 
-      <BottomBar />
+      {!immersive && <BottomBar />}
 
       {editing && <Editor />}
 

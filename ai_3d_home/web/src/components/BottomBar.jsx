@@ -48,6 +48,7 @@ export default function BottomBar() {
           ⌖ 居中
         </button>
         <button className="bb-btn" onClick={toggleFullscreen} title="全屏">⛶ 全屏</button>
+        <button className="bb-btn" onClick={() => setState({ immersive: true })} title="纯净沉浸模式（双击退出）">👁 沉浸</button>
         <button className="bb-btn" onClick={cycleQuality} title="切换画质（流畅/均衡/高清/极致）">
           ⚙️ {qLabel}
         </button>

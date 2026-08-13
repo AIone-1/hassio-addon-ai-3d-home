@@ -404,6 +404,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setState({ project: { ...st.project }, saved: false, selected: { type: 'furniture', ref: copy } })
     toast('已复制家具')
   }
+  const setFurnitureScale = (f, pct) => {
+    const s = Math.max(0.1, (pct || 100) / 100)
+    patchFurniture(f, { scale: [s, s, s] })
+  }
 
   // ---------- 门窗属性编辑（类型 / 颜色 / 内开外开 / 翻转 / 删除） ----------
   const selOpening = selected && selected.type === 'opening' ? selected.ref : null
@@ -540,8 +544,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       {furniture.map(f => {
         const lib = FURNITURE_LIB.find(x => x.type === f.type)
         const cat = getCatalogItem(f.type)
-        const w = f.width != null ? f.width : (lib ? lib.w : cat ? cat.w : 1) * (f.scale ? f.scale[0] : 1)
-        const d = f.depth != null ? f.depth : (lib ? lib.d : cat ? cat.d : 0.6) * (f.scale ? f.scale[2] : 1)
+        const w = (f.width != null ? f.width : (lib ? lib.w : cat ? cat.w : 1)) * (f.scale ? f.scale[0] : 1)
+        const d = (f.depth != null ? f.depth : (lib ? lib.d : cat ? cat.d : 0.6)) * (f.scale ? f.scale[2] : 1)
         const label = f.name || (lib ? f.type : (cat ? cat.label : f.type))
         const selF = isSel('furniture', f.id)
         const placement = f.placement || (lib && lib.placement) || 'floor'
@@ -617,6 +621,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <input type="number" step="0.1" min="0.1" value={Math.round(curH * 100) / 100} title="高"
             onChange={(e) => patchFurniture(selFurniture, { height: Number(e.target.value) || undefined })} />
           <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">缩放</span>
+          <input type="number" step="5" min="10" value={Math.round((selFurniture.scale ? selFurniture.scale[0] : 1) * 100)}
+            onChange={(e) => setFurnitureScale(selFurniture, Number(e.target.value) || 100)} />
+          <span className="plan-props-unit">%</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">旋转</span>
