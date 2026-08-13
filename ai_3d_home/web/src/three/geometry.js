@@ -20,6 +20,9 @@ export const FURNITURE_COLORS = {
 
 export const WALL_THICK = 0.12
 
+// 地板调色板（对齐原版 glass 风格冷色系，每个房间按序号取色）
+export const FLOOR_PALETTE = ['#7789ad', '#8294b7', '#8a9bbd', '#7285aa', '#7e91b5']
+
 // 房间多边形 → 顶点（x, z）数组
 export function roomPoints(room) {
   return room.points || []
@@ -303,7 +306,7 @@ export function recomputeRooms(floor) {
       name: match ? match.room.name : `房间${i + 1}`,
       points: poly,
       height: (match ? match.room.height : undefined) || floor.height || 2.8,
-      color: (match ? match.room.color : undefined) || '#d8cbb2',
+      color: FLOOR_PALETTE[i % FLOOR_PALETTE.length],
     }
   })
 }

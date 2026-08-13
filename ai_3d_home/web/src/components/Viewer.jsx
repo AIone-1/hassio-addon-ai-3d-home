@@ -87,18 +87,23 @@ function CameraFocus({ floorIndex }) {
     let has = false
     const add = (x, z) => { box.expandByPoint(new THREE.Vector3(x, 0, z)); has = true }
     ;(floor?.rooms || []).forEach((r) => (r.points || []).forEach((p) => add(p[0], p[1])))
+    ;(floor?.walls || []).forEach((w) => { add(w.start[0], w.start[1]); add(w.end[0], w.end[1]) })
     ;(floor?.furniture || []).forEach((f) => { add(f.pos[0], f.pos[2]) })
     const c = has ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 2)
-    // 户型最大尺寸，用于取景框住
-    const size = has ? Math.max(box.max.x - box.min.x, box.max.z - box.min.z) : 8
-    setState({ camTarget: [c.x, 0, c.z], camDist: Math.max(size, 4) })
+    const width = has ? box.max.x - box.min.x : 8
+    const height = has ? box.max.z - box.min.z : 6
+    const floorH = (floor && floor.height) || 2.8
+    // 对齐原版 ig：distance = max(9.5, 宽*1.42, 高*1.7, 层高*1.3)
+    const distance = Math.max(9.5, width * 1.42, height * 1.7, floorH * 1.3)
+    setState({ camTarget: [c.x, 0.55, c.z], camDist: distance })
     if (!view2d) {
-      // 按户型大小定距离，让户型居中且框住
-      const dist = size * 1.6 + 12
-      camera.position.set(c.x, c.y + dist, c.z + dist * 0.5)
-      camera.lookAt(c.x, 0, c.z)
+      // 对齐原版 lg：iso 视角，camera = target + (0.86b, 0.86b, 1.04b)，b = distance*0.88，fov 36
+      const b = distance * 0.88
+      camera.position.set(c.x + 0.86 * b, 0.55 + 0.86 * b, c.z + 1.04 * b)
+      if (camera.fov !== 36) { camera.fov = 36; camera.updateProjectionMatrix() }
+      camera.lookAt(c.x, 0.55, c.z)
     }
-  }, [floorIndex, view2d, recenterKey, JSON.stringify(floor?.rooms), JSON.stringify(floor?.furniture)])
+  }, [floorIndex, view2d, recenterKey, JSON.stringify(floor?.rooms), JSON.stringify(floor?.walls), JSON.stringify(floor?.furniture)])
 
   return null
 }
@@ -168,7 +173,7 @@ export default function Viewer({ onSelect, floorIndex }) {
         dpr={Math.min(window.devicePixelRatio || 1, q.dprMax)}
         gl={{ antialias: q.aa, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         shadows={shadows}
-        camera={{ position: [9, 10, 12], fov: 42, near: 0.1, far: 150 }}
+        camera={{ position: [8.4, 9.6, 10.2], fov: 36, near: 0.1, far: 150 }}
         onCreated={({ gl, scene, camera }) => {
           window.__dbg3d = {
             get frames() { return gl.info.render.frame },

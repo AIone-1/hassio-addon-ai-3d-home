@@ -4,6 +4,21 @@ import * as THREE from 'three'
 import { useStore, setState } from '../store'
 import { FURNITURE_COLORS, FURNITURE_LIB, WALL_THICK, robustFloorGeometry } from '../three/geometry'
 
+// 对齐原版主题（glass 视觉风格）：墙=半透明毛玻璃，地板=冷色调色板
+const THEME = {
+  day: {
+    wallColor: '#d5e0f1',
+    wallOpacity: 0.197,  // 原版 wallOpacity 0.24 × 0.82
+    floorPalette: ['#7789ad', '#8294b7', '#8a9bbd', '#7285aa', '#7e91b5'],
+  },
+  night: {
+    wallColor: '#d0dcee',
+    wallOpacity: 0.197,
+    floorPalette: ['#7587aa', '#8092b5', '#8799bb', '#7184a8', '#7d90b3'],
+  },
+}
+
+
 // 加粗画图网格（用细长方体做线，比 gridHelper 的 1px 清晰得多）
 function DrawingGrid({ size = 20, cell = 1, level, night }) {
   const n = Math.round(size / cell)
@@ -171,7 +186,7 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
       <mesh geometry={floorGeo} position={[0, floorY, 0]} renderOrder={1}>
         {view2d
           ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} side={THREE.DoubleSide} />
-          : <meshStandardMaterial color={room.color || floor.color || '#d8cbb2'} roughness={0.9} side={THREE.DoubleSide} />}
+          : <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.46} metalness={0.02} clearcoat={0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} />}
       </mesh>
       {/* 2D 地板描边：让房间范围一目了然 */}
       {view2d && (
@@ -276,6 +291,7 @@ export default function Scene({ onSelect, floorIndex }) {
   const interactive = tool === 'select' || tool === 'delete'
   const canDrag = tool === 'move' && editing
   const ml = MODE_LIGHT[mode] || MODE_LIGHT['全屋']
+  const th = night ? THEME.night : THEME.day
 
   // 家具移动：更新位置 + 触发保存
   const handleMoveFurniture = () => {
@@ -336,7 +352,7 @@ export default function Scene({ onSelect, floorIndex }) {
               <boxGeometry args={[len, view2d ? 0.01 : h, WALL_THICK]} />
               {view2d
                 ? <meshBasicMaterial color="#3a4a66" />
-                : <meshPhysicalMaterial color="#f5f2ec" transparent opacity={0.35} roughness={0.2} clearcoat={1} clearcoatRoughness={0.2} />}
+                : <meshPhysicalMaterial color={th.wallColor} transparent opacity={th.wallOpacity} roughness={0.5} metalness={0} clearcoat={0.16} clearcoatRoughness={0.72} depthWrite={false} />}
             </mesh>
           )
         })}
