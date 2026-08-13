@@ -11,7 +11,10 @@ const BASE = apiBase()
 export { BASE }
 
 async function req(path, opts = {}) {
-  const r = await fetch(BASE + path, {
+  // BASE 可能带尾斜杠（根路径时是 "/"），path 带前斜杠（如 "/api/project"），
+  // 拼接会成 "//api/project" 被浏览器当成协议相对 URL（host=api）。这里归一化双斜杠。
+  const url = (BASE + path).replace(/\/{2,}/g, '/')
+  const r = await fetch(url, {
     method: opts.method || 'GET',
     headers: opts.body ? { 'Content-Type': 'application/json' } : {},
     body: opts.body ? JSON.stringify(opts.body) : undefined,

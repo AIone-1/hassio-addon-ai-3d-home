@@ -169,9 +169,9 @@ export default function Editor() {
 
       {/* 底部右侧：缩放/楼层 */}
       <div className="editor-bottom">
-        <button className="eb-btn" onClick={() => setState({ zoom: (window.__zoom || 1) - 0.1 })}>−</button>
-        <button className="eb-btn" onClick={() => setState({ zoom: (window.__zoom || 1) + 0.1 })}>＋</button>
-        <button className="eb-btn" title="居中">居中</button>
+        <button className="eb-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta - 1 }))}>−</button>
+        <button className="eb-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta + 1 }))}>＋</button>
+        <button className="eb-btn" onClick={() => setState(s => ({ planRecenterKey: s.planRecenterKey + 1 }))} title="居中">居中</button>
         <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
         <button className="eb-btn" onClick={duplicateFloor}>复制当前层</button>
         <button className="eb-btn" onClick={deleteFloor} style={{ color: 'var(--danger)' }}>删除楼层</button>

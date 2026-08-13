@@ -107,6 +107,31 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: var(--panel-solid);
   border: 1px solid var(--border); color: var(--text); padding: 9px 18px; border-radius: 10px; font-size: 13px; z-index: 70; }
 
+/* ---------- SVG 2D 户型编辑器 ---------- */
+.plan-editor { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  background: #eef1f6; touch-action: none; cursor: crosshair; }
+.plan-grid-minor { stroke: #dde3ec; stroke-width: 0.015; }
+.plan-grid-major { stroke: #c6d0dd; stroke-width: 0.03; }
+.plan-room { fill: #e6e0d2; stroke: #b9ae98; stroke-width: 0.04; cursor: pointer; }
+.plan-room.selected { fill: #d4e6ff; stroke: #2f7fe0; stroke-width: 0.05; }
+.plan-room-name { font-size: 0.24px; fill: #737b83; font-weight: 700; text-anchor: middle; dominant-baseline: middle;
+  paint-order: stroke; stroke: #fff; stroke-width: 0.08; stroke-linejoin: round; pointer-events: none; }
+.plan-room-name.selected { fill: #214f83; }
+.plan-room-area { font-size: 0.17px; fill: #9299a0; font-weight: 600; text-anchor: middle;
+  paint-order: stroke; stroke: #fff; stroke-width: 0.07; stroke-linejoin: round; pointer-events: none; }
+.plan-room-area.selected { fill: #4e729a; }
+.plan-wall { stroke: #343a3f; stroke-linecap: butt; }
+.plan-wall-draft { stroke: #343a3f; stroke-linecap: butt; }
+.plan-preview { stroke: #2f7fe0; stroke-width: 0.05; fill: none; }
+.plan-furniture { fill: #e8ece8; stroke-width: 0.04; cursor: pointer; }
+.plan-furniture.selected { fill: #d4e6ff; stroke: #2f7fe0; stroke-width: 0.06; }
+.plan-furniture-label { font-size: 0.16px; fill: #53615a; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.plan-device { stroke-width: 0.03; cursor: pointer; }
+.plan-device-halo { fill: none; stroke: #2f7fe0; stroke-width: 0.06; }
+.plan-device-label { font-size: 0.16px; fill: #53615a; font-weight: 600; text-anchor: middle; pointer-events: none; }
+.plan-device-label.selected { fill: #2f7fe0; font-weight: 700; }
+.plan-cursor circle { fill: #2f7fe0; }
+
 /* ---------- 家具选择器（编辑器顶部弹出） ---------- */
 .furn-picker { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px;
   padding: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; z-index: 30; flex-wrap: wrap; max-width: 80vw; }

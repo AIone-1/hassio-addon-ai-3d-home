@@ -8,6 +8,8 @@ let state = {
   camTarget: [0, 0, 2],
   camDist: 10,        // 户型最大尺寸（取景用）
   recenterKey: 0,
+  planRecenterKey: 0, // SVG 2D 编辑器「居中」信号，变化时重置 zoom/pan
+  planZoomDelta: 0,   // SVG 2D 编辑器「放大/缩小」信号，+1 放大 / -1 缩小
   // 视图
   quality: 'balanced',        // eco | smooth | balanced | high
   shadows: true,

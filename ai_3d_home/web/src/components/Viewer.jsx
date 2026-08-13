@@ -2,7 +2,6 @@ import { useRef, useEffect } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import Scene from './Scene'
-import EditorController from './EditorController'
 import { Controls } from '../three/Controls'
 import { useStore, setState } from '../store'
 
@@ -75,45 +74,7 @@ function DeviceLabels({ floorIndex, containerRef }) {
   return null
 }
 
-// 真正的 2D 正交相机（对齐原版：2D 是平面视图，不是 3D 俯视）
-function CameraSwitcher({ view2d }) {
-  const perspective = useThree((s) => s.camera)
-  const set = useThree((s) => s.set)
-  const gl = useThree((s) => s.gl)
-  const camTarget = useStore((s) => s.camTarget)
-  const camDist = useStore((s) => s.camDist)
-  const orthoRef = useRef()
-
-  useEffect(() => {
-    if (view2d) {
-      if (!orthoRef.current) orthoRef.current = new THREE.OrthographicCamera(-10, 10, 6, -6, 0.1, 300)
-      const ortho = orthoRef.current
-      // 按户型尺寸框住
-      const half = Math.max(camDist, 6)
-      const aspect = gl.domElement.width / gl.domElement.height
-      const cx = (camTarget && camTarget[0]) || 0
-      const cz = (camTarget && camTarget[2]) || 0
-      ortho.left = cx - half
-      ortho.right = cx + half
-      ortho.top = cz + half / aspect
-      ortho.bottom = cz - half / aspect
-      ortho.zoom = 1 // 重置缩放，避免 2D 里缩放过、切 3D 再切回来残留
-      ortho.updateProjectionMatrix()
-      ortho.position.set(cx, 50, cz)
-      ortho.up.set(0, 0, -1)
-      ortho.lookAt(cx, 0, cz)
-      set({ camera: ortho })
-      if (window.__dbg3d) window.__dbg3d.activeCam = 'ortho'
-    } else {
-      set({ camera: perspective })
-      if (window.__dbg3d) window.__dbg3d.activeCam = 'persp'
-    }
-  }, [view2d, camDist, camTarget && camTarget[0], camTarget && camTarget[2]])
-
-  return null
-}
-
-// 相机对焦（3D 透视视角；2D 由 CameraSwitcher 用正交相机接管）
+// 相机对焦（3D 透视视角；2D 编辑已改为独立 SVG，不再切换相机）
 function CameraFocus({ floorIndex }) {
   const project = useStore((s) => s.project)
   const floor = project.floors[floorIndex]
@@ -194,22 +155,12 @@ export default function Viewer({ onSelect, floorIndex }) {
   const shadows = useStore((s) => s.shadows)
   const night = useStore((s) => s.night)
   const mode = useStore((s) => s.mode)
-  const view2d = useStore((s) => s.view2d)
   const floor = useStore((s) => s.project.floors[floorIndex])
   const bgImage = useStore((s) => s.bgImage)
   const bgMode = useStore((s) => s.bgMode)
   const containerRef = useRef(null)
   const q = QUALITY[quality] || QUALITY.balanced
   const bg = night ? '#0a1020' : (MODE_BG[mode] || MODE_BG['全屋'])
-
-  // 计算楼层范围（供 2D 正交相机取景）
-  const floorBounds = (() => {
-    let maxR = 8
-    const add = (x, z) => { const r = Math.hypot(x, z); if (r > maxR) maxR = r }
-    ;(floor?.rooms || []).forEach((r) => (r.points || []).forEach((p) => add(p[0], p[1])))
-    ;(floor?.furniture || []).forEach((f) => add(f.pos[0], f.pos[2]))
-    return Math.min(maxR * 1.5, 40)
-  })()
 
   return (
     <div className="canvas-wrap" ref={containerRef}>
@@ -235,9 +186,7 @@ export default function Viewer({ onSelect, floorIndex }) {
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />
         <CameraFocus floorIndex={floorIndex} />
-        <CameraSwitcher view2d={view2d} />
         <DeviceLabels floorIndex={floorIndex} containerRef={containerRef} />
-        <EditorController />
       </Canvas>
     </div>
   )
