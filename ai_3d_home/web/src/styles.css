@@ -122,8 +122,14 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .plan-room-area.selected { fill: #4e729a; }
 .plan-wall { stroke: #343a3f; stroke-linecap: butt; }
 .plan-wall-draft { stroke: #343a3f; stroke-linecap: butt; }
-.plan-door { stroke: #c8956c; stroke-width: 0.06; stroke-linecap: butt; cursor: pointer; }
-.plan-window { stroke: #6ab0ff; stroke-width: 0.06; stroke-linecap: butt; cursor: pointer; }
+/* 门窗（对齐原版） */
+.plan-opening { cursor: grab; }
+.opening-track { stroke: #9aa7b6; stroke-width: 0.25; stroke-linecap: round; pointer-events: none; }
+.opening-line { stroke: #fff; stroke-width: 0.18; stroke-linecap: round; cursor: pointer; }
+.opening-line.window { stroke: #d8edf3; stroke-width: 0.16; }
+.opening-line.door { stroke: #f8f4ee; }
+.door-swing { fill: none; stroke: #89929a; stroke-width: 0.035; pointer-events: none; }
+.door-leaf { stroke: #68737c; stroke-width: 0.055; stroke-linecap: round; pointer-events: none; }
 .plan-preview { stroke: #2f7fe0; stroke-width: 0.05; fill: none; }
 .plan-furniture { fill: #e8ece8; stroke-width: 0.04; cursor: pointer; }
 .plan-furniture.selected { fill: #d4e6ff; stroke: #2f7fe0; stroke-width: 0.06; }

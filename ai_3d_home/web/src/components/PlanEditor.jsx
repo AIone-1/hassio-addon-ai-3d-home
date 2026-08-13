@@ -11,15 +11,17 @@ const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
 const MAX_ZOOM = 6
 
-// 户型包围盒（房间/家具/设备都算进去；空项目给默认范围）
+// 户型包围盒（只按已完成的房间+家具+设备取景；正在画的墙不纳入，否则视口会缩到第一段墙导致后续点超出屏幕）
 function floorBounds(floor) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   const add = (x, y) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   ;(floor?.rooms || []).forEach(r => (r.points || []).forEach(p => add(p[0], p[1])))
-  ;(floor?.walls || []).forEach(w => { add(w.start[0], w.start[1]); add(w.end[0], w.end[1]) })
   ;(floor?.furniture || []).forEach(f => add(f.pos[0], f.pos[2]))
   ;(floor?.devices || []).forEach(d => add(d.pos[0], d.pos[2]))
   if (!isFinite(minX)) { minX = -5; minY = -5; maxX = 5; maxY = 5 }
+  // 四周留 5m 边距，保证画完一个房间后视口还有空间画相邻房间（否则视口缩到房间边缘，共用墙的第二个房间画不下）
+  const pad = 5
+  minX -= pad; maxX += pad; minY -= pad; maxY += pad
   return { minX, minY, width: maxX - minX, height: maxY - minY }
 }
 
@@ -70,9 +72,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const panRef = useRef(null)                   // { w:[x,y], p:[x,y] } 平移起点
   const planMoveRef = useRef(null)              // 移动户型的起点世界坐标
 
-  // 用 JSON.stringify 做依赖：floor.walls/rooms 原地 push 时数组引用不变，useMemo 不会重算
-  const bounds = useMemo(() => floorBounds(floor),
-    [JSON.stringify(floor?.rooms), JSON.stringify(floor?.walls), JSON.stringify(floor?.furniture), JSON.stringify(floor?.devices)])
+  // 房间由 recomputeRooms 返回新数组，引用变化会触发重算（画墙过程中视口保持稳定）
+  const bounds = useMemo(() => floorBounds(floor), [floor?.rooms, floor?.furniture, floor?.devices])
   const aspect = size.w / size.h
   const fitted = useMemo(() => fitBounds(bounds, aspect), [bounds, aspect])
   const vbW = fitted.width / zoom
@@ -415,7 +416,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         />
       ))}
 
-      {/* 门窗（沿墙的开口标记） */}
+      {/* 门窗（对齐原版：墙洞白线 + 门扇 + 开启弧） */}
       {openings.map(op => {
         const w = walls.find(x => x.id === op.wallId)
         if (!w) return null
@@ -424,10 +425,18 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         const py = w.start[1] + (w.end[1] - w.start[1]) * t
         const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0]) * 180 / Math.PI
         const wd = op.width || 0.9
+        const isDoor = op.type === 'door'
         return (
-          <g key={op.id} transform={`translate(${px} ${py}) rotate(${ang})`}
+          <g key={op.id} transform={`translate(${px} ${py}) rotate(${ang})`} className="plan-opening"
             onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'opening', ref: op }) } : undefined}>
-            <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className={op.type === 'door' ? 'plan-door' : 'plan-window'} />
+            <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className="opening-track" />
+            <line x1={-wd / 2} y1={0} x2={wd / 2} y2={0} className={`opening-line ${isDoor ? 'door' : 'window'}`} />
+            {isDoor && (
+              <>
+                <line x1={-wd / 2} y1={0} x2={wd / 2} y2={-wd} className="door-leaf" />
+                <path d={`M ${-wd / 2} 0 A ${wd} ${wd} 0 0 1 ${wd / 2} ${-wd}`} className="door-swing" />
+              </>
+            )}
           </g>
         )
       })}
