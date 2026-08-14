@@ -15,6 +15,14 @@ let state = {
   planImageScale: 1,  // 底图缩放倍数（1=铺满）
   calibrating: false, // 标定模式（在底图上选已知长度）
   calibratePts: [],   // 标定选的点 [[x,y], ...]
+  // 工具默认参数（点击左侧工具时右侧面板修改，放置时用）
+  wallH: 2.8,          // 墙默认高度
+  wallThick: 0.12,     // 墙默认厚度
+  wallColor: '#d5e0f1', // 墙默认颜色
+  doorStyle: 'swing',  // 门默认类型
+  doorColor: '木色',   // 门默认颜色
+  doorSwing: 'inward', // 门默认开向
+  windowStyle: 'standard', // 窗默认类型
   // 视图
   quality: 'high',            // eco | smooth | balanced | high
   shadows: true,

@@ -77,6 +77,13 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const snapStep = useStore(s => s.snapStep)
   const showFurnitureLabels = useStore(s => s.showFurnitureLabels)
   const showDimensions = useStore(s => s.showDimensions)
+  const wallH = useStore(s => s.wallH)
+  const wallThick = useStore(s => s.wallThick)
+  const wallColor = useStore(s => s.wallColor)
+  const doorStyle = useStore(s => s.doorStyle)
+  const doorColor = useStore(s => s.doorColor)
+  const doorSwing = useStore(s => s.doorSwing)
+  const windowStyle = useStore(s => s.windowStyle)
   const planImage = useStore(s => s.planImage)
   const planImageOpacity = useStore(s => s.planImageOpacity)
   const planImageScale = useStore(s => s.planImageScale)
@@ -174,7 +181,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     fl.walls = fl.walls || []
     const first = draft.pts[0], last = draft.pts[draft.pts.length - 1]
     if (Math.hypot(last[0] - first[0], last[1] - first[1]) > 0.01) {
-      fl.walls.push({ id: uid(), start: [...last], end: [...first] })
+      fl.walls.push({ id: uid(), start: [...last], end: [...first], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor })
     }
     fl.rooms = recomputeRooms(fl)
     setDraft(null)
@@ -198,7 +205,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     }
     const last = draft.pts[draft.pts.length - 1]
     if (Math.hypot(x - last[0], y - last[1]) < 0.01) return  // 点重复，忽略
-    const w = { id: uid(), start: [...last], end: [x, y] }
+    const w = { id: uid(), start: [...last], end: [x, y], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor }
     fl.walls.push(w)
     setDraft({ pts: [...draft.pts, [x, y]], walls: [...draft.walls, w] })
     setState({ project: { ...getState().project }, saved: false })
@@ -343,8 +350,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           id: uid(), wallId: best.wall.id, offset: best.t,
           width: isDoor ? 0.9 : 1.2, type: isDoor ? 'door' : 'window',
           ...(isDoor
-            ? { doorStyle: 'swing', color: '木色', swing: 'inward', hinge: 'start', height: 2.1 }
-            : { windowStyle: 'standard', bottom: 0.9, height: 0.9 }),
+            ? { doorStyle: getState().doorStyle, color: getState().doorColor, swing: getState().doorSwing, hinge: 'start', height: 2.1 }
+            : { windowStyle: getState().windowStyle, bottom: 0.9, height: 0.9 }),
         })
         setState({ project: { ...getState().project }, saved: false })
         toast(isDoor ? '已放置门' : '已放置窗')
@@ -787,6 +794,61 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         </g>
       )}
     </svg>
+    {/* 工具设置面板（点击左侧工具时右侧显示，改默认参数） */}
+    {tool === 'wall' && !selected && (
+      <div className="plan-props">
+        <div className="plan-props-head"><span>墙体设置</span></div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">高度</span>
+          <input type="number" step="0.1" min="1" max="6" value={wallH} onChange={(e) => setState({ wallH: Number(e.target.value) || 2.8 })} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">厚度</span>
+          <input type="number" step="0.02" min="0.05" max="0.5" value={wallThick} onChange={(e) => setState({ wallThick: Number(e.target.value) || 0.12 })} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          {WALL_COLORS.map((c) => (
+            <button key={c} title={c} className={`plan-props-swatch ${wallColor === c ? 'active' : ''}`} style={{ background: c }} onClick={() => setState({ wallColor: c })} />
+          ))}
+        </div>
+      </div>
+    )}
+    {tool === 'door' && !selected && (
+      <div className="plan-props">
+        <div className="plan-props-head"><span>门设置</span></div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">类型</span>
+          {DOOR_STYLES.map(s => (
+            <button key={s.key} className={`plan-props-seg ${doorStyle === s.key ? 'active' : ''}`} onClick={() => setState({ doorStyle: s.key })}>{s.label}</button>
+          ))}
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          {Object.entries(DOOR_COLORS).map(([name, hex]) => (
+            <button key={name} title={name} className={`plan-props-swatch ${doorColor === name ? 'active' : ''}`} style={{ background: hex }} onClick={() => setState({ doorColor: name })} />
+          ))}
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">开向</span>
+          <button className={`plan-props-seg ${doorSwing === 'inward' ? 'active' : ''}`} onClick={() => setState({ doorSwing: 'inward' })}>内开</button>
+          <button className={`plan-props-seg ${doorSwing === 'outward' ? 'active' : ''}`} onClick={() => setState({ doorSwing: 'outward' })}>外开</button>
+        </div>
+      </div>
+    )}
+    {tool === 'window' && !selected && (
+      <div className="plan-props">
+        <div className="plan-props-head"><span>窗设置</span></div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">类型</span>
+          {WINDOW_STYLES.map(s => (
+            <button key={s.key} className={`plan-props-seg ${windowStyle === s.key ? 'active' : ''}`} onClick={() => setState({ windowStyle: s.key })}>{s.label}</button>
+          ))}
+        </div>
+      </div>
+    )}
     {selFurniture && (
       <div className="plan-props">
         <div className="plan-props-head">
