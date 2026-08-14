@@ -559,27 +559,80 @@ function Spinner({ on, speed = 10, children }) {
   useFrame((_, dt) => { if (on && ref.current) ref.current.rotation.y += dt * speed })
   return <group ref={ref}>{children}</group>
 }
-// 空调气流（开着时向下流动的半透明风条）
-function Airflow({ on, w }) {
-  const ref = useRef()
-  useFrame((state) => {
-    if (!on || !ref.current) return
-    const t = state.clock.elapsedTime
-    ref.current.children.forEach((c, i) => {
-      const p = (t * 0.9 + i * 0.33) % 1
-      c.position.y = -0.12 - p * 0.55
-      c.material.opacity = 0.6 * (1 - p)
-      c.scale.setScalar(0.65 + 0.5 * p)
-    })
-  })
+// 空调气流着色器（直接照搬 JMGLink 原版 AC 气流动画：流动的空气粒子流）
+const AIRFLOW_VERT = `
+  precision mediump float;
+  uniform float uTime; uniform float uSpeed; uniform float uPhase; uniform float uDrop;
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    vec3 transformed = position;
+    float travel = smoothstep(0.0, 1.0, uv.y);
+    float edge = abs(uv.x - 0.5) * 2.0;
+    float core = 1.0 - smoothstep(0.55, 1.0, edge);
+    float spread = 0.72 + travel * 0.46;
+    float wave = sin((uv.y * 2.7 - uTime * uSpeed + uPhase) * 6.2831853);
+    float surfaceRipple = sin((uv.y * 4.2 + uv.x * 1.15 - uTime * uSpeed * 0.56 + uPhase) * 6.2831853);
+    transformed.x = position.x * spread + wave * 0.02 * travel * core;
+    transformed.z += pow(travel, 1.34) * uDrop + surfaceRipple * 0.012 * travel * (0.3 + core * 0.7);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
+  }
+`
+const AIRFLOW_FRAG = `
+  precision mediump float;
+  uniform float uTime; uniform vec3 uColor; uniform float uOpacity; uniform float uSpeed; uniform float uPhase;
+  varying vec2 vUv;
+  void main() {
+    float along = vUv.y;
+    float across = abs(vUv.x - 0.5) * 2.0;
+    float sideFade = pow(1.0 - smoothstep(0.52, 1.0, across), 1.55);
+    float startFade = smoothstep(0.02, 0.14, along);
+    float endFade = 1.0 - smoothstep(0.78, 1.0, along);
+    float pulse = 0.5 + 0.5 * sin((along * 3.4 - uTime * uSpeed + uPhase) * 6.2831853);
+    float vein = smoothstep(0.58, 1.0, sin((along * 5.8 + vUv.x * 1.7 - uTime * uSpeed * 0.68 + uPhase) * 6.2831853));
+    float coreGlow = pow(1.0 - across, 2.4);
+    float alpha = sideFade * startFade * endFade * uOpacity * (0.46 + pulse * 0.18 + vein * 0.18 + coreGlow * 0.22);
+    vec3 coolCore = mix(vec3(0.62, 0.93, 1.0), uColor, 0.72);
+    vec3 airyColor = mix(coolCore, vec3(1.0), coreGlow * 0.2);
+    gl_FragColor = vec4(airyColor, alpha);
+    if (gl_FragColor.a < 0.004) discard;
+  }
+`
+
+// 气流粒子流（原版 mn）
+function FlowPlane({ color, drop, length, opacity, phase, speed, startZ, width, scale = 1 }) {
+  const mat = useRef()
+  const uniforms = useMemo(() => ({
+    uColor: { value: new THREE.Color(color) },
+    uDrop: { value: drop },
+    uOpacity: { value: opacity },
+    uPhase: { value: phase },
+    uSpeed: { value: speed },
+    uTime: { value: 0 },
+  }), [])
+  useFrame((state) => { if (mat.current) mat.current.uniforms.uTime.value = state.clock.elapsedTime })
   return (
-    <group ref={ref}>
-      {[0, 1, 2].map((i) => (
-        <mesh key={i}>
-          <planeGeometry args={[w * 0.5, w * 0.28]} />
-          <meshBasicMaterial color="#cfe8ff" transparent opacity={0.2} depthWrite={false} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
+    <mesh position={[0, 0, (startZ + length / 2) * scale]} rotation={[Math.PI / 2, 0, 0]} scale={scale} renderOrder={10}>
+      <planeGeometry args={[width, length, 12, 56]} />
+      <shaderMaterial ref={mat} uniforms={uniforms} vertexShader={AIRFLOW_VERT} fragmentShader={AIRFLOW_FRAG}
+        transparent depthWrite={false} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} toneMapped={false} />
+    </mesh>
+  )
+}
+
+// 空调气流（原版 Nh：点光 + 发光条 + 两条气流粒子流）
+function Airflow({ color, scale = 1 }) {
+  const t = mixColor(color, '#28cfff', 0.72)
+  const s = mixColor(t, '#ffffff', 0.18)
+  return (
+    <group position={[0, -0.066 * scale, 0.095 * scale]}>
+      <pointLight color={s} intensity={1.34} distance={2.05} position={[0, -0.14 * scale, 0.42 * scale]} decay={2} />
+      <mesh position={[0, 0.012 * scale, 0.006 * scale]} renderOrder={11}>
+        <planeGeometry args={[0.46 * scale, 0.04 * scale]} />
+        <meshBasicMaterial color={s} transparent opacity={0.76} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+      <FlowPlane color={t} drop={0.44} length={1.08} opacity={0.54} phase={0.08} speed={0.46} startZ={0.03} width={0.58} scale={scale} />
+      <FlowPlane color={mixColor(t, '#ffffff', 0.22)} drop={0.37} length={0.92} opacity={0.36} phase={0.38} speed={0.38} startZ={0.06} width={0.36} scale={scale} />
     </group>
   )
 }
@@ -660,12 +713,14 @@ export function DeviceModel({ id, w, d, h, isOn }) {
         <mesh position={[0, 0, d / 2 + 0.002]}><planeGeometry args={[w * 0.7, h * 0.6]} /><meshStandardMaterial color="#4a5560" /></mesh>
       </group>
     }
-    // wall_ac 壁挂空调
+    // wall_ac 壁挂空调（对齐原版：开机制冷出青蓝色气流，制热偏暖色）
+    const acOn = isOn
+    const acColor = acOn ? '#eef7ff' : '#f5f7fa'
     return <group>
-      <FBox position={[0, 0, 0]} size={[w, h, d]} color="#f5f7fa" roughness={0.32} />
-      <mesh position={[0, -h * 0.18, d / 2 + 0.002]}><planeGeometry args={[w * 0.82, h * 0.34]} /><meshStandardMaterial color="#c3ccd4" /></mesh>
-      <mesh position={[w * 0.32, h * 0.16, d / 2 + 0.004]}><sphereGeometry args={[0.015, 8, 8]} /><meshBasicMaterial color={isOn ? '#4ade80' : '#8899aa'} /></mesh>
-      {isOn && <group position={[0, -h * 0.2, d / 2]}><Airflow on={isOn} w={w} /></group>}
+      <FBox position={[0, 0, 0]} size={[w, h, d]} color={acColor} roughness={0.32} />
+      <mesh position={[0, -h * 0.18, d / 2 + 0.002]}><planeGeometry args={[w * 0.82, h * 0.34]} /><meshStandardMaterial color="#c3ccd4" emissive={acOn ? '#35cfff' : '#000000'} emissiveIntensity={acOn ? 0.5 : 0} /></mesh>
+      <mesh position={[w * 0.32, h * 0.16, d / 2 + 0.004]}><sphereGeometry args={[0.015, 8, 8]} /><meshBasicMaterial color={acOn ? '#35cfff' : '#8899aa'} /></mesh>
+      {acOn && <Airflow color="#e8fbff" scale={w / 0.54} />}
     </group>
   }
 
