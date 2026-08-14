@@ -316,11 +316,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True})
 
         if p == "/api/backup":
-            # 创建存档：把当前 project 存成带时间戳的副本
+            # 创建存档：把当前 project 存成带时间戳的副本，命名 = 项目名_日期（没名字就只日期）
             import datetime
             os.makedirs(BACKUP_DIR, exist_ok=True)
-            name = "backup_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ".json"
-            _write_json(os.path.join(BACKUP_DIR, name), _read_json(PROJECT_FILE, {"floors": []}))
+            data = _read_json(PROJECT_FILE, {"floors": []})
+            pname = (data.get("name") or "").strip()
+            pname = pname.replace("/", "_").replace("\\", "_").replace(" ", "_")
+            stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            name = (pname + "_" + stamp if pname else stamp) + ".json"
+            _write_json(os.path.join(BACKUP_DIR, name), data)
             return self._send(200, {"ok": True, "name": name})
 
         if p == "/api/backup/restore":

@@ -16,6 +16,12 @@ const FURNITURE_ICONS = {
 // 地板颜色（选中房间可改）
 const FLOOR_COLORS = ['#7789ad', '#8a9bbd', '#a58b6f', '#8b8b8b', '#c9a675', '#7d8f7a', '#a08090', '#6b7f9e']
 
+// 存档文件名 → 显示标签（去掉 .json 和旧 backup_ 前缀，新命名是「项目名_日期」）
+const backupLabel = (name) => {
+  const s = (name || '').replace(/\.json$/, '')
+  return s.startsWith('backup_') ? s.slice(7) : s
+}
+
 const LEFT_TOOLS = [
   { id: 'select', label: '选择', k: 'V' },
   { id: 'move', label: '移动', k: 'M' },
@@ -453,7 +459,7 @@ export default function Editor() {
               <div style={{ maxHeight: '38vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
                 {backups.map((b) => (
                   <div key={b.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderRadius: 8, background: 'var(--panel2)' }}>
-                    <span style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{new Date(b.time * 1000).toLocaleString()}</span>
+                    <span title={new Date(b.time * 1000).toLocaleString()} style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{backupLabel(b.name)}</span>
                     <button style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--accent)', color: '#081018', fontSize: 11, cursor: 'pointer' }} onClick={() => openBackup(b.name)}>打开</button>
                     <button style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontSize: 11, cursor: 'pointer' }} onClick={() => deleteBackup(b.name)}>删除</button>
                   </div>
@@ -461,11 +467,15 @@ export default function Editor() {
               </div>
             )}
             <div className="dev-actions" style={{ margin: '0 0 10px' }}>
-              <button className="primary" onClick={() => {
+              <button className="primary" onClick={async () => {
                 const name = prompt('新项目名字：', '我的家')
                 if (name && name.trim()) {
+                  // 先保存当前项目为存档（项目名_日期），再开新项目，避免之前的项目丢失
+                  try { await api.saveProject(getState().project) } catch (e) {}
+                  await createBackup()
                   const p = { name: name.trim(), version: 1, floors: [{ id: Math.random().toString(36).slice(2, 10), name: '一层', level: 0, height: 2.8, color: '#e6dcc8', rooms: [], walls: [], furniture: [], devices: [], openings: [] }] }
                   loadProject(p); setState({ saved: false }); setProjectManagerOpen(false)
+                  toast('已新建项目，之前的项目已存为最近项目')
                 }
               }}>新建项目</button>
             </div>

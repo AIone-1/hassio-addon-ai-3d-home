@@ -106,6 +106,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const wallDragRef = useRef(null)              // 拖动的墙端点 { wall, which: 'start'|'end' }
   const panRef = useRef(null)                   // { w:[x,y], p:[x,y] } 平移起点
   const planMoveRef = useRef(null)              // 移动户型的起点世界坐标
+  const rightClickRef = useRef(0)               // 最近一次右键时间戳，用于区分单击取消 / 双击切移动
 
   // 房间由 recomputeRooms 返回新数组，引用变化会触发重算（画墙过程中视口保持稳定）
   const bounds = useMemo(() => floorBounds(floor), [floor?.rooms, floor?.furniture, floor?.devices])
@@ -278,11 +279,13 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   // ---------- 交互 ----------
   const handleFloorDown = (e) => {
     if (e.button === 2) {
-      // 右键 = 取消：取消画墙草稿 + 取消删除/画墙工具 + 取消选中 + 退出标定
+      // 双击右键 = 切移动工具；单击右键 = 取消（取消选中 / 取消移动 / 取消墙体/门窗/家具/设备的放置 / 取消删除 / 取消画墙草稿 / 退出标定）
+      const now = Date.now()
+      const isDouble = now - rightClickRef.current < 300
+      rightClickRef.current = isDouble ? 0 : now
       if (draft) cancelDraft()
-      if (tool === 'wall' || tool === 'delete') setState({ tool: 'select' })
-      setState({ selected: null })
       if (getState().calibrating) setState({ calibrating: false, calibratePts: [] })
+      setState({ tool: isDouble ? 'move' : 'select', selected: null })
       return
     }
     // 标定模式：点底图选已知长度
