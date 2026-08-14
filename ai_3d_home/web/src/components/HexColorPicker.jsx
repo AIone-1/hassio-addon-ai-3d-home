@@ -128,6 +128,12 @@ export default function HexColorPicker({ value = '#5879ad', onChange }) {
             emit(h, s, vv)
           }} />
       </div>
+      {/* 黑白灰快捷色（黑/白是 HSV 的极端，色盘里不好找，单独放一行） */}
+      <div style={{ display: 'flex', gap: 5, width: '100%', justifyContent: 'center' }}>
+        {['#000000', '#333333', '#666666', '#999999', '#cccccc', '#ffffff'].map((c) => (
+          <button key={c} title={c} style={{ width: 24, height: 24, borderRadius: 5, border: hex === c ? '2px solid var(--accent)' : '1px solid var(--border)', background: c, cursor: 'pointer', padding: 0 }} onClick={() => { const [h, s, vv] = hexToHsv(c); emit(h, s, vv) }} />
+        ))}
+      </div>
     </div>
   )
 }

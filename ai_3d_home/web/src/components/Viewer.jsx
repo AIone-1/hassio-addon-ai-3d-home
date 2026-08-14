@@ -160,8 +160,9 @@ function SceneBackground({ mode, night, bgImage, bgMode, bgColor }) {
     } else if (bgMode === 'night') {
       scene.background = new THREE.Color('#0a1020')
     } else if (bgMode === 'color') {
-      // 纯色：用色盘选的颜色
-      scene.background = new THREE.Color(bgColor || '#5278ae')
+      // 纯色：用色盘选的颜色（夜间仍用暗色；颜色非法时回退渐变，避免黑屏）
+      if (night) scene.background = new THREE.Color('#0a1020')
+      else scene.background = (bgColor && /^#[0-9a-fA-F]{6}$/.test(bgColor)) ? new THREE.Color(bgColor) : skyGradient()
     } else {
       // 渐变：蓝色天空渐变
       scene.background = night ? new THREE.Color('#0a1020') : skyGradient()
