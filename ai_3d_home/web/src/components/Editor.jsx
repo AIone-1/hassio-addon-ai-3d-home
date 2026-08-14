@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useStore, setState, currentFloor, getState, toast, undo } from '../store'
+import { useStore, setState, currentFloor, getState, toast, undo, loadProject } from '../store'
 import { api } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea } from '../three/geometry'
 import { thumbUrl } from '../catalog'
@@ -177,17 +177,17 @@ export default function Editor() {
   }
   const closePreview = () => { setPreviewModel(null); setShow3d(false) }
 
-  // 点击空白处关闭 模型选择器/设备分类 弹窗
+  // 点击空白处关闭 模型选择器/设备分类/备份菜单 弹窗
   useEffect(() => {
     const onDown = (e) => {
-      if (!furnOpen && !catOpen) return
+      if (!furnOpen && !catOpen && !backMenuOpen) return
       const t = e.target
-      if (t.closest && (t.closest('.furn-picker') || t.closest('.furn-item') || t.closest('.furn-cat'))) return
-      setFurnOpen(false); setCatOpen(false)
+      if (t.closest && (t.closest('.furn-picker') || t.closest('.furn-item') || t.closest('.furn-cat') || t.closest('.bb-menu'))) return
+      setFurnOpen(false); setCatOpen(false); setBackMenuOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [furnOpen, catOpen])
+  }, [furnOpen, catOpen, backMenuOpen])
 
   const importJson = () => {
     const input = document.createElement('input')
@@ -199,7 +199,7 @@ export default function Editor() {
       try {
         const p = JSON.parse(await f.text())
         if (p && Array.isArray(p.floors)) {
-          setState({ project: p, currentFloor: 0 })
+          loadProject(p); setState({ currentFloor: 0 })
         }
       } catch (e) { alert('JSON 解析失败') }
     }
@@ -245,7 +245,7 @@ export default function Editor() {
     try {
       const r = await api.backupRestore(name)
       if (r.ok && r.project) {
-        setState({ project: r.project, currentFloor: 0, selected: null, saved: true })
+        loadProject(r.project); setState({ currentFloor: 0, selected: null, saved: true })
         toast('已恢复存档')
         setBackupOpen(false)
       }

@@ -5,7 +5,7 @@ import BottomBar from './components/BottomBar'
 import Editor from './components/Editor'
 import BindDrawer from './components/BindDrawer'
 import DeviceList from './components/DeviceList'
-import { useStore, setState, getState, toast } from './store'
+import { useStore, setState, getState, toast, loadProject } from './store'
 import { api, TOGGLE_DOMAINS, BASE } from './api'
 import { roomsToWalls, recomputeRooms } from './three/geometry'
 import { loadCatalog } from './catalog'
@@ -117,7 +117,8 @@ export default function App() {
               }
             }
           })
-          setState({ project: p, currentFloor: 0 })
+          loadProject(p)
+          setState({ currentFloor: 0 })
         }
       } catch (e) {}
       // 拉全量实体（绑定用）

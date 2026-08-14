@@ -84,6 +84,11 @@ export function undo() {
   state = { ...state, project: prev, saved: false }
   listeners.forEach((l) => l(state))
 }
+// 加载项目（启动/恢复），不保存撤销快照
+export function loadProject(p) {
+  state = { ...state, project: p }
+  listeners.forEach((l) => l(state))
+}
 export function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn) }
 
 export function useStore(selector) {
