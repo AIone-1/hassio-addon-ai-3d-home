@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 const N = 6                 // 边数（改 8 = 八边形）
-const SIZE = 200            // canvas 边长
+const SIZE = 160            // canvas 边长
 
 function hsvToRgb(h, s, v) {
   const c = v * s

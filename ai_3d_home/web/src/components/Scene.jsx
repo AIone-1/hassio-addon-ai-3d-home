@@ -1340,6 +1340,7 @@ export default function Scene({ onSelect, floorIndex }) {
   const editing = useStore((s) => s.editing)
   const showWalls = useStore((s) => s.showWalls)
   const showOpenings = useStore((s) => s.showOpenings)
+  const showCeiling = useStore((s) => s.showCeiling)
   const camTarget = useStore((s) => s.camTarget)
   const pickItem = useStore((s) => s.pickItem)
   const wallSelIds = useStore((s) => s.wallSel)

@@ -430,12 +430,12 @@ export default function App() {
             </div>
             <div className="field" style={{ margin: '12px 0' }}>
               <label>渐变（选两个颜色）</label>
-              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8, alignItems: 'center' }}>
+                <div style={{ width: '100%' }}>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>颜色 1（顶）</div>
                   <HexColorPicker value={bgGradient1} onChange={(c) => { setState({ bgGradient1: c, bgMode: 'gradient', bgImage: '' }); api.saveSettings({ ...getState().settings, bgGradient1: c, bgMode: 'gradient', bgImage: '' }).catch(() => {}) }} />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ width: '100%' }}>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>颜色 2（底）</div>
                   <HexColorPicker value={bgGradient2} onChange={(c) => { setState({ bgGradient2: c, bgMode: 'gradient', bgImage: '' }); api.saveSettings({ ...getState().settings, bgGradient2: c, bgMode: 'gradient', bgImage: '' }).catch(() => {}) }} />
                 </div>
