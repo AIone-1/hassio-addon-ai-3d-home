@@ -5,6 +5,14 @@ import { FURNITURE_LIB, FURNITURE_COLORS } from '../three/geometry'
 import { thumbUrl } from '../catalog'
 import ModelPreview from './ModelPreview'
 
+// 内置家具图标（程序化建模无缩略图，用 emoji 表示）
+const FURNITURE_ICONS = {
+  沙发: '🛋️', 床: '🛏️', 餐桌: '🍽️', 书桌: '🪑', 衣柜: '🚪',
+  橱柜: '🗄️', 岛台: '🍳', 茶几: '🪵', 书架: '📚', 马桶: '🚽',
+  空气净化器: '🌀', 电视机: '📺', 壁灯: '💡', 挂画: '🖼️', 吊灯: '🛎️',
+  吸顶灯: '💡', 筒灯: '💡', 空调: '❄️', 热水器: '♨️',
+}
+
 const LEFT_TOOLS = [
   { id: 'select', label: '选择', k: 'V' },
   { id: 'move', label: '移动', k: 'M' },
@@ -291,7 +299,7 @@ export default function Editor() {
                   <button key={f.type}
                     className={`furn-item ${furnitureType === f.type ? 'active' : ''}`}
                     onClick={() => setPreviewModel({ type: f.type, label: f.type, w: f.w, d: f.d, h: f.h, color: FURNITURE_COLORS[f.type] || '#888', builtin: true })} title="点击预览">
-                    <span className="furn-swatch" style={{ background: FURNITURE_COLORS[f.type] || '#888' }} />
+                    <span className="furn-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{FURNITURE_ICONS[f.type] || '📦'}</span>
                     {f.type}
                     <span className="furn-dim"> {f.w}×{f.d}m</span>
                   </button>
