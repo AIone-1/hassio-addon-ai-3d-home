@@ -23,6 +23,7 @@ export const FURNITURE_LIB = [
   { type: '热水器', w: 0.45, d: 0.6, h: 0.45, placement: 'wall' },
   { type: '窗帘', w: 1.5, d: 0.12, h: 2.0, placement: 'wall' },
   { type: '传感器', w: 0.16, d: 0.16, h: 0.05, placement: 'wall' },
+  { type: '灯带', w: 1.0, d: 0.06, h: 0.03, placement: 'ceiling' },
 ]
 
 // 挂墙家具默认离地高度（m）；挂顶用层高、地面为 0
@@ -52,7 +53,7 @@ export const FURNITURE_COLORS = {
   衣柜: '#778b7e', 橱柜: '#778b7e', 岛台: '#987c62', 茶几: '#937d70', 书架: '#748774',
   马桶: '#9aa7b5', 空气净化器: '#9aa7b5', 电视机: '#5a6470',
   壁灯: '#d8b06a', 挂画: '#c0906a', 吊灯: '#d8b06a', 吸顶灯: '#d8b06a', 筒灯: '#d8b06a',
-  空调: '#e8edf2', 热水器: '#e8edf2', 窗帘: '#9fb8c8', 传感器: '#c9d4dc',
+  空调: '#e8edf2', 热水器: '#e8edf2', 窗帘: '#9fb8c8', 传感器: '#c9d4dc', 灯带: '#ffd166',
 }
 
 // 3D 家具主题色（对齐原版 glass 风格：统一蓝灰，不是每件一个色）

@@ -10,8 +10,11 @@ const FURNITURE_ICONS = {
   沙发: '🛋️', 床: '🛏️', 餐桌: '🍽️', 书桌: '🪑', 衣柜: '🚪',
   橱柜: '🗄️', 岛台: '🍳', 茶几: '🪵', 书架: '📚', 马桶: '🚽',
   空气净化器: '🌀', 电视机: '📺', 壁灯: '💡', 挂画: '🖼️', 吊灯: '🛎️',
-  吸顶灯: '💡', 筒灯: '💡', 空调: '❄️', 热水器: '♨️',
+  吸顶灯: '💡', 筒灯: '💡', 空调: '❄️', 热水器: '♨️', 灯带: '✨',
 }
+
+// 地板颜色（选中房间可改）
+const FLOOR_COLORS = ['#7789ad', '#8a9bbd', '#a58b6f', '#8b8b8b', '#c9a675', '#7d8f7a', '#a08090', '#6b7f9e']
 
 const LEFT_TOOLS = [
   { id: 'select', label: '选择', k: 'V' },
@@ -34,6 +37,7 @@ export default function Editor() {
   const snapStep = useStore((s) => s.snapStep)
   const showLabels = useStore((s) => s.showLabels)
   const showFurnitureLabels = useStore((s) => s.showFurnitureLabels)
+  const showDimensions = useStore((s) => s.showDimensions)
   const planImage = useStore((s) => s.planImage)
   const settings = useStore((s) => s.settings)
   const view2d = useStore((s) => s.view2d)
@@ -401,6 +405,7 @@ export default function Editor() {
           {snapStep}m</button>
         <button className={`et-btn ${showLabels ? 'active' : ''}`} onClick={() => setState({ showLabels: !showLabels })}>标签</button>
         <button className={`et-btn ${showFurnitureLabels ? 'active' : ''}`} onClick={() => setState({ showFurnitureLabels: !showFurnitureLabels })}>名字</button>
+        <button className={`et-btn ${showDimensions ? 'active' : ''}`} onClick={() => setState({ showDimensions: !showDimensions })} title="显示墙长度尺寸">尺寸</button>
         <button className={`et-btn ${view2d ? 'active' : ''}`} onClick={() => setState({ view2d: !view2d })}>2D</button>
         <button className={`et-btn ${!view2d ? 'active' : ''}`} onClick={() => setState({ view2d: false })}>3D</button>
         <div style={{ flex: 1 }} />
@@ -428,6 +433,12 @@ export default function Editor() {
             <input type="text" value={selRoom.name || ''} onChange={(e) => renameRoom(e.target.value)}
               style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 4 }} />
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>面积 {polygonArea(selRoom.points || []).toFixed(1)} ㎡</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+              {FLOOR_COLORS.map((c) => (
+                <button key={c} title={c} onClick={() => { const fl = getState().project.floors[currentFloorIdx]; const r = (fl.rooms || []).find(x => x.id === selRoom.id); if (r) { r.color = c; setState({ project: { ...getState().project }, saved: false }) } }}
+                  style={{ width: 20, height: 20, borderRadius: 5, background: c, border: selRoom.color === c ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.25)', cursor: 'pointer', padding: 0 }} />
+              ))}
+            </div>
           </div>
         )}
         {selWall && (

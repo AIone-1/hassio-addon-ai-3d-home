@@ -20,6 +20,7 @@ const BUILTIN_DEVICES = [
   { type: '热水器', icon: '♨️' },
   { type: '窗帘', icon: '🪟' },
   { type: '传感器', icon: '📡' },
+  { type: '灯带', icon: '✨' },
 ]
 const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
@@ -71,6 +72,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const snapOn = useStore(s => s.snap)
   const snapStep = useStore(s => s.snapStep)
   const showFurnitureLabels = useStore(s => s.showFurnitureLabels)
+  const showDimensions = useStore(s => s.showDimensions)
   const planImage = useStore(s => s.planImage)
   const planImageOpacity = useStore(s => s.planImageOpacity)
   const planImageScale = useStore(s => s.planImageScale)
@@ -619,6 +621,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       {/* 墙（持久化线段：select 选中可拉伸端点，delete 删除） */}
       {walls.map((w, i) => {
         const selW = isSel('wall', w.id)
+        const wlen = Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
+        const wmx = (w.start[0] + w.end[0]) / 2
+        const wmy = (w.start[1] + w.end[1]) / 2
         return (
           <g key={w.id || `w${i}`}>
             <line
@@ -635,6 +640,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
                 <circle cx={w.start[0]} cy={w.start[1]} r={0.16} className="plan-wall-handle" onPointerDown={(e) => startWallDrag(e, w, 'start')} />
                 <circle cx={w.end[0]} cy={w.end[1]} r={0.16} className="plan-wall-handle" onPointerDown={(e) => startWallDrag(e, w, 'end')} />
               </>
+            )}
+            {showDimensions && wlen > 0.01 && (
+              <text x={wmx} y={wmy} className="plan-dim">{wlen.toFixed(2)}m</text>
             )}
           </g>
         )

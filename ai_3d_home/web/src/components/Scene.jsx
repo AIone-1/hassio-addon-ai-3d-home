@@ -491,6 +491,16 @@ export function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
           </mesh>
         </group>
       )
+    case '灯带':
+      return (
+        <group>
+          {/* 细长发光的灯带 */}
+          <mesh position={[0, 0, 0]} castShadow>
+            <boxGeometry args={[w, h, d]} />
+            <meshStandardMaterial color="#ffe9a8" emissive="#ffd166" emissiveIntensity={0.8} />
+          </mesh>
+        </group>
+      )
     default:
       return <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
   }
