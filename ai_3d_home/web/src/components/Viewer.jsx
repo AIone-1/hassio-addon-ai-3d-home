@@ -232,7 +232,7 @@ export default function Viewer({ onSelect, floorIndex }) {
         <DeviceLabels floorIndex={floorIndex} containerRef={containerRef} />
       </Canvas>
       {/* 3D 编辑时点选墙/家具/设备，右侧弹属性面板 */}
-      {editing && selected && ['wall', 'furniture', 'device'].includes(selected.type) && <WallProps3D floorIndex={floorIndex} />}
+      {editing && <WallProps3D floorIndex={floorIndex} />}
     </div>
   )
 }

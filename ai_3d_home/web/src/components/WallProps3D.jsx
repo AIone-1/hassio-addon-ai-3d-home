@@ -144,24 +144,25 @@ export default function WallProps3D({ floorIndex }) {
           return (
             <div className="plan-props-row">
               <span className="plan-props-label">RGB</span>
-              <input type="number" min="0" max="255" value={r} onChange={(e) => setRgb(Number(e.target.value) || 0, g, b)} style={{ width: 42 }} />
-              <input type="number" min="0" max="255" value={g} onChange={(e) => setRgb(r, Number(e.target.value) || 0, b)} style={{ width: 42 }} />
-              <input type="number" min="0" max="255" value={b} onChange={(e) => setRgb(r, g, Number(e.target.value) || 0)} style={{ width: 42 }} />
+              <input type="number" min="0" max="255" value={r} onChange={(e) => setRgb(Number(e.target.value) || 0, g, b)} style={{ width: 52 }} />
+              <input type="number" min="0" max="255" value={g} onChange={(e) => setRgb(r, Number(e.target.value) || 0, b)} style={{ width: 52 }} />
+              <input type="number" min="0" max="255" value={b} onChange={(e) => setRgb(r, g, Number(e.target.value) || 0)} style={{ width: 52 }} />
             </div>
           )
         })()}
-        {/* 全色系蜂窝布局 */}
+        {/* 全色系蜂窝布局（大六边形由小六边形组成） */}
         {(() => {
+          const lens = [7, 9, 11, 13, 13, 11, 9, 7]  // 上下短中间长，整体呈六边形
           const rows = []
-          const perRow = 12
-          for (let i = 0; i < FULL_PALETTE.length; i += perRow) rows.push(FULL_PALETTE.slice(i, i + perRow))
+          let idx = 0
+          for (const l of lens) { rows.push(FULL_PALETTE.slice(idx, idx + l)); idx += l }
           const hex = 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)'
           return (
-            <div style={{ margin: '4px 0 8px' }}>
+            <div style={{ margin: '4px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               {rows.map((row, ri) => (
-                <div key={ri} style={{ display: 'flex', justifyContent: 'center', marginLeft: ri % 2 === 1 ? 10 : 0, marginTop: ri > 0 ? -5 : 0 }}>
+                <div key={ri} style={{ display: 'flex', marginTop: ri > 0 ? -6 : 0 }}>
                   {row.map((c) => (
-                    <button key={c} title={c} style={{ width: 22, height: 24, margin: '0 1px', clipPath: hex, border: 'none', background: c, cursor: 'pointer', padding: 0, outline: wall.color === c ? '2px solid var(--accent)' : 'none' }} onClick={() => commit(() => { wall.color = c })} />
+                    <button key={c} title={c} style={{ width: 22, height: 25, margin: '0 1px', clipPath: hex, border: 'none', background: c, cursor: 'pointer', padding: 0, outline: wall.color === c ? '2px solid var(--accent)' : 'none' }} onClick={() => commit(() => { wall.color = c })} />
                   ))}
                 </div>
               ))}

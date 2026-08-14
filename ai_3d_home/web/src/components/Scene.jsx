@@ -1301,19 +1301,19 @@ function WallMaterial({ texture, color, opacity, selected }) {
     let cancelled = false
     const loader = new THREE.TextureLoader()
     loader.crossOrigin = 'anonymous'
-    loader.load(MODEL_BASE + 'api/background/' + texture, (t) => {
+    loader.load(MODEL_BASE + 'api/background/' + texture + '?t=' + Date.now(), (t) => {
       if (cancelled) return
       t.colorSpace = THREE.SRGBColorSpace
       t.wrapS = t.wrapT = THREE.RepeatWrapping
-      t.repeat.set(1, 1)
       t.needsUpdate = true
       setMap(t)
     }, undefined, () => { if (!cancelled) setMap(null) })
     return () => { cancelled = true }
   }, [texture])
   const trans = opacity < 0.999
+  const matColor = map ? '#ffffff' : color
   return (
-    <meshStandardMaterial map={map || undefined} color={map ? '#ffffff' : color}
+    <meshStandardMaterial key={map ? map.uuid : 'no-tex'} map={map || undefined} color={matColor}
       emissive={selected ? '#2f7fe0' : '#000000'} emissiveIntensity={selected ? 0.45 : 0}
       transparent={trans} opacity={opacity} roughness={0.6} metalness={0.05} depthWrite={!trans} />
   )
@@ -1436,28 +1436,36 @@ export default function Scene({ onSelect, floorIndex }) {
           const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0])
           const isSel = wallSelIds.includes(w.id)
           return (
-            <mesh
-              key={w.id || i}
-              position={[mx, h / 2 + level, mz]}
-              rotation={[0, -ang, 0]}
-              onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
-                : tool === 'select' ? (e) => {
-                  e.stopPropagation()
-                  if (e.ctrlKey || e.metaKey || multiSelect) {
-                    const cur = getState().wallSel || []
-                    const next = cur.includes(w.id) ? cur.filter((x) => x !== w.id) : [...cur, w.id]
-                    setState({ wallSel: next, selected: null })
-                  } else {
-                    setState({ wallSel: [w.id], selected: null })
+            <group key={w.id || i}>
+              <mesh
+                position={[mx, h / 2 + level, mz]}
+                rotation={[0, -ang, 0]}
+                onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
+                  : tool === 'select' ? (e) => {
+                    e.stopPropagation()
+                    if (e.ctrlKey || e.metaKey || multiSelect) {
+                      const cur = getState().wallSel || []
+                      const next = cur.includes(w.id) ? cur.filter((x) => x !== w.id) : [...cur, w.id]
+                      setState({ wallSel: next, selected: null })
+                    } else {
+                      setState({ wallSel: [w.id], selected: null })
+                    }
                   }
-                }
-                : undefined}
-            >
-              <boxGeometry args={[len, view2d ? 0.01 : h, thick]} />
-              {view2d
-                ? <meshBasicMaterial color={isSel ? '#2f7fe0' : '#3a4a66'} />
-                : <WallMaterial texture={w.texture} color={wallColor} opacity={wallOpacityVal} selected={isSel} />}
-            </mesh>
+                  : undefined}
+              >
+                <boxGeometry args={[len, view2d ? 0.01 : h, thick]} />
+                {view2d
+                  ? <meshBasicMaterial color={isSel ? '#2f7fe0' : '#3a4a66'} />
+                  : <WallMaterial texture={w.texture} color={wallColor} opacity={wallOpacityVal} selected={isSel} />}
+              </mesh>
+              {/* 选中高亮：外圈蓝色线框（透明墙也看得清） */}
+              {isSel && (
+                <mesh position={[mx, h / 2 + level, mz]} rotation={[0, -ang, 0]} scale={[1.08, 1.08, 1.08]}>
+                  <boxGeometry args={[len, view2d ? 0.02 : h, thick]} />
+                  <meshBasicMaterial color="#2f7fe0" wireframe transparent opacity={0.8} depthWrite={false} />
+                </mesh>
+              )}
+            </group>
           )
           })
         })()}
