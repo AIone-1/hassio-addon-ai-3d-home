@@ -146,6 +146,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .plan-cursor circle { fill: #2f7fe0; }
 .plan-start-marker { pointer-events: none; }
 .plan-start-marker circle { fill: #2ecc71; stroke: #fff; stroke-width: 0.05; }
+.plan-start-marker.near circle { fill: #27e07a; stroke: #fff; stroke-width: 0.08; }
 .plan-origin { pointer-events: none; }
 .plan-origin line { stroke: #ff8a4a; stroke-width: 0.05; }
 .plan-origin circle { fill: none; stroke: #ff8a4a; stroke-width: 0.05; }

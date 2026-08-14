@@ -6,7 +6,7 @@ import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR
 import { getCatalogItem, thumbUrl } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
-const CLOSE = 0.5      // 画墙闭合半径（点回起点 <0.5m 闭合）
+const CLOSE = 0.8      // 画墙闭合半径（点回起点 <0.8m 闭合，大一点更容易合上）
 const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
 const MAX_ZOOM = 6
@@ -169,14 +169,13 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setDraft({ pts: [snap(raw)], walls: [] })
       return
     }
+    // 先吸附（含起点吸附），再用吸附后的点判断闭合/重复——否则起点吸附生效了但闭合判断没生效
+    const [x, y] = snap(raw)
     const first = draft.pts[0]
-    const gx = snapOn ? Math.round(raw[0] / snapStep) * snapStep : raw[0]
-    const gy = snapOn ? Math.round(raw[1] / snapStep) * snapStep : raw[1]
-    if (draft.pts.length >= 3 && Math.hypot(gx - first[0], gy - first[1]) < CLOSE) {
+    if (draft.pts.length >= 3 && Math.hypot(x - first[0], y - first[1]) < CLOSE) {
       closeDraft()
       return
     }
-    const [x, y] = snap(raw)
     const last = draft.pts[draft.pts.length - 1]
     if (Math.hypot(x - last[0], y - last[1]) < 0.01) return  // 点重复，忽略
     const w = { id: uid(), start: [...last], end: [x, y] }
@@ -714,12 +713,15 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         />
       )}
 
-      {/* 画墙起点标记（绿色圆点，提示闭合点在哪） */}
-      {draft && draft.pts.length > 0 && tool === 'wall' && (
-        <g transform={`translate(${draft.pts[0][0]} ${draft.pts[0][1]})`} className="plan-start-marker">
-          <circle r="0.18" />
-        </g>
-      )}
+      {/* 画墙起点标记（绿色圆点，鼠标靠近时放大提示可闭合） */}
+      {draft && draft.pts.length > 0 && tool === 'wall' && (() => {
+        const near = cursor && Math.hypot(cursor[0] - draft.pts[0][0], cursor[1] - draft.pts[0][1]) < CLOSE
+        return (
+          <g transform={`translate(${draft.pts[0][0]} ${draft.pts[0][1]})`} className={`plan-start-marker ${near ? 'near' : ''}`}>
+            <circle r={near ? 0.32 : 0.18} />
+          </g>
+        )
+      })()}
 
       {/* 放置/画墙时的吸附点标记 */}
       {(tool === 'furniture' || tool === 'device' || tool === 'wall') && cursor && (
