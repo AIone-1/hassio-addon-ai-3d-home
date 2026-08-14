@@ -21,17 +21,33 @@ export default function BottomBar() {
     if (document.fullscreenElement) document.exitFullscreen?.()
     else document.documentElement.requestFullscreen?.()
   }
-  // 导出 3D 截图
-  const export3DPng = () => {
+  // 导出 3D 截图（count 张，多张时自动旋转不同角度截）
+  const export3DPng = (count = 1) => {
     const canvas = document.querySelector('.canvas-wrap canvas')
     if (!canvas) return toast('请先在 3D 视图')
-    const a = document.createElement('a')
-    a.href = canvas.toDataURL('image/png')
-    a.download = '户型3D.png'
-    a.click()
+    const snap = (i) => {
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = count <= 1 ? '户型3D.png' : `户型3D_${i}.png`
+      a.click()
+    }
+    if (count <= 1) { snap(1); return }
+    const wasRotating = getState().autoRotate
+    setState({ autoRotate: true, rotateSpeed: 3 })
+    toast(`正在截取 ${count} 张不同角度…`)
+    let n = 0
+    const timer = setInterval(() => {
+      snap(n + 1)
+      n++
+      if (n >= count) {
+        clearInterval(timer)
+        if (!wasRotating) setState({ autoRotate: false })
+        toast(`已导出 ${count} 张截图`)
+      }
+    }, 900)
   }
-  // 录制 3D 旋转视频（6 秒，优先 mp4，浏览器不支持则 webm）
-  const record3DVideo = () => {
+  // 录制 3D 旋转视频（秒数可调，优先 mp4，浏览器不支持则 webm）
+  const record3DVideo = (seconds = 6) => {
     const canvas = document.querySelector('.canvas-wrap canvas')
     if (!canvas) return toast('请先在 3D 视图')
     if (typeof MediaRecorder === 'undefined') return toast('浏览器不支持录制')
@@ -53,8 +69,8 @@ export default function BottomBar() {
     recorder.start()
     const wasRotating = getState().autoRotate
     setState({ autoRotate: true })
-    toast('正在录制 6 秒旋转视频…')
-    setTimeout(() => { recorder.stop(); if (!wasRotating) setState({ autoRotate: false }) }, 6000)
+    toast(`正在录制 ${seconds} 秒旋转视频…`)
+    setTimeout(() => { recorder.stop(); if (!wasRotating) setState({ autoRotate: false }) }, seconds * 1000)
   }
 
   return (
@@ -84,8 +100,15 @@ export default function BottomBar() {
           <button className="bb-btn" onClick={() => setShareOpen(!shareOpen)} title="分享/导出">📤 分享</button>
           {shareOpen && (
             <div className="bb-menu">
-              <button className="bb-menu-item" onClick={() => { export3DPng(); setShareOpen(false) }}>📷 导出 3D 图片</button>
-              <button className="bb-menu-item" onClick={() => { record3DVideo(); setShareOpen(false) }}>🎬 录制 3D 视频</button>
+              <div className="bb-menu-title">📷 导出 3D 图片</div>
+              <button className="bb-menu-item" onClick={() => { export3DPng(1); setShareOpen(false) }}>1 张</button>
+              <button className="bb-menu-item" onClick={() => { export3DPng(4); setShareOpen(false) }}>4 张（不同角度）</button>
+              <button className="bb-menu-item" onClick={() => { export3DPng(8); setShareOpen(false) }}>8 张（不同角度）</button>
+              <div className="bb-menu-sep" />
+              <div className="bb-menu-title">🎬 录制 3D 视频</div>
+              <button className="bb-menu-item" onClick={() => { record3DVideo(3); setShareOpen(false) }}>3 秒</button>
+              <button className="bb-menu-item" onClick={() => { record3DVideo(6); setShareOpen(false) }}>6 秒</button>
+              <button className="bb-menu-item" onClick={() => { record3DVideo(10); setShareOpen(false) }}>10 秒</button>
             </div>
           )}
         </div>

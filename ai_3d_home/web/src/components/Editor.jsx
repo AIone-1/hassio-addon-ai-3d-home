@@ -39,6 +39,7 @@ export default function Editor() {
   const [backups, setBackups] = useState([])
   const [backupOpen, setBackupOpen] = useState(false)
   const [defaultOpen, setDefaultOpen] = useState(false)
+  const [previewModel, setPreviewModel] = useState(null)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -315,7 +316,7 @@ export default function Editor() {
                       <div key={m.type} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                         <button
                           className={`furn-item ${furnitureType === m.type ? 'active' : ''}`}
-                          onClick={() => { setState({ furnitureType: m.type, tool: 'furniture' }); setFurnOpen(false) }}>
+                          onClick={() => setPreviewModel(m)} title="点击预览">
                           <img className="furn-thumb" src={thumbUrl(m.thumb)} alt={m.label} loading="lazy" />
                           <span>{m.label}</span>
                         </button>
@@ -413,6 +414,23 @@ export default function Editor() {
               </div>
             </div>
             <button className="close-btn" onClick={() => setDefaultOpen(false)}>关闭</button>
+          </div>
+        </div>
+      )}
+      {/* 模型预览弹窗 */}
+      {previewModel && (
+        <div className="modal-mask" onClick={() => setPreviewModel(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="dname">{previewModel.label}</div>
+            <img src={thumbUrl(previewModel.thumb)} alt={previewModel.label}
+              style={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }} />
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
+              尺寸约 {previewModel.w}×{previewModel.d}×{previewModel.h} 米
+            </div>
+            <div className="dev-actions">
+              <button className="primary" onClick={() => { setState({ furnitureType: previewModel.type, tool: 'furniture' }); setFurnOpen(false); setPreviewModel(null) }}>使用此模型</button>
+              <button className="close-btn" onClick={() => setPreviewModel(null)}>关闭</button>
+            </div>
           </div>
         </div>
       )}
