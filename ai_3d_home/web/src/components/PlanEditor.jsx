@@ -7,6 +7,20 @@ import { getCatalogItem, thumbUrl } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
 const CLOSE = 0.8      // 画墙闭合半径（点回起点 <0.8m 闭合，大一点更容易合上）
+
+// 设备模型按设备类型分组（选择设备时按灯光/摄像机/安防等分类显示模型）
+const DEVICE_MODEL_GROUPS = [
+  { label: '灯光', types: ['吊灯', '吸顶灯', '台灯', '落地灯', '壁灯', '筒灯'] },
+  { label: '摄像机', types: ['监控'] },
+  { label: '安防', types: ['烟感器', '门铃'] },
+]
+// 内置程序化设备模型（无缩略图，用 emoji 图标）
+const BUILTIN_DEVICES = [
+  { type: '空调', icon: '❄️' },
+  { type: '热水器', icon: '♨️' },
+  { type: '窗帘', icon: '🪟' },
+  { type: '传感器', icon: '📡' },
+]
 const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
 const MAX_ZOOM = 6
@@ -846,19 +860,34 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <button onClick={() => patchDevice(selDevice, { modelId: undefined })}
               style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', background: !selDevice.modelId ? 'var(--accent)' : 'var(--panel2)', color: !selDevice.modelId ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12, alignSelf: 'flex-start' }}>无（圆球）</button>
-            {groupedCatalog.map(([label, items]) => (
-              <div key={label}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 3px' }}>{label}</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {items.map((m) => (
-                    <button key={m.type} title={m.label} onClick={() => patchDevice(selDevice, { modelId: m.type })}
-                      style={{ padding: 3, borderRadius: 6, border: selDevice.modelId === m.type ? '2px solid var(--accent)' : '1px solid var(--border)', background: 'var(--panel2)', cursor: 'pointer' }}>
-                      <img src={thumbUrl(m.thumb)} alt={m.label} style={{ width: 36, height: 36, objectFit: 'contain', display: 'block', borderRadius: 4 }} />
-                    </button>
-                  ))}
-                </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 3px' }}>家电/设备</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {BUILTIN_DEVICES.map((b) => (
+                  <button key={b.type} title={b.type} onClick={() => patchDevice(selDevice, { modelId: b.type })}
+                    style={{ padding: 5, borderRadius: 6, border: selDevice.modelId === b.type ? '2px solid var(--accent)' : '1px solid var(--border)', background: 'var(--panel2)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
+                    {b.icon}
+                  </button>
+                ))}
               </div>
-            ))}
+            </div>
+            {DEVICE_MODEL_GROUPS.map((g) => {
+              const items = groupedCatalog.filter(([label]) => g.types.includes(label)).flatMap(([, its]) => its)
+              if (items.length === 0) return null
+              return (
+                <div key={g.label}>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 3px' }}>{g.label}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {items.map((m) => (
+                      <button key={m.type} title={m.label} onClick={() => patchDevice(selDevice, { modelId: m.type })}
+                        style={{ padding: 3, borderRadius: 6, border: selDevice.modelId === m.type ? '2px solid var(--accent)' : '1px solid var(--border)', background: 'var(--panel2)', cursor: 'pointer' }}>
+                        <img src={thumbUrl(m.thumb)} alt={m.label} style={{ width: 36, height: 36, objectFit: 'contain', display: 'block', borderRadius: 4 }} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
         <div className="plan-props-row">

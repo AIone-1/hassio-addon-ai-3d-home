@@ -459,6 +459,38 @@ export function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
           </mesh>
         </group>
       )
+    case '窗帘':
+      return (
+        <group>
+          {/* 窗帘杆（横卧圆杆） */}
+          <mesh position={[0, h * 0.48, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.02, 0.02, w, 8]} />
+            <meshStandardMaterial color="#8a9aa8" metalness={0.4} roughness={0.3} />
+          </mesh>
+          {/* 窗帘布（几片竖条） */}
+          {[-0.3, -0.1, 0.1, 0.3].map((V) => (
+            <mesh key={V} position={[V * w, -h * 0.26, 0]} castShadow>
+              <boxGeometry args={[w * 0.18, h * 0.5, d * 0.5]} />
+              <meshStandardMaterial color="#9fb8c8" roughness={0.7} />
+            </mesh>
+          ))}
+        </group>
+      )
+    case '传感器':
+      return (
+        <group>
+          {/* 小圆盘（贴墙） */}
+          <mesh position={[0, 0, 0]}>
+            <cylinderGeometry args={[w * 0.5, w * 0.5, h, 16]} />
+            <meshStandardMaterial color="#eef2f5" roughness={0.35} />
+          </mesh>
+          {/* 指示灯 */}
+          <mesh position={[0, 0, d * 0.3]}>
+            <sphereGeometry args={[w * 0.15, 8, 8]} />
+            <meshBasicMaterial color="#4ade80" />
+          </mesh>
+        </group>
+      )
     default:
       return <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
   }
