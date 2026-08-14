@@ -26,6 +26,8 @@ export default function App() {
   const bgImage = useStore((s) => s.bgImage)
   const bgMode = useStore((s) => s.bgMode)
   const bgColor = useStore((s) => s.bgColor)
+  const bgGradient1 = useStore((s) => s.bgGradient1)
+  const bgGradient2 = useStore((s) => s.bgGradient2)
   const view2d = useStore((s) => s.view2d)
   const immersive = useStore((s) => s.immersive)
   const settings = useStore((s) => s.settings)
@@ -357,7 +359,7 @@ export default function App() {
             </div>
             <div className="field" style={{ margin: '12px 0' }}>
               <label>背景颜色（六边形色盘）</label>
-              <HexColorPicker value={bgColor} onChange={(c) => { setState({ bgColor: c }); api.saveSettings({ ...getState().settings, bgColor: c }).catch(() => {}) }} />
+              <HexColorPicker value={bgColor} onChange={(c) => { setState({ bgColor: c, bgMode: 'color', bgImage: '' }); api.saveSettings({ ...getState().settings, bgColor: c, bgMode: 'color', bgImage: '' }).catch(() => {}) }} />
             </div>
             <div className="field" style={{ margin: '12px 0' }}>
               <label>上传图片（作为背景）</label>
@@ -425,6 +427,19 @@ export default function App() {
                 api.saveSettings({ ...getState().settings, bgImage: url, bgMode: 'image' }).catch(() => {})
               }}>应用 URL</button>
               <button className="close-btn" onClick={() => { setState({ bgImage: '', settingsOpen: false }); api.saveSettings({ ...getState().settings, bgImage: '' }).catch(() => {}) }}>清除</button>
+            </div>
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>渐变（选两个颜色）</label>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>颜色 1（顶）</div>
+                  <HexColorPicker value={bgGradient1} onChange={(c) => { setState({ bgGradient1: c, bgMode: 'gradient', bgImage: '' }); api.saveSettings({ ...getState().settings, bgGradient1: c, bgMode: 'gradient', bgImage: '' }).catch(() => {}) }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>颜色 2（底）</div>
+                  <HexColorPicker value={bgGradient2} onChange={(c) => { setState({ bgGradient2: c, bgMode: 'gradient', bgImage: '' }); api.saveSettings({ ...getState().settings, bgGradient2: c, bgMode: 'gradient', bgImage: '' }).catch(() => {}) }} />
+                </div>
+              </div>
             </div>
           </div>
         </div>

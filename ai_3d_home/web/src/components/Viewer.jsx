@@ -123,12 +123,12 @@ const MODE_FOG = {
   '环境': '#6889ba', '安防': '#0b0f27',
 }
 
-// 场景背景：有图用图，没图用色盘选的颜色
-function SceneBackground({ bgImage, bgColor }) {
+// 场景背景：纯色 / 背景图 / 渐变（两色）
+function SceneBackground({ bgMode, bgImage, bgColor, bgGradient1, bgGradient2 }) {
   const scene = useThree((s) => s.scene)
 
   useEffect(() => {
-    if (bgImage) {
+    if (bgMode === 'image' && bgImage) {
       // bgImage 可能是本地图片名（存的名字），也可能是外部 URL / data URL，分别处理
       const url = (bgImage.startsWith('http') || bgImage.startsWith('data:'))
         ? bgImage
@@ -141,11 +141,25 @@ function SceneBackground({ bgImage, bgColor }) {
       }, undefined, () => {
         scene.background = new THREE.Color('#1a2a40')
       })
+    } else if (bgMode === 'gradient') {
+      // 渐变：两色垂直渐变
+      const canvas = document.createElement('canvas')
+      canvas.width = 4
+      canvas.height = 512
+      const ctx = canvas.getContext('2d')
+      const g = ctx.createLinearGradient(0, 0, 0, 512)
+      g.addColorStop(0, bgGradient1 || '#253962')
+      g.addColorStop(1, bgGradient2 || '#46618d')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, 4, 512)
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.needsUpdate = true
+      scene.background = tex
     } else {
       // 纯色：色盘选的颜色（颜色非法时回退默认蓝，避免黑屏）
       scene.background = (bgColor && /^#[0-9a-fA-F]{6}$/.test(bgColor)) ? new THREE.Color(bgColor) : new THREE.Color('#5278ae')
     }
-  }, [bgImage, bgColor])
+  }, [bgMode, bgImage, bgColor, bgGradient1, bgGradient2])
 
   return null
 }
@@ -159,6 +173,8 @@ export default function Viewer({ onSelect, floorIndex }) {
   const bgImage = useStore((s) => s.bgImage)
   const bgMode = useStore((s) => s.bgMode)
   const bgColor = useStore((s) => s.bgColor)
+  const bgGradient1 = useStore((s) => s.bgGradient1)
+  const bgGradient2 = useStore((s) => s.bgGradient2)
   const editing = useStore((s) => s.editing)
   const selected = useStore((s) => s.selected)
   const editorBgImage = useStore((s) => s.editorBgImage)
@@ -207,7 +223,7 @@ export default function Viewer({ onSelect, floorIndex }) {
           }
         }}
       >
-        <SceneBackground bgImage={editing ? editorBgImage : bgImage} bgColor={bgColor} />
+        <SceneBackground bgMode={editing ? editorBgMode : bgMode} bgImage={editing ? editorBgImage : bgImage} bgColor={bgColor} bgGradient1={bgGradient1} bgGradient2={bgGradient2} />
         <fog attach="fog" args={[fogColor, night ? 30 : 40, night ? 70 : 90]} />
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />

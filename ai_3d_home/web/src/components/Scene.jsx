@@ -953,12 +953,13 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   const view2d = useStore((s) => s.view2d)
   const showCeiling = useStore((s) => s.showCeiling)
   const editing = useStore((s) => s.editing)
-  if (pts.length < 3) return null
   // 所有房间地板同一高度（对齐原版 0.025m；房间不重叠，无需高度差）
   const floorY = level + 0.025
 
   // 地板：按房间多边形实际形状（万能三角剖分，直接水平铺设，法线朝上）
-  const floorGeo = useMemo(() => robustFloorGeometry(pts, THREE), [JSON.stringify(pts)])
+  // 注意：useMemo 必须在早退判断之前调用，避免 hooks 顺序变化导致崩溃
+  const floorGeo = useMemo(() => (pts.length >= 3 ? robustFloorGeometry(pts, THREE) : null), [JSON.stringify(pts)])
+  if (pts.length < 3) return null
 
   return (
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
