@@ -336,6 +336,19 @@ class Handler(BaseHTTPRequestHandler):
             _write_json(PROJECT_FILE, data)
             return self._send(200, {"ok": True, "project": data})
 
+        if p == "/api/backup/delete":
+            # 删除存档：body 带 name（文件名）
+            body = self._json_body() or {}
+            name = body.get("name", "")
+            fp = os.path.join(BACKUP_DIR, os.path.basename(name))
+            if not name.endswith(".json") or not os.path.isfile(fp):
+                return self._send(400, {"error": "bad backup name"})
+            try:
+                os.remove(fp)
+            except Exception:
+                return self._send(400, {"error": "delete failed"})
+            return self._send(200, {"ok": True})
+
         if p == "/api/background":
             # 上传背景图（base64 data URL）
             body = self._json_body() or {}

@@ -31,6 +31,7 @@ export const api = {
   backups: () => req('/api/backups'),
   backup: () => req('/api/backup', { method: 'POST', body: {} }),
   backupRestore: (name) => req('/api/backup/restore', { method: 'POST', body: { name } }),
+  backupDelete: (name) => req('/api/backup/delete', { method: 'POST', body: { name } }),
   entities: () => req('/api/ha/entities'),
   states: () => req('/api/ha/states'),
   service: (domain, service, entity_id) =>

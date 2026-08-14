@@ -52,12 +52,10 @@ export default function Editor() {
   const [catOpen, setCatOpen] = useState(false)
   const [openCats, setOpenCats] = useState({})
   const [backups, setBackups] = useState([])
-  const [backupOpen, setBackupOpen] = useState(false)
   const [defaultOpen, setDefaultOpen] = useState(false)
   const [previewModel, setPreviewModel] = useState(null)
   const [show3d, setShow3d] = useState(false)
   const [floorManagerOpen, setFloorManagerOpen] = useState(false)
-  const [backMenuOpen, setBackMenuOpen] = useState(false)
   const [projectManagerOpen, setProjectManagerOpen] = useState(false)
 
   // 下载模型按中文分类分组
@@ -178,17 +176,17 @@ export default function Editor() {
   }
   const closePreview = () => { setPreviewModel(null); setShow3d(false) }
 
-  // 点击空白处关闭 模型选择器/设备分类/备份菜单 弹窗
+  // 点击空白处关闭 模型选择器/设备分类 弹窗
   useEffect(() => {
     const onDown = (e) => {
-      if (!furnOpen && !catOpen && !backMenuOpen) return
+      if (!furnOpen && !catOpen) return
       const t = e.target
-      if (t.closest && (t.closest('.furn-picker') || t.closest('.furn-item') || t.closest('.furn-cat') || t.closest('.bb-menu'))) return
-      setFurnOpen(false); setCatOpen(false); setBackMenuOpen(false)
+      if (t.closest && (t.closest('.furn-picker') || t.closest('.furn-item') || t.closest('.furn-cat'))) return
+      setFurnOpen(false); setCatOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [furnOpen, catOpen, backMenuOpen])
+  }, [furnOpen, catOpen])
 
   const importJson = () => {
     const input = document.createElement('input')
@@ -234,23 +232,33 @@ export default function Editor() {
   const createBackup = async () => {
     try { await api.backup() } catch (e) {}
   }
-  const openBackups = async () => {
+  // 加载最近项目（存档）列表
+  const loadBackups = async () => {
     try {
       const r = await api.backups()
       setBackups(r.backups || [])
     } catch (e) { setBackups([]) }
-    setBackupOpen(true)
   }
-  const restoreBackup = async (name) => {
-    if (!confirm(`恢复存档 ${name}？将覆盖当前户型。`)) return
+  // 打开项目 = 恢复存档
+  const openBackup = async (name) => {
+    if (!confirm(`打开项目「${name}」？将覆盖当前户型。`)) return
     try {
       const r = await api.backupRestore(name)
       if (r.ok && r.project) {
         loadProject(r.project); setState({ currentFloor: 0, selected: null, saved: true })
-        toast('已恢复存档')
-        setBackupOpen(false)
+        toast('已打开项目')
+        setProjectManagerOpen(false)
       }
-    } catch (e) { toast('恢复失败') }
+    } catch (e) { toast('打开失败') }
+  }
+  // 删除项目 = 删除存档
+  const deleteBackup = async (name) => {
+    if (!confirm(`删除项目「${name}」？将删除该存档，不可恢复。`)) return
+    try {
+      await api.backupDelete(name)
+      toast('已删除项目')
+      loadBackups()
+    } catch (e) { toast('删除失败') }
   }
 
   const duplicateFloor = () => {
@@ -303,20 +311,9 @@ export default function Editor() {
     <>
       {/* 顶部工具栏 */}
       <div className="editor-top">
-        <button className="et-btn" onClick={() => setProjectManagerOpen(true)}>项目</button>
+        <button className="et-btn" onClick={() => { loadBackups(); setProjectManagerOpen(true) }}>项目</button>
         <button className="et-btn" onClick={() => undo()} title="撤销上一次操作">↩️ 撤销</button>
         <button className="et-btn" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>
-        <div style={{ position: 'relative' }}>
-          <button className="et-btn" onClick={() => setBackMenuOpen(!backMenuOpen)}>备份</button>
-          {backMenuOpen && (
-            <div className="bb-menu" style={{ top: 32, bottom: 'auto' }}>
-              <button className="bb-menu-item" onClick={() => { openBackups(); setBackMenuOpen(false) }}>📁 最近备份</button>
-              <button className="bb-menu-item" onClick={() => { exportPNG(); setBackMenuOpen(false) }}>📷 导出图</button>
-              <button className="bb-menu-item" onClick={() => { exportSVG(); setBackMenuOpen(false) }}>📐 导出 SVG</button>
-              <button className="bb-menu-item" onClick={() => { exportJson(); setBackMenuOpen(false) }}>📄 导出 JSON</button>
-            </div>
-          )}
-        </div>
         <button className="et-btn" onClick={importPlanImage}>导入底图</button>
         {planImage && (
           <button className="et-btn" onClick={() => { setState({ calibrating: true, calibratePts: [] }); toast('标定：点底图选一段已知长度的起点') }} title="底图比例尺标定">标定</button>
@@ -426,8 +423,8 @@ export default function Editor() {
         ))}
       </div>
 
-      {/* 右侧信息栏（未选中时显示户型信息） */}
-      {!selected && (
+      {/* 右侧信息栏（未选中且不是墙体/门/窗工具时显示户型信息；点这些工具会弹出各自的设置信息框，户型信息应自动收回） */}
+      {!selected && !['wall', 'door', 'window'].includes(tool) && (
         <div className="editor-info">
           <div className="editor-info-title">户型信息</div>
           <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
@@ -438,10 +435,10 @@ export default function Editor() {
         </div>
       )}
 
-      {/* 项目弹窗 */}
+      {/* 项目弹窗（合并备份：最近项目=存档列表，可打开/删除） */}
       {projectManagerOpen && (
         <div className="modal-mask" onClick={() => setProjectManagerOpen(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 420, maxHeight: '82vh', overflowY: 'auto' }}>
             <div className="dname">项目</div>
             <div style={{ margin: '10px 0' }}>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>项目名</div>
@@ -449,7 +446,21 @@ export default function Editor() {
                 onChange={(e) => { project.name = e.target.value; setState({ project: { ...project }, saved: false }) }}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
             </div>
-            <div className="dev-actions">
+            <div style={{ fontSize: 11, color: 'var(--muted)', margin: '10px 0 6px' }}>最近项目</div>
+            {backups.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 10px' }}>还没有项目快照。点「保存」会自动生成一份项目快照。</p>
+            ) : (
+              <div style={{ maxHeight: '38vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
+                {backups.map((b) => (
+                  <div key={b.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderRadius: 8, background: 'var(--panel2)' }}>
+                    <span style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{new Date(b.time * 1000).toLocaleString()}</span>
+                    <button style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--accent)', color: '#081018', fontSize: 11, cursor: 'pointer' }} onClick={() => openBackup(b.name)}>打开</button>
+                    <button style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontSize: 11, cursor: 'pointer' }} onClick={() => deleteBackup(b.name)}>删除</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="dev-actions" style={{ margin: '0 0 10px' }}>
               <button className="primary" onClick={() => {
                 const name = prompt('新项目名字：', '我的家')
                 if (name && name.trim()) {
@@ -457,8 +468,13 @@ export default function Editor() {
                   loadProject(p); setState({ saved: false }); setProjectManagerOpen(false)
                 }
               }}>新建项目</button>
-              <button className="close-btn" onClick={() => setProjectManagerOpen(false)}>关闭</button>
             </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              <button style={{ flex: 1, padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={exportPNG}>📷 导出图</button>
+              <button style={{ flex: 1, padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={exportSVG}>📐 导出 SVG</button>
+              <button style={{ flex: 1, padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={exportJson}>📄 导出 JSON</button>
+            </div>
+            <button className="close-btn" onClick={() => setProjectManagerOpen(false)}>关闭</button>
           </div>
         </div>
       )}
@@ -492,27 +508,6 @@ export default function Editor() {
         </div>
       )}
 
-      {/* 存档列表弹窗 */}
-      {backupOpen && (
-        <div className="modal-mask" onClick={() => setBackupOpen(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="dname">历史存档</div>
-            {backups.length === 0 ? (
-              <p style={{ color: 'var(--muted)', fontSize: '12px', margin: '10px 0' }}>还没有存档。点「保存」会自动创建一份存档。</p>
-            ) : (
-              <div style={{ maxHeight: '52vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px', margin: '10px 0' }}>
-                {backups.map((b) => (
-                  <div key={b.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 9px', borderRadius: '8px', background: 'var(--panel2)' }}>
-                    <span style={{ flex: 1, fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{new Date(b.time * 1000).toLocaleString()}</span>
-                    <button style={{ padding: '3px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--accent)', color: '#081018', fontSize: '11px', cursor: 'pointer' }} onClick={() => restoreBackup(b.name)}>恢复</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button className="close-btn" onClick={() => setBackupOpen(false)}>关闭</button>
-          </div>
-        </div>
-      )}
       {/* 默认选项面板 */}
       {defaultOpen && (
         <div className="modal-mask" onClick={() => setDefaultOpen(false)}>
