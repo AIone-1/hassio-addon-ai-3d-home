@@ -2191,48 +2191,6 @@
   "thumb": "电饭煲_312.webp"
  },
  {
-  "name": "热水器_313",
-  "type": "热水器",
-  "title": "Washer",
-  "glb": "热水器_313.glb",
-  "thumb": "热水器_313.webp"
- },
- {
-  "name": "热水器_314",
-  "type": "热水器",
-  "title": "Dryer",
-  "glb": "热水器_314.glb",
-  "thumb": "热水器_314.webp"
- },
- {
-  "name": "热水器_315",
-  "type": "热水器",
-  "title": "Stove",
-  "glb": "热水器_315.glb",
-  "thumb": "热水器_315.webp"
- },
- {
-  "name": "热水器_316",
-  "type": "热水器",
-  "title": "Stove",
-  "glb": "热水器_316.glb",
-  "thumb": "热水器_316.webp"
- },
- {
-  "name": "热水器_317",
-  "type": "热水器",
-  "title": "Fridge",
-  "glb": "热水器_317.glb",
-  "thumb": "热水器_317.webp"
- },
- {
-  "name": "热水器_318",
-  "type": "热水器",
-  "title": "Air conditioner",
-  "glb": "热水器_318.glb",
-  "thumb": "热水器_318.webp"
- },
- {
   "name": "空调_319",
   "type": "空调",
   "title": "Air conditioner",

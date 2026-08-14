@@ -416,6 +416,49 @@ function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
           </mesh>
         </group>
       )
+    case '空调':
+      return (
+        <group>
+          {/* 壁挂分体空调：白色扁机身 */}
+          <FBox position={[0, 0, 0]} size={[w, h, d]} color="#f5f7fa" roughness={0.32} />
+          {/* 出风口格栅 */}
+          <mesh position={[0, -h * 0.18, d / 2 + 0.002]}>
+            <planeGeometry args={[w * 0.82, h * 0.34]} />
+            <meshStandardMaterial color="#c3ccd4" roughness={0.45} />
+          </mesh>
+          {[-1, 0, 1].map((i) => (
+            <mesh key={i} position={[i * w * 0.25, -h * 0.18, d / 2 + 0.004]}>
+              <planeGeometry args={[w * 0.2, h * 0.3]} />
+              <meshStandardMaterial color="#d8dee4" roughness={0.4} />
+            </mesh>
+          ))}
+          {/* 指示灯 */}
+          <mesh position={[w * 0.32, h * 0.16, d / 2 + 0.006]}>
+            <sphereGeometry args={[0.018, 8, 8]} />
+            <meshBasicMaterial color="#4ade80" />
+          </mesh>
+        </group>
+      )
+    case '热水器':
+      return (
+        <group>
+          {/* 储水式电热水器：横卧白色圆筒 */}
+          <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+            <cylinderGeometry args={[h * 0.5, h * 0.5, d, 24]} />
+            <meshStandardMaterial color="#f5f7fa" roughness={0.35} metalness={0.02} />
+          </mesh>
+          {/* 端盖 */}
+          <mesh position={[d / 2, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <circleGeometry args={[h * 0.5, 24]} />
+            <meshStandardMaterial color="#e8ecef" roughness={0.35} />
+          </mesh>
+          {/* 底部进出水管 */}
+          <mesh position={[0, -h * 0.5 - 0.02, 0]}>
+            <cylinderGeometry args={[0.028, 0.028, 0.3, 8]} />
+            <meshStandardMaterial color="#c0c6cc" metalness={0.4} roughness={0.3} />
+          </mesh>
+        </group>
+      )
     default:
       return <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
   }
