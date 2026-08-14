@@ -833,7 +833,7 @@ export default function Scene({ onSelect, floorIndex }) {
         {showWalls && (floor.walls || []).map((w, i) => {
           const len = Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
           if (len < 0.001) return null
-          const h = floor.height || 2.8
+          const h = w.height || floor.height || 2.8
           const mx = (w.start[0] + w.end[0]) / 2
           const mz = (w.start[1] + w.end[1]) / 2
           const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0])

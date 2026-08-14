@@ -287,6 +287,12 @@ export default function Editor() {
     const target = (fl.rooms || []).find(r => r.id === selRoom.id)
     if (target) { target.name = name; setState({ project: { ...getState().project }, saved: false }) }
   }
+  const selWall = selected && selected.type === 'wall' ? selected.ref : null
+  const setWallHeight = (h) => {
+    const fl = getState().project.floors[currentFloorIdx]
+    const target = (fl.walls || []).find(w => w.id === selWall.id)
+    if (target) { target.height = h; setState({ project: { ...getState().project }, saved: false }) }
+  }
 
   return (
     <>
@@ -421,6 +427,17 @@ export default function Editor() {
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>面积 {polygonArea(selRoom.points || []).toFixed(1)} ㎡</div>
           </div>
         )}
+        {selWall && (
+          <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: 'var(--panel2)' }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>当前墙高</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input type="number" step="0.1" min="1" max="6" value={selWall.height || floor?.height || 2.8}
+                onChange={(e) => setWallHeight(Number(e.target.value) || 2.8)}
+                style={{ flex: 1, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12 }} />
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>米</span>
+            </div>
+          </div>
+        )}
         <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
         <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
         <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
@@ -435,10 +452,14 @@ export default function Editor() {
             <div className="dname">楼层管理</div>
             <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, margin: '10px 0' }}>
               {project.floors.map((f, i) => (
-                <div key={f.id} onClick={() => { setState({ currentFloor: i }); setFloorManagerOpen(false) }}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 6, background: i === currentFloorIdx ? 'var(--accent)' : 'var(--panel2)', color: i === currentFloorIdx ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12 }}>
-                  <span>{f.name}</span>
-                  {i === currentFloorIdx && <span style={{ fontSize: 10 }}>当前</span>}
+                <div key={f.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 6, background: i === currentFloorIdx ? 'var(--accent)' : 'var(--panel2)', color: i === currentFloorIdx ? '#081018' : 'var(--text)', fontSize: 12 }}>
+                  <span style={{ flex: 1, cursor: 'pointer' }} onClick={() => { setState({ currentFloor: i }); setFloorManagerOpen(false) }}>{f.name}{i === currentFloorIdx ? '（当前）' : ''}</span>
+                  <input type="number" step="0.1" min="2" max="6" value={f.height || 2.8}
+                    onChange={(e) => { f.height = Number(e.target.value) || 2.8; setState({ project: { ...project }, saved: false }) }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ width: 46, padding: '3px 5px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 11 }} />
+                  <span style={{ fontSize: 10, opacity: 0.7 }}>米</span>
                 </div>
               ))}
             </div>
