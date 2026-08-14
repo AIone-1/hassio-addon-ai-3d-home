@@ -51,6 +51,7 @@ export default function Editor() {
   const modelCatalog = useStore((s) => s.modelCatalog)
   const furnitureScale = useStore((s) => s.furnitureScale)
   const selected = useStore((s) => s.selected)
+  const multiSelect = useStore((s) => s.multiSelect)
   const floor = currentFloor()
   const currentFloorIdx = useStore((s) => s.currentFloor)
   const [furnOpen, setFurnOpen] = useState(false)
@@ -297,6 +298,11 @@ export default function Editor() {
   const infoRoomCount = (floor?.rooms || []).length
   const infoFurnCount = (floor?.furniture || []).length
   const infoDevCount = new Set((floor?.devices || []).map(d => d.entity_id)).size
+  const infoWalls = floor?.walls || []
+  const infoWallCount = infoWalls.length
+  const infoHorizCount = infoWalls.filter(w => Math.abs(w.end[1] - w.start[1]) < 0.01).length
+  const infoVertCount = infoWalls.filter(w => Math.abs(w.end[0] - w.start[0]) < 0.01).length
+  const infoDiagCount = infoWallCount - infoHorizCount - infoVertCount
   const prevFloor = () => { if (currentFloorIdx > 0) setState({ currentFloor: currentFloorIdx - 1 }) }
   const nextFloor = () => { if (currentFloorIdx < project.floors.length - 1) setState({ currentFloor: currentFloorIdx + 1 }) }
   const selRoom = selected && selected.type === 'room' ? selected.ref : null
@@ -426,6 +432,12 @@ export default function Editor() {
             {t.label}<span className="k">{t.k}</span>
           </button>
         ))}
+        <button
+          className={`el-btn ${multiSelect ? 'active' : ''}`}
+          onClick={() => setState({ multiSelect: !multiSelect })}
+          title="开启后点击墙即可多选（不用按住 Ctrl）">
+          多选<span className="k">{multiSelect ? '开' : '关'}</span>
+        </button>
       </div>
 
       {/* 右侧信息栏（未选中且不是墙体/门/窗工具时显示户型信息；点这些工具会弹出各自的设置信息框，户型信息应自动收回） */}
@@ -435,6 +447,8 @@ export default function Editor() {
           <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
           <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
           <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
+          <div className="editor-info-row"><span>墙</span><b>{infoWallCount} 条</b></div>
+          <div className="editor-info-row"><span>水平 / 竖直 / 斜线</span><b>{infoHorizCount} / {infoVertCount} / {infoDiagCount}</b></div>
           <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
           <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
         </div>

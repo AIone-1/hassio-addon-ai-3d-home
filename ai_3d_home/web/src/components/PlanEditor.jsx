@@ -109,6 +109,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const planImageScale = useStore(s => s.planImageScale)
   const selected = useStore(s => s.selected)
   const wallSelIds = useStore(s => s.wallSel)
+  const multiSelect = useStore(s => s.multiSelect)
   const furnitureType = useStore(s => s.furnitureType)
   const pendingEntity = useStore(s => s.pendingEntity)
   const modelCatalog = useStore(s => s.modelCatalog)
@@ -835,8 +836,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
                 if (tool === 'delete') { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
                 else if (tool === 'select') {
                   e.stopPropagation()
-                  // Ctrl/Cmd 多选；普通点击单选（替换）
-                  if (e.ctrlKey || e.metaKey) toggleWallSel(w.id)
+                  // Ctrl/Cmd 或多选模式开关 多选；普通点击单选（替换）
+                  if (e.ctrlKey || e.metaKey || multiSelect) toggleWallSel(w.id)
                   else setState({ wallSel: [w.id], selected: null })
                 }
               }}

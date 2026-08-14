@@ -48,6 +48,7 @@ let state = {
   furnitureScale: 1,          // 家具尺寸缩放倍数
   selected: null,             // {type:'room'|'wall'|'furniture'|'device'|'opening', ref, floorIdx}
   wallSel: [],                // 多选墙（最多 2 条）的 id 列表，用于共线/垂直/水平约束
+  multiSelect: false,         // 多选模式开关（左侧快捷栏按钮）
   roomDraft: null,            // 画房间/墙的草稿
   pendingEntity: null,        // 待绑定实体
   bindOpen: false,            // 绑定抽屉
