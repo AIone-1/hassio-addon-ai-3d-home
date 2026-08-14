@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useStore, setState, currentFloor, getState, toast } from '../store'
+import { useStore, setState, currentFloor, getState, toast, undo } from '../store'
 import { api } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea } from '../three/geometry'
 import { thumbUrl } from '../catalog'
@@ -53,6 +53,7 @@ export default function Editor() {
   const [previewModel, setPreviewModel] = useState(null)
   const [show3d, setShow3d] = useState(false)
   const [floorManagerOpen, setFloorManagerOpen] = useState(false)
+  const [backMenuOpen, setBackMenuOpen] = useState(false)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -291,8 +292,19 @@ export default function Editor() {
     <>
       {/* 顶部工具栏 */}
       <div className="editor-top">
-        <button className="et-btn" onClick={() => setState({ mode: '全屋' })}>{mode}</button>
-        <button className="et-btn" onClick={openBackups}>最近备份</button>
+        <button className="et-btn" onClick={() => undo()} title="撤销上一次操作">↩️ 撤销</button>
+        <button className="et-btn" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>
+        <div style={{ position: 'relative' }}>
+          <button className="et-btn" onClick={() => setBackMenuOpen(!backMenuOpen)}>备份</button>
+          {backMenuOpen && (
+            <div className="bb-menu">
+              <button className="bb-menu-item" onClick={() => { openBackups(); setBackMenuOpen(false) }}>📁 最近备份</button>
+              <button className="bb-menu-item" onClick={() => { exportPNG(); setBackMenuOpen(false) }}>📷 导出图</button>
+              <button className="bb-menu-item" onClick={() => { exportSVG(); setBackMenuOpen(false) }}>📐 导出 SVG</button>
+              <button className="bb-menu-item" onClick={() => { exportJson(); setBackMenuOpen(false) }}>📄 导出 JSON</button>
+            </div>
+          )}
+        </div>
         <button className="et-btn" onClick={importPlanImage}>导入底图</button>
         <button className="et-btn" onClick={() => setDefaultOpen(true)}>默认</button>
         {planImage && (
@@ -302,19 +314,12 @@ export default function Editor() {
             <button className="et-btn" onClick={removePlanImage} style={{ color: 'var(--danger)' }}>删除底图</button>
           </>
         )}
-        <button className="et-btn" onClick={exportPNG}>导出图</button>
-        <button className="et-btn" onClick={exportSVG}>导出 SVG</button>
-        <button className="et-btn" onClick={exportJson}>导出 JSON</button>
-        <button className="et-btn" onClick={resetFloor} style={{ color: 'var(--danger)' }}>清空当前层</button>
         <button className="et-btn" onClick={clearAll} style={{ color: 'var(--danger)' }}>清空全部</button>
         <button className="et-btn" onClick={() => { saveNow(); createBackup() }} style={{ color: 'var(--accent)' }}>保存</button>
         <div className="et-sep" />
         <button className="et-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta - 1 }))} title="缩小">−</button>
         <button className="et-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta + 1 }))} title="放大">＋</button>
         <button className="et-btn" onClick={() => setState(s => ({ planRecenterKey: s.planRecenterKey + 1 }))} title="居中">居中</button>
-        <div className="et-sep" />
-        <button className="et-btn" onClick={duplicateFloor}>复制当前层</button>
-        <button className="et-btn" onClick={deleteFloor} style={{ color: 'var(--danger)' }}>删除楼层</button>
         <div className="et-sep" />
 
         {/* 家具库 */}
@@ -409,10 +414,11 @@ export default function Editor() {
       <div className="editor-info">
         <div className="editor-info-title">户型信息</div>
         {selRoom && (
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>当前房间名</div>
+          <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: 'var(--panel2)' }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>当前房间</div>
             <input type="text" value={selRoom.name || ''} onChange={(e) => renameRoom(e.target.value)}
-              style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 4 }} />
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>面积 {polygonArea(selRoom.points || []).toFixed(1)} ㎡</div>
           </div>
         )}
         <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
@@ -420,7 +426,6 @@ export default function Editor() {
         <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
         <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
         <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
-        <button className="editor-info-manage" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>
       </div>
 
       {/* 楼层管理弹窗 */}
