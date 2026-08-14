@@ -2,8 +2,8 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { useStore, setState } from '../store'
-import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, DOOR_COLORS, robustFloorGeometry, wallKey, DEVICE_MODELS } from '../three/geometry'
+import { useStore, setState, getState } from '../store'
+import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, DOOR_COLORS, robustFloorGeometry, wallKey, DEVICE_MODELS, FURNITURE_WALL_HEIGHT } from '../three/geometry'
 import { getCatalogItem } from '../catalog'
 
 // 对齐原版主题（glass 视觉风格）：墙=半透明毛玻璃，地板=冷色调色板
@@ -1034,7 +1034,9 @@ function Window3D({ op, px, pz, level, ang, h, wd }) {
 function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
   const state = useStore((s) => s.haStates[dev.entity_id])
   const domain = (dev.entity_id || '').split('.')[0]
-  const isOn = state && state.state === 'on'
+  // 设备「开」：普通设备 state==='on'；空调(climate) 只要不是 off 就是开（cool/heat/dry/fan_only…）
+  const st = state && state.state
+  const isOn = domain === 'climate' ? (st && st !== 'off' && st !== 'unknown' && st !== 'unavailable') : st === 'on'
   const cat = dev.modelId ? getCatalogItem(dev.modelId) : null
   const devModel = dev.modelId ? DEVICE_MODELS.find((m) => m.id === dev.modelId) : null
   const isLight = domain === 'light' || domain === 'switch'
@@ -1095,6 +1097,28 @@ const MODE_LIGHT = {
 }
 
 // ---------- 主场景 ----------
+// 3D 放置平面（家具工具下点击地面放置）
+function PlacePlane({ level, onPlace }) {
+  const { camera, gl } = useThree()
+  const raycaster = useMemo(() => new THREE.Raycaster(), [])
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -level), [level])
+  const toWorld = (e) => {
+    const rect = gl.domElement.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
+    const p = new THREE.Vector3()
+    return raycaster.ray.intersectPlane(plane, p) ? p : null
+  }
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, level, 0]}
+      onClick={(e) => { const p = toWorld(e); if (p) onPlace(p.x, p.z) }}>
+      <planeGeometry args={[1000, 1000]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  )
+}
+
 export default function Scene({ onSelect, floorIndex }) {
   const project = useStore((s) => s.project)
   const floor = useStore((s) => s.project.floors[floorIndex])
@@ -1118,6 +1142,24 @@ export default function Scene({ onSelect, floorIndex }) {
   // 家具移动：更新位置 + 触发保存
   const handleMoveFurniture = () => {
     setState({ project: { ...project }, saved: false })
+  }
+
+  // 3D 放置家具（家具工具下点击地面放置）
+  const placeFurniture = (x, z) => {
+    const st = getState()
+    const ft = st.furnitureType
+    const fl = st.project.floors[floorIndex]
+    if (!fl) return
+    fl.furniture = fl.furniture || []
+    const s = st.furnitureScale || 1
+    const lib = FURNITURE_LIB.find((f) => f.type === ft)
+    const devModel = DEVICE_MODELS.find((m) => m.id === ft)
+    const placement = (lib && lib.placement) || (devModel && devModel.placement) || 'floor'
+    const floorH = fl.height || 2.8
+    const wallH = devModel ? (devModel.defaultHeight || FURNITURE_WALL_HEIGHT) : FURNITURE_WALL_HEIGHT
+    const h = placement === 'ceiling' ? floorH : placement === 'wall' ? wallH : 0
+    fl.furniture.push({ id: Math.random().toString(36).slice(2, 10), type: ft, pos: [x, h, z], rot: 0, scale: [s, s, s], placement })
+    setState({ project: { ...st.project }, saved: false })
   }
 
   if (!floor) return null
@@ -1155,6 +1197,8 @@ export default function Scene({ onSelect, floorIndex }) {
             position={[camTarget[0], level + 0.005, camTarget[2]]}
           />
         )}
+        {/* 3D 放置平面：家具工具下点击地面放置 */}
+        {editing && tool === 'furniture' && <PlacePlane level={level} onPlace={placeFurniture} />}
 
         {/* 墙（持久化线段，毛玻璃材质对齐原版；删除模式可点；showWalls 关闭则去除墙壁） */}
         {showWalls && (() => {

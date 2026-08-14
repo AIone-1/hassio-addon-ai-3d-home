@@ -1309,6 +1309,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           </div>
         </div>
         <div className="plan-props-row">
+          <span className="plan-props-label">高度</span>
+          <input type="number" step="0.1" min="0" max="6" value={Math.round((selDevice.pos[1] || 1.4) * 100) / 100}
+            onChange={(e) => patchDevice(selDevice, { pos: [selDevice.pos[0], Number(e.target.value) || 0, selDevice.pos[2]] })} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
           <span className="plan-props-label">实体</span>
           <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selDevice.entity_id}</span>
         </div>
