@@ -307,7 +307,7 @@ export default function Editor() {
         <div style={{ position: 'relative' }}>
           <button className="et-btn" onClick={() => setBackMenuOpen(!backMenuOpen)}>备份</button>
           {backMenuOpen && (
-            <div className="bb-menu">
+            <div className="bb-menu" style={{ top: 32, bottom: 'auto' }}>
               <button className="bb-menu-item" onClick={() => { openBackups(); setBackMenuOpen(false) }}>📁 最近备份</button>
               <button className="bb-menu-item" onClick={() => { exportPNG(); setBackMenuOpen(false) }}>📷 导出图</button>
               <button className="bb-menu-item" onClick={() => { exportSVG(); setBackMenuOpen(false) }}>📐 导出 SVG</button>
