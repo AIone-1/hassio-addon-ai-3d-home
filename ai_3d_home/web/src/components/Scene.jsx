@@ -887,7 +887,7 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
 }
 
 // ---------- 门窗（墙段上的开口：门 4 类型 + 5 色 + 内开外开；窗 4 类型） ----------
-function Opening({ op, floor, level }) {
+function Opening({ op, floor, level, onSelect }) {
   const wall = (floor.walls || []).find((w) => w.id === op.wallId)
   if (!wall) return null
   const a = wall.start, b = wall.end
@@ -898,8 +898,9 @@ function Opening({ op, floor, level }) {
   const pz = a[1] + (b[1] - a[1]) * t
   const wd = op.width || 0.9
   const isDoor = op.type !== 'window'
-  if (isDoor) return <Door3D op={op} px={px} pz={pz} level={level} ang={ang} h={h} wd={wd} />
-  return <Window3D op={op} px={px} pz={pz} level={level} ang={ang} h={h} wd={wd} />
+  const click = onSelect ? (e) => { e.stopPropagation(); onSelect({ type: 'opening', ref: op }) } : undefined
+  if (isDoor) return <group onClick={click}><Door3D op={op} px={px} pz={pz} level={level} ang={ang} h={h} wd={wd} /></group>
+  return <group onClick={click}><Window3D op={op} px={px} pz={pz} level={level} ang={ang} h={h} wd={wd} /></group>
 }
 
 // 门：门框（左右上）+ 门扇（平开/双开/推拉/门框 + 颜色 + 内开外开 + 翻转）
@@ -1179,7 +1180,9 @@ export default function Scene({ onSelect, floorIndex }) {
               key={w.id || i}
               position={[mx, h / 2 + level, mz]}
               rotation={[0, -ang, 0]}
-              onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) } : undefined}
+              onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
+                : tool === 'select' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w }) }
+                : undefined}
             >
               <boxGeometry args={[len, view2d ? 0.01 : h, thick]} />
               {view2d
@@ -1198,7 +1201,7 @@ export default function Scene({ onSelect, floorIndex }) {
         ))}
 
         {/* 门窗（showOpenings 关闭则去除） */}
-        {showOpenings && (floor.openings || []).map((op) => <Opening key={op.id} op={op} floor={floor} level={level} />)}
+        {showOpenings && (floor.openings || []).map((op) => <Opening key={op.id} op={op} floor={floor} level={level} onSelect={interactive ? onSelect : undefined} />)}
 
         {/* 家具（纯户型图模式隐藏摆设，只看户型结构） */}
         {mode !== '纯户型' && (floor.furniture || []).map((f) => (

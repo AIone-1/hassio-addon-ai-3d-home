@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import Scene from './Scene'
+import WallProps3D from './WallProps3D'
 import { Controls } from '../three/Controls'
 import { useStore, setState } from '../store'
 import { BASE } from '../api'
@@ -175,6 +176,10 @@ export default function Viewer({ onSelect, floorIndex }) {
   const floor = useStore((s) => s.project.floors[floorIndex])
   const bgImage = useStore((s) => s.bgImage)
   const bgMode = useStore((s) => s.bgMode)
+  const editing = useStore((s) => s.editing)
+  const selected = useStore((s) => s.selected)
+  const editorBgImage = useStore((s) => s.editorBgImage)
+  const editorBgMode = useStore((s) => s.editorBgMode)
   const containerRef = useRef(null)
   const q = QUALITY[quality] || QUALITY.balanced
   const fogColor = night ? '#0a1020' : (MODE_FOG[mode] || MODE_FOG['全屋'])
@@ -198,13 +203,15 @@ export default function Viewer({ onSelect, floorIndex }) {
           }
         }}
       >
-        <SceneBackground mode={mode} night={night} bgImage={bgImage} bgMode={bgMode} />
+        <SceneBackground mode={mode} night={night} bgImage={editing ? editorBgImage : bgImage} bgMode={editing ? editorBgMode : bgMode} />
         <fog attach="fog" args={[fogColor, night ? 30 : 40, night ? 70 : 90]} />
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />
         <CameraFocus floorIndex={floorIndex} />
         <DeviceLabels floorIndex={floorIndex} containerRef={containerRef} />
       </Canvas>
+      {/* 3D 编辑时点选墙，右侧弹墙属性面板 */}
+      {editing && selected && selected.type === 'wall' && <WallProps3D floorIndex={floorIndex} />}
     </div>
   )
 }

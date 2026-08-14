@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore, setState, currentFloor, getState, toast, undo, redo, loadProject } from '../store'
-import { api } from '../api'
+import { api, BASE } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
 import { thumbUrl } from '../catalog'
 import ModelPreview from './ModelPreview'
@@ -66,6 +66,7 @@ export default function Editor() {
   const [show3d, setShow3d] = useState(false)
   const [floorManagerOpen, setFloorManagerOpen] = useState(false)
   const [projectManagerOpen, setProjectManagerOpen] = useState(false)
+  const [editorBgOpen, setEditorBgOpen] = useState(false)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -338,6 +339,7 @@ export default function Editor() {
           <button className="et-btn" onClick={() => { setState({ calibrating: true, calibratePts: [] }); toast('标定：点底图选一段已知长度的起点') }} title="底图比例尺标定">标定</button>
         )}
         <button className="et-btn" onClick={() => setDefaultOpen(true)}>默认</button>
+        <button className="et-btn" onClick={() => setEditorBgOpen(true)}>背景</button>
         {planImage && (
           <>
             <button className="et-btn" onClick={() => setState(s => ({ planImageScale: (s.planImageScale || 1) * 1.25 }))} title="放大底图">底图＋</button>
@@ -594,6 +596,43 @@ export default function Editor() {
               </div>
             </div>
             <button className="close-btn" onClick={() => setDefaultOpen(false)}>关闭</button>
+          </div>
+        </div>
+      )}
+      {/* 3D 视图背景弹窗（独立于主界面背景） */}
+      {editorBgOpen && (
+        <div className="modal-mask" onClick={() => setEditorBgOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="dname">3D 视图背景</div>
+            <div style={{ margin: '10px 0' }}>
+              <input type="file" accept="image/*" id="editor-bg-file" style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const file = e.target.files[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = async () => {
+                    try {
+                      const r = await fetch(BASE + 'api/background', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ data: reader.result }),
+                      })
+                      const res = await r.json()
+                      if (res.ok && res.name) {
+                        setState({ editorBgImage: res.name, editorBgMode: 'image' })
+                        toast('3D 背景已上传')
+                      }
+                    } catch (err) { toast('上传失败') }
+                  }
+                  reader.readAsDataURL(file)
+                }} />
+              <button className="primary" onClick={() => document.getElementById('editor-bg-file').click()}>上传背景图</button>
+              <button style={{ marginLeft: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}
+                onClick={() => { setState({ editorBgImage: getState().bgImage, editorBgMode: getState().bgMode }); toast('已同步主界面背景') }}>同步主界面背景</button>
+              <button style={{ marginLeft: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 13 }}
+                onClick={() => { setState({ editorBgImage: '', editorBgMode: 'color' }); toast('已清除 3D 背景') }}>清除</button>
+            </div>
+            <button className="close-btn" onClick={() => setEditorBgOpen(false)}>关闭</button>
           </div>
         </div>
       )}

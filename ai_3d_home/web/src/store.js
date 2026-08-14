@@ -63,6 +63,8 @@ let state = {
   toast: '',
   bgImage: '',           // 自定义背景图 URL
   bgMode: 'color',       // 背景效果: color纯色 | image背景图 | gradient渐变 | night夜景
+  editorBgImage: '',     // 3D 编辑视图独立背景图（和主界面背景互不影响）
+  editorBgMode: 'color', // 3D 编辑视图背景模式
   settingsOpen: false,   // 设置面板
 }
 
