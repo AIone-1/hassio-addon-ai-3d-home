@@ -589,6 +589,19 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     Object.assign(target, patch)
     setState({ project: { ...getState().project }, saved: false })
   }
+  // 改墙长度：起点固定，终点沿墙方向移动。加长=向终点方向延伸，缩短=向起点方向收
+  const setWallLength = (w, len) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(x => x.id === w.id)
+    if (!target) return
+    const dx = target.end[0] - target.start[0], dy = target.end[1] - target.start[1]
+    const cur = Math.hypot(dx, dy)
+    if (cur < 1e-6 || !(len > 0)) return
+    const k = len / cur
+    target.end = [target.start[0] + dx * k, target.start[1] + dy * k]
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false })
+  }
   // 下载模型按分类分组（设备选模型用）
   const groupedCatalog = useMemo(() => {
     const m = {}
@@ -697,8 +710,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             />
             {selW && tool === 'select' && (
               <>
-                <circle cx={w.start[0]} cy={w.start[1]} r={0.16} className="plan-wall-handle" onPointerDown={(e) => startWallDrag(e, w, 'start')} />
-                <circle cx={w.end[0]} cy={w.end[1]} r={0.16} className="plan-wall-handle" onPointerDown={(e) => startWallDrag(e, w, 'end')} />
+                <circle cx={w.start[0]} cy={w.start[1]} r={0.16} className="plan-wall-handle start" onPointerDown={(e) => startWallDrag(e, w, 'start')} />
+                <circle cx={w.end[0]} cy={w.end[1]} r={0.16} className="plan-wall-handle end" onPointerDown={(e) => startWallDrag(e, w, 'end')} />
               </>
             )}
             {showDimensions && wlen > 0.01 && (
@@ -807,6 +820,18 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           strokeDasharray="0.3 0.28"
         />
       )}
+
+      {/* 画墙时水平/垂直提示（当前段被轴向吸附成水平或垂直时显示） */}
+      {draft && draft.pts.length > 0 && cursor && tool === 'wall' && (() => {
+        const last = draft.pts[draft.pts.length - 1]
+        const dx = cursor[0] - last[0], dy = cursor[1] - last[1]
+        let label = null
+        if (Math.abs(dy) < 0.01 && Math.abs(dx) > 0.01) label = '水平'
+        else if (Math.abs(dx) < 0.01 && Math.abs(dy) > 0.01) label = '垂直'
+        if (!label) return null
+        const mx = (last[0] + cursor[0]) / 2, my = (last[1] + cursor[1]) / 2
+        return <text x={mx} y={my - 0.14} className="plan-align-hint">{label}</text>
+      })()}
 
       {/* 画墙起点标记（绿色圆点，鼠标靠近时放大提示可闭合） */}
       {draft && draft.pts.length > 0 && tool === 'wall' && (() => {
@@ -1075,6 +1100,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       <div className="plan-props">
         <div className="plan-props-head">
           <span>墙</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">长度</span>
+          <input type="number" step="0.1" min="0.1"
+            value={Math.round(Math.hypot(selWall.end[0] - selWall.start[0], selWall.end[1] - selWall.start[1]) * 100) / 100}
+            onChange={(e) => setWallLength(selWall, Number(e.target.value) || 0)}
+            title="起点固定，终点沿墙方向伸缩" />
+          <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">高度</span>

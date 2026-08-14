@@ -142,9 +142,13 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .plan-room-area.selected { fill: #4e729a; }
 .plan-wall { stroke: #343a3f; stroke-linecap: butt; }
 .plan-wall.selected { stroke: #2f7fe0; stroke-width: 0.16; }
-.plan-wall-handle { fill: #2f7fe0; stroke: #fff; stroke-width: 0.05; cursor: move; }
+.plan-wall-handle { stroke: #fff; stroke-width: 0.05; cursor: move; }
+.plan-wall-handle.start { fill: #2ecc71; }   /* 起点=绿色 */
+.plan-wall-handle.end { fill: #2f7fe0; }     /* 终点=蓝色 */
 .plan-dim { font-size: 0.16px; fill: #2f7fe0; text-anchor: middle; dominant-baseline: middle; pointer-events: none;
   paint-order: stroke; stroke: #fff; stroke-width: 0.07; stroke-linejoin: round; font-weight: 600; }
+.plan-align-hint { font-size: 0.18px; fill: #1e9e6a; text-anchor: middle; dominant-baseline: middle; pointer-events: none;
+  paint-order: stroke; stroke: #fff; stroke-width: 0.08; stroke-linejoin: round; font-weight: 700; }
 .plan-wall-draft { stroke: #343a3f; stroke-linecap: butt; }
 /* 门窗（对齐原版） */
 .plan-opening { cursor: grab; }
