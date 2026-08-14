@@ -124,7 +124,7 @@ const MODE_FOG = {
 }
 
 // 场景背景：按 bgMode 切换 纯色/背景图/渐变/夜景
-function SceneBackground({ mode, night, bgImage, bgMode }) {
+function SceneBackground({ mode, night, bgImage, bgMode, bgColor }) {
   const scene = useThree((s) => s.scene)
 
   useEffect(() => {
@@ -159,11 +159,14 @@ function SceneBackground({ mode, night, bgImage, bgMode }) {
       })
     } else if (bgMode === 'night') {
       scene.background = new THREE.Color('#0a1020')
+    } else if (bgMode === 'color') {
+      // 纯色：用色盘选的颜色
+      scene.background = new THREE.Color(bgColor || '#5278ae')
     } else {
-      // 默认（color/gradient）都用蓝色天空渐变
+      // 渐变：蓝色天空渐变
       scene.background = night ? new THREE.Color('#0a1020') : skyGradient()
     }
-  }, [mode, night, bgImage, bgMode])
+  }, [mode, night, bgImage, bgMode, bgColor])
 
   return null
 }
@@ -176,6 +179,7 @@ export default function Viewer({ onSelect, floorIndex }) {
   const floor = useStore((s) => s.project.floors[floorIndex])
   const bgImage = useStore((s) => s.bgImage)
   const bgMode = useStore((s) => s.bgMode)
+  const bgColor = useStore((s) => s.bgColor)
   const editing = useStore((s) => s.editing)
   const selected = useStore((s) => s.selected)
   const editorBgImage = useStore((s) => s.editorBgImage)
@@ -224,7 +228,7 @@ export default function Viewer({ onSelect, floorIndex }) {
           }
         }}
       >
-        <SceneBackground mode={mode} night={night} bgImage={editing ? editorBgImage : bgImage} bgMode={editing ? editorBgMode : bgMode} />
+        <SceneBackground mode={mode} night={night} bgImage={editing ? editorBgImage : bgImage} bgMode={editing ? editorBgMode : bgMode} bgColor={bgColor} />
         <fog attach="fog" args={[fogColor, night ? 30 : 40, night ? 70 : 90]} />
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />

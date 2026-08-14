@@ -5,6 +5,7 @@ import BottomBar from './components/BottomBar'
 import Editor from './components/Editor'
 import BindDrawer from './components/BindDrawer'
 import DeviceList from './components/DeviceList'
+import HexColorPicker from './components/HexColorPicker'
 import { useStore, setState, getState, toast, loadProject } from './store'
 import { api, TOGGLE_DOMAINS, BASE } from './api'
 import { roomsToWalls, recomputeRooms } from './three/geometry'
@@ -24,6 +25,7 @@ export default function App() {
   const settingsOpen = useStore((s) => s.settingsOpen)
   const bgImage = useStore((s) => s.bgImage)
   const bgMode = useStore((s) => s.bgMode)
+  const bgColor = useStore((s) => s.bgColor)
   const view2d = useStore((s) => s.view2d)
   const immersive = useStore((s) => s.immersive)
   const settings = useStore((s) => s.settings)
@@ -84,6 +86,7 @@ export default function App() {
           night: !!settings.night,
           bgImage: settings.bgImage || '',
           bgMode: settings.bgMode || 'color',
+          bgColor: settings.bgColor || '#5278ae',
           // 编辑器默认选项
           snap: settings.snap !== undefined ? settings.snap : true,
           showLabels: settings.showLabels !== undefined ? settings.showLabels : true,
@@ -363,6 +366,12 @@ export default function App() {
                   >{l}</button>
                 ))}
               </div>
+              {bgMode === 'color' && (
+                <div style={{ marginTop: 12 }}>
+                  <label>背景颜色（六边形色盘）</label>
+                  <HexColorPicker value={bgColor} onChange={(c) => { setState({ bgColor: c }); api.saveSettings({ ...getState().settings, bgColor: c }).catch(() => {}) }} />
+                </div>
+              )}
             </div>
             {bgMode === 'image' && (
               <>

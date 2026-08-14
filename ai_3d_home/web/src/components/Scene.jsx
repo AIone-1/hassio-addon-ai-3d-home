@@ -952,6 +952,7 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   const pts = room.points || []
   const view2d = useStore((s) => s.view2d)
   const showCeiling = useStore((s) => s.showCeiling)
+  const editing = useStore((s) => s.editing)
   if (pts.length < 3) return null
   // 所有房间地板同一高度（对齐原版 0.025m；房间不重叠，无需高度差）
   const floorY = level + 0.025
@@ -967,8 +968,8 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
           ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} side={THREE.DoubleSide} />
           : <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.46} metalness={0.02} clearcoat={0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} />}
       </mesh>
-      {/* 屋顶（顶面）：半透明，可开关 */}
-      {showCeiling && !view2d && (
+      {/* 主界面屋顶：封闭房间顶上加半透明顶面（只在非编辑状态显示） */}
+      {showCeiling && !editing && !view2d && (
         <mesh geometry={floorGeo} position={[0, level + (floor.height || 2.8), 0]} rotation={[Math.PI, 0, 0]} renderOrder={2}>
           <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.5} metalness={0.02} transparent opacity={0.55} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
@@ -1416,6 +1417,13 @@ export default function Scene({ onSelect, floorIndex }) {
           <gridHelper
             args={[30, 30, night ? '#5a6a8a' : '#b8c6d8', night ? '#3a4a6a' : '#dde6ef']}
             position={[camTarget[0], level + 0.005, camTarget[2]]}
+          />
+        )}
+        {/* 3D 编辑屋顶：和下面地板对应的网格画布（层高高度），方便摆放吊顶/吊灯等 */}
+        {editing && !view2d && showCeiling && (
+          <gridHelper
+            args={[30, 30, night ? '#6a8ab0' : '#a8c8e8', night ? '#4a6a90' : '#d8e8f8']}
+            position={[camTarget[0], level + (floor.height || 2.8), camTarget[2]]}
           />
         )}
         {/* 3D 放置平面：家具工具下点击地面/房顶放置；移动工具拾起后点击放下 */}
