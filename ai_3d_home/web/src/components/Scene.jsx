@@ -60,7 +60,7 @@ const MODEL_BASE = (() => {
 })()
 
 // 加载网上 GLB 模型：等比缩放放进目标 w/d/h 盒子（不拉伸），横竖方向对齐，水平居中、底部贴地、开阴影
-function GltfModel({ name, w, d, h }) {
+export function GltfModel({ name, w, d, h }) {
   const url = MODEL_BASE + 'models/' + name
   const [scene, setScene] = useState(null)
 
@@ -116,7 +116,7 @@ function FBox({ position, size, color, roughness = 0.72 }) {
 }
 
 // ---------- 家具模型（对齐原版：每个家具用多个盒子拼出具体造型，统一蓝灰主题色） ----------
-function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
+export function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
   const lib = FURNITURE_LIB.find((f) => f.type === type)
   // 网上下载的 GLB 模型：直接加载渲染（自动缩放对齐）
   if (lib && lib.glb) return <GltfModel name={lib.glb} w={cw || lib.w} d={cd || lib.d} h={ch || lib.h} />

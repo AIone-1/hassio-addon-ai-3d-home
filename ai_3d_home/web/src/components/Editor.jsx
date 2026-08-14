@@ -3,6 +3,7 @@ import { useStore, setState, currentFloor, getState, toast } from '../store'
 import { api } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS } from '../three/geometry'
 import { thumbUrl } from '../catalog'
+import ModelPreview from './ModelPreview'
 
 const LEFT_TOOLS = [
   { id: 'select', label: '选择', k: 'V' },
@@ -276,16 +277,6 @@ export default function Editor() {
             <div style={{ fontSize: 12, color: 'var(--muted)', padding: '0 4px 8px' }}>
               共 {FURNITURE_LIB.length + modelCatalog.filter((m) => !(settings.hiddenModels || []).includes(m.type)).length} 个模型
             </div>
-            {/* 尺寸选择 */}
-            <div className="furn-size">
-              <span className="furn-size-label">尺寸</span>
-              {[0.6, 0.8, 1, 1.2, 1.5].map((s) => (
-                <button key={s} className={`furn-size-btn ${furnitureScale === s ? 'active' : ''}`}
-                  onClick={() => setState({ furnitureScale: s })}>
-                  {Math.round(s * 100)}%
-                </button>
-              ))}
-            </div>
             {/* 内置家具（程序化建模） */}
             <div className="furn-cat" onClick={() => setOpenCats(o => ({ ...o, 内置: !o['内置'] }))}>
               <span className="furn-cat-label">内置家具</span>
@@ -294,7 +285,7 @@ export default function Editor() {
             </div>
             {openCats['内置'] && (
               <div className="furn-items">
-                {FURNITURE_LIB.map((f) => (
+                {FURNITURE_LIB.filter((f) => !(settings.hiddenModels || []).includes(f.type)).map((f) => (
                   <button key={f.type}
                     className={`furn-item ${furnitureType === f.type ? 'active' : ''}`}
                     onClick={() => setPreviewModel({ type: f.type, label: f.type, w: f.w, d: f.d, h: f.h, color: FURNITURE_COLORS[f.type] || '#888', builtin: true })} title="点击预览">
@@ -417,27 +408,30 @@ export default function Editor() {
           </div>
         </div>
       )}
-      {/* 模型预览弹窗 */}
+      {/* 模型预览弹窗（3D 预览 + 尺寸 + 缩放 + 放置/删除） */}
       {previewModel && (
         <div className="modal-mask" onClick={() => setPreviewModel(null)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 400 }}>
             <div className="dname">{previewModel.label}</div>
-            {previewModel.builtin ? (
-              <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }}>
-                <span style={{ width: 110, height: 110, borderRadius: 12, background: previewModel.color, border: '2px solid rgba(255,255,255,0.3)' }} />
-              </div>
-            ) : (
-              <img src={thumbUrl(previewModel.thumb)} alt={previewModel.label}
-                style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }} />
-            )}
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+            <div style={{ height: 280, borderRadius: 8, background: 'rgba(0,0,0,0.25)', margin: '10px 0', overflow: 'hidden' }}>
+              <ModelPreview model={previewModel} />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
               尺寸约 {previewModel.w}×{previewModel.d}×{previewModel.h} 米
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>缩放</span>
+              {[0.6, 0.8, 1, 1.2, 1.5].map((s) => (
+                <button key={s} onClick={() => setState({ furnitureScale: s })}
+                  style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid var(--border)', background: furnitureScale === s ? 'var(--accent)' : 'var(--panel2)', color: furnitureScale === s ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 11 }}>
+                  {Math.round(s * 100)}%
+                </button>
+              ))}
             </div>
             <div className="dev-actions">
               <button className="primary" onClick={() => { setState({ furnitureType: previewModel.type, tool: 'furniture' }); setFurnOpen(false); setPreviewModel(null) }}>放置</button>
-              {!previewModel.builtin && (
-                <button style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 13 }} onClick={() => { hideModel(previewModel); setPreviewModel(null) }}>删除</button>
-              )}
+              <button style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 13 }}
+                onClick={() => { if (confirm(`确认删除「${previewModel.label}」？`)) { hideModel(previewModel); setPreviewModel(null) } }}>删除</button>
               <button className="close-btn" onClick={() => setPreviewModel(null)}>关闭</button>
             </div>
           </div>
