@@ -29,6 +29,7 @@ const LEFT_TOOLS = [
   { id: 'wall', label: '墙体', k: 'W' },
   { id: 'door', label: '门', k: 'D' },
   { id: 'window', label: '窗', k: 'N' },
+  { id: 'cut', label: '裁剪', k: 'X' },
   { id: 'furniture', label: '家具', k: 'F' },
   { id: 'device', label: '设备', k: 'E' },
   { id: 'texture', label: '贴图', k: 'B' },
@@ -81,6 +82,10 @@ export default function Editor() {
     else if (t === 'wall') {
       setFurnOpen(false); setCatOpen(false)
       toast('画墙：点画布放墙点，点回起点或按 Enter 闭合生成房间')
+    } else if (t === 'cut') {
+      setFurnOpen(false); setCatOpen(false)
+      setState({ wallSel: [] })
+      toast('裁剪：点一面墙，在与其它墙的交点处切成两段')
     } else { setFurnOpen(false); setCatOpen(false) }
   }
 

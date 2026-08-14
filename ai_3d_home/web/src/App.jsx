@@ -248,7 +248,7 @@ export default function App() {
         setState({ editing: false, bindOpen: false, pendingEntity: null, selected: null, view2d: false, settingsOpen: false, tool: 'select' })
       }
       // 工具快捷键 V/M/G/H/W/D/N/F/E/B
-      const map = { v: 'select', m: 'move', g: 'movePlan', h: 'pan', w: 'wall', d: 'door', n: 'window', f: 'furniture', e: 'device', b: 'texture' }
+      const map = { v: 'select', m: 'move', g: 'movePlan', h: 'pan', w: 'wall', d: 'door', n: 'window', x: 'cut', f: 'furniture', e: 'device', b: 'texture' }
       if (map[e.key.toLowerCase()] && editing) {
         setState({ tool: map[e.key.toLowerCase()] })
       }

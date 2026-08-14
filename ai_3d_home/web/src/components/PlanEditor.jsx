@@ -2,7 +2,7 @@
 // 墙是线段（floor.walls 持久化），房间由墙段的封闭环自动检测（recomputeRooms）——这就是"共用墙/相交也封闭"的机制
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
-import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg, segmentIntersect } from '../three/geometry'
 import { getCatalogItem, thumbUrl } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
@@ -370,6 +370,18 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     if (e.button !== 0) return
 
     if (tool === 'wall') { addWallPoint(toWorld(e)); return }
+    if (tool === 'cut') {
+      // 裁剪：找离点击最近的墙，在与其它墙的交点处切成两段
+      const p = toWorld(e)
+      let best = null, bd = 0.5
+      for (const w of (floor?.walls || [])) {
+        const r = pointToSeg(p, w.start, w.end)
+        if (r.dist < bd) { bd = r.dist; best = w }
+      }
+      if (best) cutWall(best, p)
+      else toast('请点击要裁剪的墙')
+      return
+    }
     if (tool === 'movePlan') {
       planMoveRef.current = toWorld(e)
       svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
@@ -662,14 +674,64 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       const n = [-da[1], da[0]]
       b.end = [b.start[0] + n[0] * lb, b.start[1] + n[1] * lb]
     } else if (type === 'collinear') {
-      // 共线：b 起点投影到 a 所在直线，方向对齐 a
-      const t = (b.start[0] - a.start[0]) * da[0] + (b.start[1] - a.start[1]) * da[1]
-      const proj = [a.start[0] + t * da[0], a.start[1] + t * da[1]]
-      b.start = proj
-      b.end = [proj[0] + da[0] * lb, proj[1] + da[1] * lb]
+      // 共线：第2条线接到第1条线终点，沿第1条线方向延长（不是两条线重合）
+      b.start = [...a.end]
+      b.end = [a.end[0] + da[0] * lb, a.end[1] + da[1] * lb]
+    } else if (type === 'samepoint') {
+      // 同点：找两墙最近的端点对，把第2条线平移到端点重合
+      const p1 = [a.start, a.end], p2 = [b.start, b.end]
+      let bi = 0, bj = 0, bd = Infinity
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+        const d = Math.hypot(p1[i][0] - p2[j][0], p1[i][1] - p2[j][1])
+        if (d < bd) { bd = d; bi = i; bj = j }
+      }
+      const dx = p1[bi][0] - p2[bj][0], dy = p1[bi][1] - p2[bj][1]
+      b.start = [b.start[0] + dx, b.start[1] + dy]
+      b.end = [b.end[0] + dx, b.end[1] + dy]
     }
     fl.rooms = recomputeRooms(fl)
     setState({ project: { ...getState().project }, saved: false, wallSel: [a.id, b.id] })
+  }
+  // 绕起点旋转 ±90°
+  const rotateWall90 = (w, dir) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(v => v.id === w.id)
+    if (!target) return
+    const dx = target.end[0] - target.start[0], dy = target.end[1] - target.start[1]
+    if (Math.hypot(dx, dy) < 1e-6) return
+    // +90°（逆时针）：(dx,dy)->(-dy,dx)；-90°（顺时针）：(dx,dy)->(dy,-dx)
+    target.end = dir > 0
+      ? [target.start[0] - dy, target.start[1] + dx]
+      : [target.start[0] + dy, target.start[1] - dx]
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false })
+  }
+  // 裁剪：把墙在与其它墙的交点处切成两段（吸附到交点，切完房间仍闭合）
+  const cutWall = (w, clickPt) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(v => v.id === w.id)
+    if (!target) return
+    let best = null, bd = Infinity
+    for (const o of (fl.walls || [])) {
+      if (o.id === target.id) continue
+      const ip = segmentIntersect(target.start, target.end, o.start, o.end)
+      if (ip) {
+        const d = Math.hypot(ip[0] - clickPt[0], ip[1] - clickPt[1])
+        if (d < bd) { bd = d; best = ip }
+      }
+    }
+    if (!best) { toast('这面墙没有和其他墙相交'); return }
+    if (Math.hypot(best[0] - target.start[0], best[1] - target.start[1]) < 0.01 ||
+        Math.hypot(best[0] - target.end[0], best[1] - target.end[1]) < 0.01) {
+      toast('交点就在端点，无需裁剪')
+      return
+    }
+    const w2 = { id: uid(), start: [...best], end: [...target.end], height: target.height, thickness: target.thickness, color: target.color, opacity: target.opacity }
+    target.end = [...best]
+    fl.walls.push(w2)
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false, wallSel: [target.id, w2.id] })
+    toast('已裁剪成两段')
   }
   // 改墙起点 / 终点（坐标直接改）
   const setWallStart = (w, x, y) => {
@@ -1278,6 +1340,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             value={Math.round(Math.atan2(selWall.end[1] - selWall.start[1], selWall.end[0] - selWall.start[0]) * 180 / Math.PI)}
             onChange={(e) => setWallAngle(selWall, Number(e.target.value) || 0)} />
           <span className="plan-props-unit">°</span>
+          <button onClick={() => rotateWall90(selWall, 1)} title="逆时针转 90°">+90°</button>
+          <button onClick={() => rotateWall90(selWall, -1)} title="顺时针转 90°">-90°</button>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">高度</span>
@@ -1320,6 +1384,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <button className="plan-props-seg" onClick={() => applyWallConstraint('perp')}>垂直</button>
           <button className="plan-props-seg" onClick={() => applyWallConstraint('collinear')}>共线</button>
           <button className="plan-props-seg" onClick={() => applyWallConstraint('horizontal')}>水平</button>
+          <button className="plan-props-seg" onClick={() => applyWallConstraint('samepoint')}>同点</button>
         </div>
       </div>
     )}
