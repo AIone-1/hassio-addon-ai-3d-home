@@ -2,7 +2,7 @@
 import { useSyncExternalStore } from 'react'
 
 let state = {
-  project: { version: 1, floors: [] },
+  project: { name: '我的家', version: 1, floors: [] },
   settings: {},
   currentFloor: 0,
   camTarget: [0, 0, 2],

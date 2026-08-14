@@ -58,6 +58,7 @@ export default function Editor() {
   const [show3d, setShow3d] = useState(false)
   const [floorManagerOpen, setFloorManagerOpen] = useState(false)
   const [backMenuOpen, setBackMenuOpen] = useState(false)
+  const [projectManagerOpen, setProjectManagerOpen] = useState(false)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -302,6 +303,7 @@ export default function Editor() {
     <>
       {/* 顶部工具栏 */}
       <div className="editor-top">
+        <button className="et-btn" onClick={() => setProjectManagerOpen(true)}>项目</button>
         <button className="et-btn" onClick={() => undo()} title="撤销上一次操作">↩️ 撤销</button>
         <button className="et-btn" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>
         <div style={{ position: 'relative' }}>
@@ -458,6 +460,31 @@ export default function Editor() {
         <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
         <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
       </div>
+
+      {/* 项目弹窗 */}
+      {projectManagerOpen && (
+        <div className="modal-mask" onClick={() => setProjectManagerOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="dname">项目</div>
+            <div style={{ margin: '10px 0' }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>项目名</div>
+              <input type="text" value={project.name || ''}
+                onChange={(e) => { project.name = e.target.value; setState({ project: { ...project }, saved: false }) }}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            <div className="dev-actions">
+              <button className="primary" onClick={() => {
+                const name = prompt('新项目名字：', '我的家')
+                if (name && name.trim()) {
+                  const p = { name: name.trim(), version: 1, floors: [{ id: Math.random().toString(36).slice(2, 10), name: '一层', level: 0, height: 2.8, color: '#e6dcc8', rooms: [], walls: [], furniture: [], devices: [], openings: [] }] }
+                  loadProject(p); setState({ saved: false }); setProjectManagerOpen(false)
+                }
+              }}>新建项目</button>
+              <button className="close-btn" onClick={() => setProjectManagerOpen(false)}>关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 楼层管理弹窗 */}
       {floorManagerOpen && (
