@@ -356,27 +356,11 @@ export default function App() {
               </div>
             </div>
             <div className="field" style={{ margin: '12px 0' }}>
-              <label>背景效果</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[['color', '纯色'], ['image', '背景图'], ['gradient', '渐变'], ['night', '夜景']].map(([v, l]) => (
-                  <button
-                    key={v}
-                    onClick={() => { setState({ bgMode: v }); api.saveSettings({ ...getState().settings, bgMode: v }).catch(() => {}) }}
-                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: bgMode === v ? 'var(--accent)' : 'var(--panel2)', color: bgMode === v ? '#081018' : '#fff', cursor: 'pointer' }}
-                  >{l}</button>
-                ))}
-              </div>
-              {bgMode === 'color' && (
-                <div style={{ marginTop: 12 }}>
-                  <label>背景颜色（六边形色盘）</label>
-                  <HexColorPicker value={bgColor} onChange={(c) => { setState({ bgColor: c }); api.saveSettings({ ...getState().settings, bgColor: c }).catch(() => {}) }} />
-                </div>
-              )}
+              <label>背景颜色（六边形色盘）</label>
+              <HexColorPicker value={bgColor} onChange={(c) => { setState({ bgColor: c }); api.saveSettings({ ...getState().settings, bgColor: c }).catch(() => {}) }} />
             </div>
-            {bgMode === 'image' && (
-              <>
-                <div className="field" style={{ margin: '12px 0' }}>
-              <label>上传图片（推荐，本地图片用它）</label>
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>上传图片（作为背景）</label>
               <input
                 type="file" accept="image/*"
                 style={{ width: '100%', padding: '6px', color: '#fff' }}
@@ -442,8 +426,6 @@ export default function App() {
               }}>应用 URL</button>
               <button className="close-btn" onClick={() => { setState({ bgImage: '', settingsOpen: false }); api.saveSettings({ ...getState().settings, bgImage: '' }).catch(() => {}) }}>清除</button>
             </div>
-              </>
-            )}
           </div>
         </div>
       )}

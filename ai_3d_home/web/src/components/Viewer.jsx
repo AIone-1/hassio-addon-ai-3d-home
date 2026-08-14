@@ -123,28 +123,12 @@ const MODE_FOG = {
   '环境': '#6889ba', '安防': '#0b0f27',
 }
 
-// 场景背景：按 bgMode 切换 纯色/背景图/渐变/夜景
-function SceneBackground({ mode, night, bgImage, bgMode, bgColor }) {
+// 场景背景：有图用图，没图用色盘选的颜色
+function SceneBackground({ bgImage, bgColor }) {
   const scene = useThree((s) => s.scene)
 
   useEffect(() => {
-    // 天空渐变（对齐原版采样：顶 #253962 → 底 #46618d 垂直渐变）
-    const skyGradient = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = 4
-      canvas.height = 512
-      const ctx = canvas.getContext('2d')
-      const g = ctx.createLinearGradient(0, 0, 0, 512)
-      g.addColorStop(0, '#253962')
-      g.addColorStop(1, '#46618d')
-      ctx.fillStyle = g
-      ctx.fillRect(0, 0, 4, 512)
-      const tex = new THREE.CanvasTexture(canvas)
-      tex.needsUpdate = true
-      return tex
-    }
-
-    if (bgMode === 'image' && bgImage) {
+    if (bgImage) {
       // bgImage 可能是本地图片名（存的名字），也可能是外部 URL / data URL，分别处理
       const url = (bgImage.startsWith('http') || bgImage.startsWith('data:'))
         ? bgImage
@@ -157,17 +141,11 @@ function SceneBackground({ mode, night, bgImage, bgMode, bgColor }) {
       }, undefined, () => {
         scene.background = new THREE.Color('#1a2a40')
       })
-    } else if (bgMode === 'night') {
-      scene.background = new THREE.Color('#0a1020')
-    } else if (bgMode === 'color') {
-      // 纯色：用色盘选的颜色（夜间仍用暗色；颜色非法时回退渐变，避免黑屏）
-      if (night) scene.background = new THREE.Color('#0a1020')
-      else scene.background = (bgColor && /^#[0-9a-fA-F]{6}$/.test(bgColor)) ? new THREE.Color(bgColor) : skyGradient()
     } else {
-      // 渐变：蓝色天空渐变
-      scene.background = night ? new THREE.Color('#0a1020') : skyGradient()
+      // 纯色：色盘选的颜色（颜色非法时回退默认蓝，避免黑屏）
+      scene.background = (bgColor && /^#[0-9a-fA-F]{6}$/.test(bgColor)) ? new THREE.Color(bgColor) : new THREE.Color('#5278ae')
     }
-  }, [mode, night, bgImage, bgMode, bgColor])
+  }, [bgImage, bgColor])
 
   return null
 }
@@ -229,7 +207,7 @@ export default function Viewer({ onSelect, floorIndex }) {
           }
         }}
       >
-        <SceneBackground mode={mode} night={night} bgImage={editing ? editorBgImage : bgImage} bgMode={editing ? editorBgMode : bgMode} bgColor={bgColor} />
+        <SceneBackground bgImage={editing ? editorBgImage : bgImage} bgColor={bgColor} />
         <fog attach="fog" args={[fogColor, night ? 30 : 40, night ? 70 : 90]} />
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
         <Controls />
