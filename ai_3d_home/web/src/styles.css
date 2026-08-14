@@ -172,6 +172,10 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .furn-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.25); flex-shrink: 0; }
 .furn-dim { font-size: 10px; color: var(--muted); font-weight: 400; }
 .furn-thumb { width: 42px; height: 42px; object-fit: contain; border-radius: 6px; background: rgba(255,255,255,0.06); flex-shrink: 0; }
+.furn-del { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; line-height: 14px; text-align: center;
+  border-radius: 50%; border: 1px solid var(--border); background: var(--panel-solid); color: var(--danger);
+  font-size: 10px; cursor: pointer; padding: 0; }
+.furn-del:hover { background: var(--danger); color: #fff; }
 
 /* ---------- 2D 编辑器画布容器 + 家具属性面板 ---------- */
 .plan-wrap { position: absolute; inset: 0; }

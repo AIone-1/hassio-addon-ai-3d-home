@@ -147,6 +147,15 @@ export default function Editor() {
     setState({ settings: s })
     api.saveSettings(s).catch(() => {})
   }
+  // 隐藏（删除）某个下载模型，不再显示
+  const hideModel = (m) => {
+    const hidden = getState().settings.hiddenModels || []
+    if (hidden.includes(m.type)) return
+    const s = { ...getState().settings, hiddenModels: [...hidden, m.type] }
+    setState({ settings: s })
+    api.saveSettings(s).catch(() => {})
+    toast(`已隐藏「${m.label}」`)
+  }
 
   const importJson = () => {
     const input = document.createElement('input')
@@ -302,13 +311,16 @@ export default function Editor() {
                 </div>
                 {openCats[label] && (
                   <div className="furn-items">
-                    {items.map((m) => (
-                      <button key={m.type}
-                        className={`furn-item ${furnitureType === m.type ? 'active' : ''}`}
-                        onClick={() => { setState({ furnitureType: m.type, tool: 'furniture' }); setFurnOpen(false) }}>
-                        <img className="furn-thumb" src={thumbUrl(m.thumb)} alt={m.label} loading="lazy" />
-                        <span>{m.label}</span>
-                      </button>
+                    {items.filter((m) => !(settings.hiddenModels || []).includes(m.type)).map((m) => (
+                      <div key={m.type} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                        <button
+                          className={`furn-item ${furnitureType === m.type ? 'active' : ''}`}
+                          onClick={() => { setState({ furnitureType: m.type, tool: 'furniture' }); setFurnOpen(false) }}>
+                          <img className="furn-thumb" src={thumbUrl(m.thumb)} alt={m.label} loading="lazy" />
+                          <span>{m.label}</span>
+                        </button>
+                        <button className="furn-del" onClick={(e) => { e.stopPropagation(); hideModel(m) }} title="删除此模型">✕</button>
+                      </div>
                     ))}
                   </div>
                 )}

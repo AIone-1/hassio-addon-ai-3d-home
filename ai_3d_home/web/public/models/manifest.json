@@ -2191,48 +2191,6 @@
   "thumb": "电饭煲_312.webp"
  },
  {
-  "name": "空调_319",
-  "type": "空调",
-  "title": "Air conditioner",
-  "glb": "空调_319.glb",
-  "thumb": "空调_319.webp"
- },
- {
-  "name": "空调_320",
-  "type": "空调",
-  "title": "Air conditioner",
-  "glb": "空调_320.glb",
-  "thumb": "空调_320.webp"
- },
- {
-  "name": "空调_321",
-  "type": "空调",
-  "title": "Air conditioner",
-  "glb": "空调_321.glb",
-  "thumb": "空调_321.webp"
- },
- {
-  "name": "空调_322",
-  "type": "空调",
-  "title": "Air Conditioner",
-  "glb": "空调_322.glb",
-  "thumb": "空调_322.webp"
- },
- {
-  "name": "空调_323",
-  "type": "空调",
-  "title": "Air conditioner",
-  "glb": "空调_323.glb",
-  "thumb": "空调_323.webp"
- },
- {
-  "name": "空调_324",
-  "type": "空调",
-  "title": "Air Vent",
-  "glb": "空调_324.glb",
-  "thumb": "空调_324.webp"
- },
- {
   "name": "智能音箱_325",
   "type": "智能音箱",
   "title": "Speaker",
@@ -2385,5 +2343,61 @@
   "title": "Window1 white open 1731",
   "glb": "窗_346.glb",
   "thumb": "窗_346.webp"
+ },
+ {
+  "name": "空调_335",
+  "type": "空调",
+  "title": "Air conditioner",
+  "glb": "空调_335.glb",
+  "thumb": "空调_335.webp"
+ },
+ {
+  "name": "空调_336",
+  "type": "空调",
+  "title": "Air conditioner",
+  "glb": "空调_336.glb",
+  "thumb": "空调_336.webp"
+ },
+ {
+  "name": "空调_337",
+  "type": "空调",
+  "title": "Air conditioner",
+  "glb": "空调_337.glb",
+  "thumb": "空调_337.webp"
+ },
+ {
+  "name": "空调_338",
+  "type": "空调",
+  "title": "Air conditioner",
+  "glb": "空调_338.glb",
+  "thumb": "空调_338.webp"
+ },
+ {
+  "name": "空调_339",
+  "type": "空调",
+  "title": "Air Conditioner",
+  "glb": "空调_339.glb",
+  "thumb": "空调_339.webp"
+ },
+ {
+  "name": "空调_340",
+  "type": "空调",
+  "title": "Air conditioner",
+  "glb": "空调_340.glb",
+  "thumb": "空调_340.webp"
+ },
+ {
+  "name": "空调_341",
+  "type": "空调",
+  "title": "Air Conditioner",
+  "glb": "空调_341.glb",
+  "thumb": "空调_341.webp"
+ },
+ {
+  "name": "空调_342",
+  "type": "空调",
+  "title": "Air conditioner",
+  "glb": "空调_342.glb",
+  "thumb": "空调_342.webp"
  }
 ]
