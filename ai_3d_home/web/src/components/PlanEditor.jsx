@@ -22,6 +22,8 @@ const BUILTIN_DEVICES = [
   { type: '传感器', icon: '📡' },
   { type: '灯带', icon: '✨' },
 ]
+// 地板颜色（选中房间可改）
+const FLOOR_COLORS = ['#7789ad', '#8a9bbd', '#a58b6f', '#8b8b8b', '#c9a675', '#7d8f7a', '#a08090', '#6b7f9e']
 const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
 const MAX_ZOOM = 6
@@ -529,6 +531,24 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setState({ project: { ...st.project }, saved: false, selected: null })
     toast('已删除设备')
   }
+  // 房间属性（改名/颜色）
+  const selRoom = selected && selected.type === 'room' ? selected.ref : null
+  const patchRoom = (r, patch) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.rooms || []).find(x => x.id === r.id)
+    if (!target) return
+    Object.assign(target, patch)
+    setState({ project: { ...getState().project }, saved: false })
+  }
+  // 墙属性（高度）
+  const selWall = selected && selected.type === 'wall' ? selected.ref : null
+  const patchWall = (w, patch) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(x => x.id === w.id)
+    if (!target) return
+    Object.assign(target, patch)
+    setState({ project: { ...getState().project }, saved: false })
+  }
   // 下载模型按分类分组（设备选模型用）
   const groupedCatalog = useMemo(() => {
     const m = {}
@@ -923,6 +943,43 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         <div className="plan-props-row">
           <span className="plan-props-label">实体</span>
           <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selDevice.entity_id}</span>
+        </div>
+      </div>
+    )}
+    {selRoom && (
+      <div className="plan-props">
+        <div className="plan-props-head">
+          <span>房间</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">名字</span>
+          <input type="text" value={selRoom.name || ''}
+            onChange={(e) => patchRoom(selRoom, { name: e.target.value })} />
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">面积</span>
+          <span style={{ fontSize: 12, color: 'var(--text)' }}>{polygonArea(selRoom.points || []).toFixed(1)} ㎡</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          {FLOOR_COLORS.map((c) => (
+            <button key={c} title={c} onClick={() => patchRoom(selRoom, { color: c })}
+              className={`plan-props-swatch ${selRoom.color === c ? 'active' : ''}`}
+              style={{ background: c }} />
+          ))}
+        </div>
+      </div>
+    )}
+    {selWall && (
+      <div className="plan-props">
+        <div className="plan-props-head">
+          <span>墙</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">高度</span>
+          <input type="number" step="0.1" min="1" max="6" value={selWall.height || floor?.height || 2.8}
+            onChange={(e) => patchWall(selWall, { height: Number(e.target.value) || 2.8 })} />
+          <span className="plan-props-unit">m</span>
         </div>
       </div>
     )}

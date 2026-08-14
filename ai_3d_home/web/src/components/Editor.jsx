@@ -426,40 +426,17 @@ export default function Editor() {
         ))}
       </div>
 
-      {/* 右侧信息栏 */}
-      <div className="editor-info">
-        <div className="editor-info-title">户型信息</div>
-        {selRoom && (
-          <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: 'var(--panel2)' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>当前房间</div>
-            <input type="text" value={selRoom.name || ''} onChange={(e) => renameRoom(e.target.value)}
-              style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 4 }} />
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>面积 {polygonArea(selRoom.points || []).toFixed(1)} ㎡</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-              {FLOOR_COLORS.map((c) => (
-                <button key={c} title={c} onClick={() => { const fl = getState().project.floors[currentFloorIdx]; const r = (fl.rooms || []).find(x => x.id === selRoom.id); if (r) { r.color = c; setState({ project: { ...getState().project }, saved: false }) } }}
-                  style={{ width: 20, height: 20, borderRadius: 5, background: c, border: selRoom.color === c ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.25)', cursor: 'pointer', padding: 0 }} />
-              ))}
-            </div>
-          </div>
-        )}
-        {selWall && (
-          <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: 'var(--panel2)' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>当前墙高</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input type="number" step="0.1" min="1" max="6" value={selWall.height || floor?.height || 2.8}
-                onChange={(e) => setWallHeight(Number(e.target.value) || 2.8)}
-                style={{ flex: 1, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12 }} />
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>米</span>
-            </div>
-          </div>
-        )}
-        <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
-        <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
-        <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
-        <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
-        <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
-      </div>
+      {/* 右侧信息栏（未选中时显示户型信息） */}
+      {!selected && (
+        <div className="editor-info">
+          <div className="editor-info-title">户型信息</div>
+          <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
+          <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
+          <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
+          <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
+          <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
+        </div>
+      )}
 
       {/* 项目弹窗 */}
       {projectManagerOpen && (
