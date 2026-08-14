@@ -270,9 +270,12 @@ export default function Editor() {
         <div className="et-sep" />
 
         {/* 家具库 */}
-        <button className="et-btn" onClick={() => setCatOpen(false) + setFurnOpen(!furnOpen)}>家具</button>
+        <button className="et-btn" onClick={() => setCatOpen(false) + setFurnOpen(!furnOpen)}>模型</button>
         {furnOpen && (
           <div className="furn-picker">
+            <div style={{ fontSize: 12, color: 'var(--muted)', padding: '0 4px 8px' }}>
+              共 {FURNITURE_LIB.length + modelCatalog.filter((m) => !(settings.hiddenModels || []).includes(m.type)).length} 个模型
+            </div>
             {/* 尺寸选择 */}
             <div className="furn-size">
               <span className="furn-size-label">尺寸</span>
@@ -294,7 +297,7 @@ export default function Editor() {
                 {FURNITURE_LIB.map((f) => (
                   <button key={f.type}
                     className={`furn-item ${furnitureType === f.type ? 'active' : ''}`}
-                    onClick={() => { setState({ furnitureType: f.type, tool: 'furniture' }); setFurnOpen(false) }}>
+                    onClick={() => setPreviewModel({ type: f.type, label: f.type, w: f.w, d: f.d, h: f.h, color: FURNITURE_COLORS[f.type] || '#888', builtin: true })} title="点击预览">
                     <span className="furn-swatch" style={{ background: FURNITURE_COLORS[f.type] || '#888' }} />
                     {f.type}
                     <span className="furn-dim"> {f.w}×{f.d}m</span>
@@ -313,15 +316,12 @@ export default function Editor() {
                 {openCats[label] && (
                   <div className="furn-items">
                     {items.filter((m) => !(settings.hiddenModels || []).includes(m.type)).map((m) => (
-                      <div key={m.type} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                        <button
-                          className={`furn-item ${furnitureType === m.type ? 'active' : ''}`}
-                          onClick={() => setPreviewModel(m)} title="点击预览">
-                          <img className="furn-thumb" src={thumbUrl(m.thumb)} alt={m.label} loading="lazy" />
-                          <span>{m.label}</span>
-                        </button>
-                        <button className="furn-del" onClick={(e) => { e.stopPropagation(); hideModel(m) }} title="删除此模型">✕</button>
-                      </div>
+                      <button key={m.type}
+                        className={`furn-item ${furnitureType === m.type ? 'active' : ''}`}
+                        onClick={() => setPreviewModel(m)} title="点击预览">
+                        <img className="furn-thumb" src={thumbUrl(m.thumb)} alt={m.label} loading="lazy" />
+                        <span>{m.label}</span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -422,13 +422,22 @@ export default function Editor() {
         <div className="modal-mask" onClick={() => setPreviewModel(null)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="dname">{previewModel.label}</div>
-            <img src={thumbUrl(previewModel.thumb)} alt={previewModel.label}
-              style={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }} />
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
+            {previewModel.builtin ? (
+              <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }}>
+                <span style={{ width: 110, height: 110, borderRadius: 12, background: previewModel.color, border: '2px solid rgba(255,255,255,0.3)' }} />
+              </div>
+            ) : (
+              <img src={thumbUrl(previewModel.thumb)} alt={previewModel.label}
+                style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }} />
+            )}
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
               尺寸约 {previewModel.w}×{previewModel.d}×{previewModel.h} 米
             </div>
             <div className="dev-actions">
-              <button className="primary" onClick={() => { setState({ furnitureType: previewModel.type, tool: 'furniture' }); setFurnOpen(false); setPreviewModel(null) }}>使用此模型</button>
+              <button className="primary" onClick={() => { setState({ furnitureType: previewModel.type, tool: 'furniture' }); setFurnOpen(false); setPreviewModel(null) }}>放置</button>
+              {!previewModel.builtin && (
+                <button style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 13 }} onClick={() => { hideModel(previewModel); setPreviewModel(null) }}>删除</button>
+              )}
               <button className="close-btn" onClick={() => setPreviewModel(null)}>关闭</button>
             </div>
           </div>
