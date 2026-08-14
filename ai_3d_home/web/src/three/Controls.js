@@ -22,6 +22,7 @@ export function Controls({ enabled = true }) {
   const autoRotate = useStore((s) => s.autoRotate)
   const rotateDir = useStore((s) => s.rotateDir)
   const rotateSpeed = useStore((s) => s.rotateSpeed)
+  const viewSignal = useStore((s) => s.camViewSignal)
 
   useEffect(() => {
     const c = new ThreeOrbitControls(camera, gl.domElement)
@@ -62,11 +63,41 @@ export function Controls({ enabled = true }) {
     if (ref.current && target) ref.current.target.set(target[0], target[1], target[2])
   }, [target && target[0], target && target[1], target && target[2]])
 
+  // 视图切换（上视图/前视图/自定义视图）
+  useEffect(() => {
+    if (!viewSignal.n || !ref.current || !viewSignal.type) return
+    const st = getState()
+    const t = st.camTarget
+    const dist = st.camDist
+    if (viewSignal.type === 'top') {
+      ref.current.target.set(t[0], t[1], t[2])
+      camera.position.set(t[0], t[1] + dist * 1.4, t[2] + 0.01)
+    } else if (viewSignal.type === 'front') {
+      ref.current.target.set(t[0], t[1] + 0.3, t[2])
+      camera.position.set(t[0], t[1] + 0.3, t[2] + dist)
+    } else if (viewSignal.type.startsWith('custom:')) {
+      const cv = st.customViews.find((v) => v.id === viewSignal.type.slice(7))
+      if (cv) {
+        ref.current.target.set(cv.target[0], cv.target[1], cv.target[2])
+        camera.position.set(cv.pos[0], cv.pos[1], cv.pos[2])
+      } else return
+    } else return
+    ref.current.update()
+  }, [viewSignal.n, camera])
+
   useEffect(() => {
     if (ref.current) ref.current.enabled = enabled
   }, [enabled])
 
   // 传 delta 给 update，让 autoRotate 按实际帧耗时缩放（帧率无关，消除卡顿）
-  useFrame((_, delta) => ref.current?.update(delta))
+  useFrame((_, delta) => {
+    const c = ref.current
+    if (!c) return
+    c.update(delta)
+    // 暴露当前相机位置/目标，供「保存视角」读取（不触发 React 重渲染）
+    if (!window.__cam3d) window.__cam3d = {}
+    window.__cam3d.pos = c.object.position.toArray()
+    window.__cam3d.target = c.target.toArray()
+  })
   return null
 }

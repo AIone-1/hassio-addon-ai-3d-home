@@ -18,18 +18,37 @@ export default function BottomBar() {
   const deviceCount = new Set(project.floors.flatMap((f) => (f.devices || []).map((d) => d.entity_id))).size
   const [shareOpen, setShareOpen] = useState(false)
   const [qualityOpen, setQualityOpen] = useState(false)
+  const [viewOpen, setViewOpen] = useState(false)
+  const customViews = useStore((s) => s.customViews)
 
-  // 点击空白处关闭 分享/画质 菜单
+  const setView = (type) => {
+    setState((s) => ({ camViewSignal: { type, n: s.camViewSignal.n + 1 } }))
+    setViewOpen(false)
+  }
+  const saveView = () => {
+    const cam = window.__cam3d
+    if (!cam || !cam.pos) { toast('相机还没就绪'); return }
+    const name = prompt('给这个视角起个名字：', `视角${customViews.length + 1}`)
+    if (!name || !name.trim()) return
+    const v = { id: 'v' + Date.now(), name: name.trim(), pos: [...cam.pos], target: [...cam.target] }
+    setState({ customViews: [...customViews, v] })
+    toast('已保存视角「' + v.name + '」')
+  }
+  const delView = (id) => {
+    setState({ customViews: customViews.filter((v) => v.id !== id) })
+  }
+
+  // 点击空白处关闭 分享/画质/视图 菜单
   useEffect(() => {
     const onDown = (e) => {
-      if (!shareOpen && !qualityOpen) return
+      if (!shareOpen && !qualityOpen && !viewOpen) return
       const t = e.target
       if (t.closest && t.closest('.bb-menu')) return
-      setShareOpen(false); setQualityOpen(false)
+      setShareOpen(false); setQualityOpen(false); setViewOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [shareOpen, qualityOpen])
+  }, [shareOpen, qualityOpen, viewOpen])
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen?.()
@@ -144,6 +163,23 @@ export default function BottomBar() {
         <button className={`bb-btn ${showOpenings ? 'active' : ''}`} onClick={() => setState({ showOpenings: !showOpenings })} title="显示/去除门窗">
           🚪 门窗
         </button>
+        <div style={{ position: 'relative' }}>
+          <button className="bb-btn" onClick={() => setViewOpen(!viewOpen)} title="切换视角">👁 视图</button>
+          {viewOpen && (
+            <div className="bb-menu">
+              <button className="bb-menu-item" onClick={() => setView('top')}>⬇ 上视图</button>
+              <button className="bb-menu-item" onClick={() => setView('front')}>⬆ 前视图</button>
+              <div className="bb-menu-sep" />
+              <button className="bb-menu-item" onClick={() => { saveView(); setViewOpen(false) }}>💾 保存当前视角</button>
+              {customViews.map((v) => (
+                <div key={v.id} style={{ display: 'flex', alignItems: 'center' }}>
+                  <button className="bb-menu-item" style={{ flex: 1 }} onClick={() => setView('custom:' + v.id)}>📷 {v.name}</button>
+                  <button style={{ padding: '2px 6px', background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }} onClick={() => delView(v.id)} title="删除">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <button className={`bb-btn ${night ? 'active' : ''}`} onClick={() => setState({ night: !night })} title="日间/夜间">
           {night ? '🌙 夜间' : '☀️ 日间'}
         </button>

@@ -7,6 +7,8 @@ let state = {
   currentFloor: 0,
   camTarget: [0, 0, 2],
   camDist: 10,        // 户型最大尺寸（取景用）
+  camViewSignal: { type: null, n: 0 },  // 视图切换信号（top/front/custom），n 自增触发
+  customViews: [],    // 自定义视图 [{ id, name, pos: [x,y,z], target: [x,y,z] }]
   recenterKey: 0,
   planRecenterKey: 0, // SVG 2D 编辑器「居中」信号，变化时重置 zoom/pan
   planZoomDelta: 0,   // SVG 2D 编辑器「放大/缩小」信号，+1 放大 / -1 缩小
@@ -50,6 +52,7 @@ let state = {
   selected: null,             // {type:'room'|'wall'|'furniture'|'device'|'opening', ref, floorIdx}
   wallSel: [],                // 多选墙（最多 2 条）的 id 列表，用于共线/垂直/水平约束
   multiSelect: false,         // 多选模式开关（左侧快捷栏按钮）
+  pickItem: null,             // 3D 移动工具「拾起待放置」的对象 {type, id}
   roomDraft: null,            // 画房间/墙的草稿
   pendingEntity: null,        // 待绑定实体
   bindOpen: false,            // 绑定抽屉

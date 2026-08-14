@@ -878,6 +878,9 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -level), [level])
   const dragRef = useRef(false)
+  const tool = useStore((s) => s.tool)
+  const pickItem = useStore((s) => s.pickItem)
+  const isPicked = pickItem && pickItem.type === 'furniture' && pickItem.id === item.id
 
   const toWorld = (e) => {
     const rect = gl.domElement.getBoundingClientRect()
@@ -893,7 +896,21 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
       position={[pos[0], level + (pos[1] || 0), pos[2]]}
       rotation={[0, rot * Math.PI / 180, 0]}
       scale={scale}
-      onClick={interactive ? (e) => { e.stopPropagation(); onSelect(item) } : undefined}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (tool === 'move') {
+          // 移动工具：单击拾起，再单击放下
+          if (isPicked) setState({ pickItem: null })
+          else { onSelect(item); setState({ pickItem: { type: 'furniture', id: item.id } }) }
+        } else if (tool === 'select' || tool === 'delete') {
+          onSelect(item)
+        }
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        onSelect(item)
+        setState({ tool: 'move', pickItem: { type: 'furniture', id: item.id } })
+      }}
       onPointerDown={canDrag ? (e) => {
         e.stopPropagation()
         onSelect(item)
@@ -901,7 +918,7 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
         e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId)
       } : undefined}
       onPointerMove={canDrag ? (e) => {
-        if (!dragRef.current) return
+        if (!dragRef.current && !isPicked) return
         e.stopPropagation()
         const p = toWorld(e)
         if (p) {
@@ -1212,6 +1229,7 @@ export default function Scene({ onSelect, floorIndex }) {
   const showWalls = useStore((s) => s.showWalls)
   const showOpenings = useStore((s) => s.showOpenings)
   const camTarget = useStore((s) => s.camTarget)
+  const pickItem = useStore((s) => s.pickItem)
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
   const interactive = tool === 'select' || tool === 'delete'
@@ -1277,8 +1295,9 @@ export default function Scene({ onSelect, floorIndex }) {
             position={[camTarget[0], level + 0.005, camTarget[2]]}
           />
         )}
-        {/* 3D 放置平面：家具工具下点击地面放置 */}
+        {/* 3D 放置平面：家具工具下点击地面放置；移动工具拾起后点击地面放下 */}
         {editing && tool === 'furniture' && <PlacePlane level={level} onPlace={placeFurniture} />}
+        {editing && tool === 'move' && pickItem && <PlacePlane level={level} onPlace={() => setState({ pickItem: null })} />}
 
         {/* 墙（持久化线段，毛玻璃材质对齐原版；删除模式可点；showWalls 关闭则去除墙壁） */}
         {showWalls && (() => {
