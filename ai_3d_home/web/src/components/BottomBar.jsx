@@ -1,4 +1,5 @@
 import { useStore, setState, getState, toast } from '../store'
+import { api } from '../api'
 import { useState, useEffect } from 'react'
 
 const MODES = ['全屋', '照明', '遮阳', '环境', '安防', '纯户型']
@@ -25,7 +26,13 @@ export default function BottomBar() {
     setState((s) => ({ camViewSignal: { type, n: s.camViewSignal.n + 1 } }))
     setViewOpen(false)
   }
-  const persistViews = (vs) => { try { localStorage.setItem('ai3d_custom_views', JSON.stringify(vs)) } catch (e) {} }
+  // 视角存 settings（跨设备通用）
+  const persistViews = (vs) => {
+    try { localStorage.setItem('ai3d_custom_views', JSON.stringify(vs)) } catch (e) {}
+    const s = { ...getState().settings, customViews: vs }
+    setState({ settings: s })
+    api.saveSettings(s).catch(() => {})
+  }
   const saveView = () => {
     const cam = window.__cam3d
     if (!cam || !cam.pos) { toast('相机还没就绪'); return }
@@ -42,13 +49,6 @@ export default function BottomBar() {
     setState({ customViews: next })
     persistViews(next)
   }
-  // 启动时从 localStorage 恢复已存视角（刷新不丢）
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('ai3d_custom_views') || '[]')
-      if (Array.isArray(saved) && saved.length) setState({ customViews: saved })
-    } catch (e) {}
-  }, [])
 
   // 点击空白处关闭 分享/画质/视图 菜单
   useEffect(() => {

@@ -1,6 +1,6 @@
 // 3D 视图里的属性面板（简化版）：墙/家具/设备 选中后弹面板改常用属性
 // 和 2D 编辑器共用同一份数据；墙=长度/高度/厚度/颜色/不透明度/壁纸，家具=高度/旋转/缩放/删除，设备=高度/删除
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as THREE from 'three'
 import { useStore, setState, getState, toast } from '../store'
 import { recomputeRooms } from '../three/geometry'
@@ -30,6 +30,8 @@ export default function WallProps3D({ floorIndex }) {
   const wallSelIds = useStore((s) => s.wallSel)
   const wallOpacity = useStore((s) => s.wallOpacity)
   const [favColors, setFavColors] = useState(getFav())
+  const [bgList, setBgList] = useState([])
+  useEffect(() => { api.backgrounds().then((r) => setBgList(r.images || [])).catch(() => {}) }, [])
   if (!selected && wallSelIds.length === 0) return null
 
   const toggleFav = (c) => {
@@ -184,7 +186,7 @@ export default function WallProps3D({ floorIndex }) {
                     body: JSON.stringify({ data: reader.result }),
                   })
                   const res = await r.json()
-                  if (res.ok && res.name) { commit(() => { wall.texture = res.name }); toast('壁纸已上传') }
+                  if (res.ok && res.name) { commit(() => { wall.texture = res.name }); setBgList([{ name: res.name }, ...bgList]); toast('壁纸已上传') }
                 } catch (err) { toast('上传失败') }
               }
               reader.readAsDataURL(file)
@@ -192,6 +194,15 @@ export default function WallProps3D({ floorIndex }) {
           <button onClick={() => document.getElementById('wall-texture-file').click()}>{wall.texture ? '更换壁纸' : '上传壁纸'}</button>
           {wall.texture && <button style={{ color: 'var(--danger)' }} onClick={() => commit(() => { wall.texture = '' })}>清除</button>}
         </div>
+        {bgList.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+            {bgList.map((img) => (
+              <img key={img.name} src={BASE + 'api/background/' + img.name} alt=""
+                style={{ width: 48, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: wall.texture === img.name ? '2px solid var(--accent)' : '1px solid var(--border)' }}
+                onClick={() => commit(() => { wall.texture = img.name })} />
+            ))}
+          </div>
+        )}
         <div className="plan-props-row">
           <span className="plan-props-label">不透明度</span>
           <input type="range" min="10" max="100" step="5" style={{ flex: 1 }}

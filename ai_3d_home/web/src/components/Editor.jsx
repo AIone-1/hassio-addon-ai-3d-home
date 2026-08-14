@@ -67,6 +67,8 @@ export default function Editor() {
   const [floorManagerOpen, setFloorManagerOpen] = useState(false)
   const [projectManagerOpen, setProjectManagerOpen] = useState(false)
   const [editorBgOpen, setEditorBgOpen] = useState(false)
+  const [bgList, setBgList] = useState([])
+  const editorBgImage = useStore((s) => s.editorBgImage)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -339,7 +341,7 @@ export default function Editor() {
           <button className="et-btn" onClick={() => { setState({ calibrating: true, calibratePts: [] }); toast('标定：点底图选一段已知长度的起点') }} title="底图比例尺标定">标定</button>
         )}
         <button className="et-btn" onClick={() => setDefaultOpen(true)}>默认</button>
-        <button className="et-btn" onClick={() => setEditorBgOpen(true)}>背景</button>
+        <button className="et-btn" onClick={async () => { try { const r = await api.backgrounds(); setBgList(r.images || []) } catch (e) {} setEditorBgOpen(true) }}>背景</button>
         {planImage && (
           <>
             <button className="et-btn" onClick={() => setState(s => ({ planImageScale: (s.planImageScale || 1) * 1.25 }))} title="放大底图">底图＋</button>
@@ -620,17 +622,36 @@ export default function Editor() {
                       const res = await r.json()
                       if (res.ok && res.name) {
                         setState({ editorBgImage: res.name, editorBgMode: 'image' })
+                        setBgList([{ name: res.name, time: Date.now() / 1000 }, ...bgList])
                         toast('3D 背景已上传')
                       }
                     } catch (err) { toast('上传失败') }
                   }
                   reader.readAsDataURL(file)
                 }} />
+              {/* 已上传背景图缩略图 */}
+              {bgList.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                  {bgList.map((img) => (
+                    <div key={img.name} style={{ position: 'relative' }}>
+                      <img src={BASE + 'api/background/' + img.name} alt=""
+                        style={{ width: 56, height: 38, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: editorBgImage === img.name ? '2px solid var(--accent)' : '1px solid var(--border)' }}
+                        onClick={() => setState({ editorBgImage: img.name, editorBgMode: 'image' })} />
+                      <button title="删除" onClick={async () => {
+                        if (!confirm('删除这张背景图？')) return
+                        await api.backgroundDelete(img.name)
+                        setBgList(bgList.filter((x) => x.name !== img.name))
+                        if (getState().editorBgImage === img.name) setState({ editorBgImage: '', editorBgMode: 'color' })
+                      }} style={{ position: 'absolute', top: -6, right: -6, width: 16, height: 16, lineHeight: '14px', borderRadius: '50%', background: 'var(--panel-solid)', color: 'var(--danger)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: 10, padding: 0 }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <button className="primary" onClick={() => document.getElementById('editor-bg-file').click()}>上传背景图</button>
               <button style={{ marginLeft: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}
+                onClick={() => { setState({ editorBgImage: '', editorBgMode: 'color' }); toast('已恢复默认蓝色背景') }}>默认</button>
+              <button style={{ marginLeft: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}
                 onClick={() => { setState({ editorBgImage: getState().bgImage, editorBgMode: getState().bgMode }); toast('已同步主界面背景') }}>同步主界面背景</button>
-              <button style={{ marginLeft: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 13 }}
-                onClick={() => { setState({ editorBgImage: '', editorBgMode: 'color' }); toast('已清除 3D 背景') }}>清除</button>
             </div>
             <button className="close-btn" onClick={() => setEditorBgOpen(false)}>关闭</button>
           </div>
