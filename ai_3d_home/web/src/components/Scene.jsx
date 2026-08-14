@@ -969,9 +969,9 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
           ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} side={THREE.DoubleSide} />
           : <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.46} metalness={0.02} clearcoat={0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} />}
       </mesh>
-      {/* 主界面屋顶：封闭房间顶上加半透明顶面（只在非编辑状态显示） */}
+      {/* 主界面屋顶：封闭房间顶上加半透明顶面（和地板同一多边形，只在不同高度，不翻转） */}
       {showCeiling && !editing && !view2d && (
-        <mesh geometry={floorGeo} position={[0, level + (floor.height || 2.8), 0]} rotation={[Math.PI, 0, 0]} renderOrder={2}>
+        <mesh geometry={floorGeo} position={[0, level + (floor.height || 2.8), 0]} renderOrder={2}>
           <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.5} metalness={0.02} transparent opacity={0.8} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
       )}
