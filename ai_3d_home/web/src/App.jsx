@@ -19,6 +19,7 @@ export default function App() {
   const selected = useStore((s) => s.selected)
   const haConnected = useStore((s) => s.haConnected)
   const haStates = useStore((s) => s.haStates)
+  const haEntities = useStore((s) => s.haEntities)
   const toastMsg = useStore((s) => s.toast)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const bgImage = useStore((s) => s.bgImage)
@@ -233,6 +234,12 @@ export default function App() {
   }, [editing])
 
   const devState = deviceModal ? haStates[deviceModal.entity_id] : null
+  // 天气 + 温度（左上角信息）
+  const WEATHER_ICON = { sunny: '☀️', 'clear-night': '🌙', partlycloudy: '⛅', cloudy: '☁️', rainy: '🌧️', pouring: '🌧️', snowy: '❄️', snowyrainy: '🌨️', lightning: '⛈️', fog: '🌫️', windy: '💨', hail: '🌨️' }
+  const weatherEnt = (haEntities || []).find(e => e.entity_id.startsWith('weather.'))
+  const weatherSt = weatherEnt ? haStates[weatherEnt.entity_id] : null
+  const tempEnt = (haEntities || []).find(e => e.entity_id.startsWith('sensor.') && (e.attributes?.device_class === 'temperature' || /temperature|temp|_temp|温度/.test(e.entity_id)))
+  const tempSt = tempEnt ? haStates[tempEnt.entity_id] : null
 
   return (
     <div className="app" onDoubleClick={() => immersive && setState({ immersive: false })}>
@@ -245,6 +252,12 @@ export default function App() {
         <span style={{ color: 'var(--accent2)' }}>
           {editing ? `· 房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
         </span>
+        {weatherSt && (
+          <span>{(WEATHER_ICON[weatherSt.state] || '🌡️')} {weatherSt.state}</span>
+        )}
+        {tempSt && (
+          <span>🌡️ {tempSt.state}{tempSt.attributes?.unit_of_measurement || '°C'}</span>
+        )}
         <span ref={fpsRef} style={{ fontSize: '16px', fontWeight: 700 }} />
       </div>}
 
