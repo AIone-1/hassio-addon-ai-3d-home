@@ -886,6 +886,7 @@ export default function Scene({ onSelect, floorIndex }) {
           const h = w.height || floor.height || 2.8
           const thick = w.thickness || WALL_THICK
           const wallColor = w.color || th.wallColor
+          const wallOpacityVal = w.opacity != null ? w.opacity / 100 : th.wallOpacity
           const mx = (w.start[0] + w.end[0]) / 2
           const mz = (w.start[1] + w.end[1]) / 2
           const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0])
@@ -899,7 +900,7 @@ export default function Scene({ onSelect, floorIndex }) {
               <boxGeometry args={[len, view2d ? 0.01 : h, thick]} />
               {view2d
                 ? <meshBasicMaterial color="#3a4a66" />
-                : <meshPhysicalMaterial color={wallColor} transparent opacity={th.wallOpacity} roughness={0.5} metalness={0} clearcoat={0.16} clearcoatRoughness={0.72} depthWrite={false} />}
+                : <meshPhysicalMaterial color={wallColor} transparent opacity={wallOpacityVal} roughness={0.5} metalness={0} clearcoat={0.16} clearcoatRoughness={0.72} depthWrite={false} />}
             </mesh>
           )
           })

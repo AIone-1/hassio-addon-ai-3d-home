@@ -26,6 +26,25 @@ const BUILTIN_DEVICES = [
 const FLOOR_COLORS = ['#7789ad', '#8a9bbd', '#a58b6f', '#8b8b8b', '#c9a675', '#7d8f7a', '#a08090', '#6b7f9e']
 // 墙颜色（选中墙可改）
 const WALL_COLORS = ['#d5e0f1', '#f5f7fa', '#e8e4dc', '#c9c9c9', '#d8e8f0', '#e0d8e8', '#d0e8d8', '#f0e0d0']
+
+// 描述两墙的几何状态与关系（墙1方向 · 墙2方向 · 关系）
+function wallRelText(ids, walls) {
+  const a = walls.find(w => w.id === ids[0])
+  const b = walls.find(w => w.id === ids[1])
+  if (!a || !b) return ''
+  const dir = (w) => {
+    const dx = w.end[0] - w.start[0], dy = w.end[1] - w.start[1]
+    return Math.abs(dy) < 0.01 ? '水平' : Math.abs(dx) < 0.01 ? '竖直' : '斜线'
+  }
+  const dax = a.end[0] - a.start[0], day = a.end[1] - a.start[1]
+  const dbx = b.end[0] - b.start[0], dby = b.end[1] - b.start[1]
+  const dot = dax * dbx + day * dby
+  const cross = dax * dby - day * dbx
+  let rel = '斜交'
+  if (Math.abs(dot) < 0.01) rel = '垂直'
+  else if (Math.abs(cross) < 0.01) rel = '共线/平行'
+  return `墙1:${dir(a)} · 墙2:${dir(b)} · 关系:${rel}`
+}
 const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
 const MAX_ZOOM = 6
@@ -80,6 +99,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const wallH = useStore(s => s.wallH)
   const wallThick = useStore(s => s.wallThick)
   const wallColor = useStore(s => s.wallColor)
+  const wallOpacity = useStore(s => s.wallOpacity)
   const doorStyle = useStore(s => s.doorStyle)
   const doorColor = useStore(s => s.doorColor)
   const doorSwing = useStore(s => s.doorSwing)
@@ -88,6 +108,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const planImageOpacity = useStore(s => s.planImageOpacity)
   const planImageScale = useStore(s => s.planImageScale)
   const selected = useStore(s => s.selected)
+  const wallSelIds = useStore(s => s.wallSel)
   const furnitureType = useStore(s => s.furnitureType)
   const pendingEntity = useStore(s => s.pendingEntity)
   const modelCatalog = useStore(s => s.modelCatalog)
@@ -167,6 +188,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     return [x, y]
   }
 
+  // 轴向吸附：把 pt 吸附到相对 anchor 的水平/垂直方向（拖动墙端点时用，水平/竖直有停顿感）
+  const snapAxis = (pt, anchor) => {
+    const dx = pt[0] - anchor[0], dy = pt[1] - anchor[1]
+    if (Math.abs(dx) > 0.01 && Math.abs(dy / dx) < 0.18) return [pt[0], anchor[1]]
+    if (Math.abs(dy) > 0.01 && Math.abs(dx / dy) < 0.18) return [anchor[0], pt[1]]
+    return pt
+  }
+
   // 缩放到目标倍数，保持光标下的世界点不动（对齐原版 pi）
   const zoomTo = (client, target) => {
     const svg = svgRef.current
@@ -195,7 +224,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     fl.walls = fl.walls || []
     const first = draft.pts[0], last = draft.pts[draft.pts.length - 1]
     if (Math.hypot(last[0] - first[0], last[1] - first[1]) > 0.01) {
-      fl.walls.push({ id: uid(), start: [...last], end: [...first], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor })
+      fl.walls.push({ id: uid(), start: [...last], end: [...first], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor, ...(getState().wallOpacity !== 100 ? { opacity: getState().wallOpacity } : {}) })
     }
     fl.rooms = recomputeRooms(fl)
     setDraft(null)
@@ -219,7 +248,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     }
     const last = draft.pts[draft.pts.length - 1]
     if (Math.hypot(x - last[0], y - last[1]) < 0.01) return  // 点重复，忽略
-    const w = { id: uid(), start: [...last], end: [x, y], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor }
+    const w = { id: uid(), start: [...last], end: [x, y], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor, ...(getState().wallOpacity !== 100 ? { opacity: getState().wallOpacity } : {}) }
     fl.walls.push(w)
     // 每加一面墙就增量识别一次：墙一闭合（含和已有墙重合/共用墙）就立刻出房间，不用非得点回起点或按 Enter
     const prevCount = (fl.rooms || []).length
@@ -307,7 +336,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       rightClickRef.current = isDouble ? 0 : now
       if (draft) cancelDraft()
       if (getState().calibrating) setState({ calibrating: false, calibratePts: [] })
-      setState({ tool: isDouble ? 'move' : 'select', selected: null })
+      setState({ tool: isDouble ? 'move' : 'select', selected: null, wallSel: [] })
       return
     }
     // 标定模式：点底图选已知长度
@@ -394,7 +423,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setState({ project: { ...getState().project }, pendingEntity: null, bindOpen: false, saved: false })
       return
     }
-    if (tool === 'select' || tool === 'move') setState({ selected: null })
+    if (tool === 'select' || tool === 'move') setState({ selected: null, wallSel: [] })
   }
 
   const handleMove = (e) => {
@@ -412,8 +441,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       return
     }
     if (wallDragRef.current) {
-      const [x, y] = snap(w)
       const { wall, which } = wallDragRef.current
+      const anchor = which === 'start' ? wall.end : wall.start
+      let [x, y] = snap(w)
+      ;[x, y] = snapAxis([x, y], anchor)
       wall[which] = [x, y]
       const fl = getState().project.floors[floorIndex]
       fl.rooms = recomputeRooms(fl)
@@ -481,7 +512,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const clickEl = (e, type, ref) => {
     if (tool !== 'select' && tool !== 'delete') return
     e.stopPropagation()
+    setState({ wallSel: [] })  // 点非墙对象时清掉墙多选
     onSelect({ type, ref })
+  }
+  // 多选墙（最多 2 条），用于共线/垂直/水平约束；点已选中的墙则取消选中
+  const toggleWallSel = (id) => {
+    const cur = getState().wallSel || []
+    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].slice(-2)
+    setState({ wallSel: next, selected: null })
   }
 
   const isSel = (type, id) => selected && selected.type === type && selected.ref && selected.ref.id === id
@@ -581,7 +619,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setState({ project: { ...getState().project }, saved: false })
   }
   // 墙属性（高度）
-  const selWall = selected && selected.type === 'wall' ? selected.ref : null
+  // 单选墙（用于属性面板）；墙改成用 wallSel 多选（最多 2 条），这里取唯一选中的那条
+  const selWall = wallSelIds.length === 1 ? (floor?.walls || []).find(w => w.id === wallSelIds[0]) || null : null
   const patchWall = (w, patch) => {
     const fl = getState().project.floors[floorIndex]
     const target = (fl.walls || []).find(x => x.id === w.id)
@@ -601,6 +640,35 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     target.end = [target.start[0] + dx * k, target.start[1] + dy * k]
     fl.rooms = recomputeRooms(fl)
     setState({ project: { ...getState().project }, saved: false })
+  }
+  // 两墙约束：垂直 / 共线 / 水平（都作用在第 2 面墙，保持第 1 面墙不动）
+  const applyWallConstraint = (type) => {
+    const fl = getState().project.floors[floorIndex]
+    const ids = getState().wallSel || []
+    if (ids.length !== 2) return
+    const a = (fl.walls || []).find(w => w.id === ids[0])
+    const b = (fl.walls || []).find(w => w.id === ids[1])
+    if (!a || !b) return
+    const la = Math.hypot(a.end[0] - a.start[0], a.end[1] - a.start[1])
+    if (la < 1e-6) return
+    const da = [(a.end[0] - a.start[0]) / la, (a.end[1] - a.start[1]) / la]  // a 方向单位向量
+    const lb = Math.hypot(b.end[0] - b.start[0], b.end[1] - b.start[1]) || 1
+    if (type === 'horizontal') {
+      // 水平：b 变成水平（保持 b 起点、长度）
+      b.end = [b.start[0] + (b.end[0] - b.start[0] >= 0 ? 1 : -1) * lb, b.start[1]]
+    } else if (type === 'perp') {
+      // 垂直：b 变成垂直于 a（a 的法向），保持 b 起点、长度
+      const n = [-da[1], da[0]]
+      b.end = [b.start[0] + n[0] * lb, b.start[1] + n[1] * lb]
+    } else if (type === 'collinear') {
+      // 共线：b 起点投影到 a 所在直线，方向对齐 a
+      const t = (b.start[0] - a.start[0]) * da[0] + (b.start[1] - a.start[1]) * da[1]
+      const proj = [a.start[0] + t * da[0], a.start[1] + t * da[1]]
+      b.start = proj
+      b.end = [proj[0] + da[0] * lb, proj[1] + da[1] * lb]
+    }
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false, wallSel: [a.id, b.id] })
   }
   // 下载模型按分类分组（设备选模型用）
   const groupedCatalog = useMemo(() => {
@@ -691,9 +759,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         )
       })}
 
-      {/* 墙（持久化线段：select 选中可拉伸端点，delete 删除） */}
+      {/* 墙（持久化线段：select 多选（最多2条），delete 删除） */}
       {walls.map((w, i) => {
-        const selW = isSel('wall', w.id)
+        const selW = wallSelIds.includes(w.id)
         const wlen = Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
         const wmx = (w.start[0] + w.end[0]) / 2
         const wmy = (w.start[1] + w.end[1]) / 2
@@ -703,9 +771,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
               x1={w.start[0]} y1={w.start[1]} x2={w.end[0]} y2={w.end[1]}
               className={`plan-wall ${selW ? 'selected' : ''}`}
               strokeWidth={WALL_T}
+              strokeOpacity={((w.opacity != null ? w.opacity : wallOpacity) / 100)}
               onClick={(e) => {
                 if (tool === 'delete') { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
-                else if (tool === 'select') { e.stopPropagation(); onSelect({ type: 'wall', ref: w }) }
+                else if (tool === 'select') { e.stopPropagation(); toggleWallSel(w.id) }
               }}
             />
             {selW && tool === 'select' && (
@@ -875,6 +944,11 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           {WALL_COLORS.map((c) => (
             <button key={c} title={c} className={`plan-props-swatch ${wallColor === c ? 'active' : ''}`} style={{ background: c }} onClick={() => setState({ wallColor: c })} />
           ))}
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">不透明度</span>
+          <input type="range" min="10" max="100" step="5" style={{ flex: 1 }} value={wallOpacity} onChange={(e) => setState({ wallOpacity: Number(e.target.value) })} />
+          <span className="plan-props-unit">{wallOpacity}%</span>
         </div>
       </div>
     )}
@@ -1110,6 +1184,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
+          <span className="plan-props-label">方向</span>
+          <span style={{ fontSize: 12, color: 'var(--text)' }}>
+            {Math.abs(selWall.end[1] - selWall.start[1]) < 0.01 ? '水平' : Math.abs(selWall.end[0] - selWall.start[0]) < 0.01 ? '竖直' : '斜线'}
+          </span>
+        </div>
+        <div className="plan-props-row">
           <span className="plan-props-label">高度</span>
           <input type="number" step="0.1" min="1" max="6" value={selWall.height || floor?.height || 2.8}
             onChange={(e) => patchWall(selWall, { height: Number(e.target.value) || 2.8 })} />
@@ -1128,6 +1208,28 @@ export default function PlanEditor({ onSelect, floorIndex }) {
               className={`plan-props-swatch ${(selWall.color || '#d5e0f1') === c ? 'active' : ''}`}
               style={{ background: c }} />
           ))}
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">不透明度</span>
+          <input type="range" min="10" max="100" step="5" style={{ flex: 1 }}
+            value={selWall.opacity != null ? selWall.opacity : wallOpacity}
+            onChange={(e) => patchWall(selWall, { opacity: Number(e.target.value) })} />
+          <span className="plan-props-unit">{selWall.opacity != null ? selWall.opacity : wallOpacity}%</span>
+        </div>
+      </div>
+    )}
+    {wallSelIds.length === 2 && (
+      <div className="plan-props">
+        <div className="plan-props-head"><span>两墙约束</span></div>
+        <div className="plan-props-row">
+          <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1 }}>
+            已选 2 面墙：{wallRelText(wallSelIds, walls)}
+          </span>
+        </div>
+        <div className="plan-props-row">
+          <button className="plan-props-seg" onClick={() => applyWallConstraint('perp')}>垂直</button>
+          <button className="plan-props-seg" onClick={() => applyWallConstraint('collinear')}>共线</button>
+          <button className="plan-props-seg" onClick={() => applyWallConstraint('horizontal')}>水平</button>
         </div>
       </div>
     )}

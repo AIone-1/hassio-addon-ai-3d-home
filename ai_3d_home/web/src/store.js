@@ -19,6 +19,7 @@ let state = {
   wallH: 2.8,          // 墙默认高度
   wallThick: 0.12,     // 墙默认厚度
   wallColor: '#d5e0f1', // 墙默认颜色
+  wallOpacity: 100,    // 墙默认不透明度（%）
   doorStyle: 'swing',  // 门默认类型
   doorColor: '木色',   // 门默认颜色
   doorSwing: 'inward', // 门默认开向
@@ -46,6 +47,7 @@ let state = {
   furnitureType: '沙发',
   furnitureScale: 1,          // 家具尺寸缩放倍数
   selected: null,             // {type:'room'|'wall'|'furniture'|'device'|'opening', ref, floorIdx}
+  wallSel: [],                // 多选墙（最多 2 条）的 id 列表，用于共线/垂直/水平约束
   roomDraft: null,            // 画房间/墙的草稿
   pendingEntity: null,        // 待绑定实体
   bindOpen: false,            // 绑定抽屉
