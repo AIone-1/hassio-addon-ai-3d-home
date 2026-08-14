@@ -1304,13 +1304,17 @@ function WallMaterial({ texture, color, opacity }) {
     loader.load(MODEL_BASE + 'api/background/' + texture, (t) => {
       if (cancelled) return
       t.colorSpace = THREE.SRGBColorSpace
+      t.wrapS = t.wrapT = THREE.RepeatWrapping
+      t.repeat.set(1, 1)
+      t.needsUpdate = true
       setMap(t)
     }, undefined, () => { if (!cancelled) setMap(null) })
     return () => { cancelled = true }
   }, [texture])
+  const trans = opacity < 0.999
   return (
-    <meshPhysicalMaterial map={map || undefined} color={map ? '#ffffff' : color} transparent opacity={opacity}
-      roughness={0.5} metalness={0} clearcoat={0.16} clearcoatRoughness={0.72} depthWrite={false} />
+    <meshStandardMaterial map={map || undefined} color={map ? '#ffffff' : color}
+      transparent={trans} opacity={opacity} roughness={0.6} metalness={0.05} depthWrite={!trans} />
   )
 }
 

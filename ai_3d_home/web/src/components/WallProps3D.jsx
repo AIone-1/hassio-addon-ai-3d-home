@@ -1,6 +1,7 @@
 // 3D 视图里的属性面板（简化版）：墙/家具/设备 选中后弹面板改常用属性
 // 和 2D 编辑器共用同一份数据；墙=长度/高度/厚度/颜色/不透明度/壁纸，家具=高度/旋转/缩放/删除，设备=高度/删除
 import { useState } from 'react'
+import * as THREE from 'three'
 import { useStore, setState, getState, toast } from '../store'
 import { recomputeRooms } from '../three/geometry'
 import { api, BASE } from '../api'
@@ -92,11 +93,41 @@ export default function WallProps3D({ floorIndex }) {
             ))}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 16px)', gap: 3, margin: '4px 0 8px' }}>
-          {FULL_PALETTE.map((c) => (
-            <button key={c} title={c} style={{ width: 16, height: 16, borderRadius: 3, border: wall.color === c ? '2px solid var(--accent)' : '1px solid var(--border)', background: c, cursor: 'pointer', padding: 0 }} onClick={() => commit(() => { wall.color = c })} />
-          ))}
-        </div>
+        {/* RGB 数值输入 */}
+        {(() => {
+          const cc = new THREE.Color(wall.color || '#d5e0f1')
+          const r = Math.round(cc.r * 255), g = Math.round(cc.g * 255), b = Math.round(cc.b * 255)
+          const setRgb = (nr, ng, nb) => {
+            const hex = '#' + [nr, ng, nb].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')
+            commit(() => { wall.color = hex })
+          }
+          return (
+            <div className="plan-props-row">
+              <span className="plan-props-label">RGB</span>
+              <input type="number" min="0" max="255" value={r} onChange={(e) => setRgb(Number(e.target.value) || 0, g, b)} style={{ width: 42 }} />
+              <input type="number" min="0" max="255" value={g} onChange={(e) => setRgb(r, Number(e.target.value) || 0, b)} style={{ width: 42 }} />
+              <input type="number" min="0" max="255" value={b} onChange={(e) => setRgb(r, g, Number(e.target.value) || 0)} style={{ width: 42 }} />
+            </div>
+          )
+        })()}
+        {/* 全色系蜂窝布局 */}
+        {(() => {
+          const rows = []
+          const perRow = 12
+          for (let i = 0; i < FULL_PALETTE.length; i += perRow) rows.push(FULL_PALETTE.slice(i, i + perRow))
+          const hex = 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)'
+          return (
+            <div style={{ margin: '4px 0 8px' }}>
+              {rows.map((row, ri) => (
+                <div key={ri} style={{ display: 'flex', justifyContent: 'center', marginLeft: ri % 2 === 1 ? 10 : 0, marginTop: ri > 0 ? -5 : 0 }}>
+                  {row.map((c) => (
+                    <button key={c} title={c} style={{ width: 22, height: 24, margin: '0 1px', clipPath: hex, border: 'none', background: c, cursor: 'pointer', padding: 0, outline: wall.color === c ? '2px solid var(--accent)' : 'none' }} onClick={() => commit(() => { wall.color = c })} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
         <div className="plan-props-row">
           <span className="plan-props-label">壁纸</span>
           <input type="file" accept="image/*" id="wall-texture-file" style={{ display: 'none' }}
