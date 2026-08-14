@@ -1294,7 +1294,7 @@ function PlacePlane({ height, onPlace }) {
 }
 
 // 墙面材质（支持壁纸贴图）
-function WallMaterial({ texture, color, opacity }) {
+function WallMaterial({ texture, color, opacity, selected }) {
   const [map, setMap] = useState(null)
   useEffect(() => {
     if (!texture) { setMap(null); return }
@@ -1314,6 +1314,7 @@ function WallMaterial({ texture, color, opacity }) {
   const trans = opacity < 0.999
   return (
     <meshStandardMaterial map={map || undefined} color={map ? '#ffffff' : color}
+      emissive={selected ? '#2f7fe0' : '#000000'} emissiveIntensity={selected ? 0.45 : 0}
       transparent={trans} opacity={opacity} roughness={0.6} metalness={0.05} depthWrite={!trans} />
   )
 }
@@ -1332,6 +1333,8 @@ export default function Scene({ onSelect, floorIndex }) {
   const showOpenings = useStore((s) => s.showOpenings)
   const camTarget = useStore((s) => s.camTarget)
   const pickItem = useStore((s) => s.pickItem)
+  const wallSelIds = useStore((s) => s.wallSel)
+  const multiSelect = useStore((s) => s.multiSelect)
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
   const interactive = tool === 'select' || tool === 'delete'
@@ -1431,19 +1434,29 @@ export default function Scene({ onSelect, floorIndex }) {
           const mx = (w.start[0] + w.end[0]) / 2
           const mz = (w.start[1] + w.end[1]) / 2
           const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0])
+          const isSel = wallSelIds.includes(w.id)
           return (
             <mesh
               key={w.id || i}
               position={[mx, h / 2 + level, mz]}
               rotation={[0, -ang, 0]}
               onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
-                : tool === 'select' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w }) }
+                : tool === 'select' ? (e) => {
+                  e.stopPropagation()
+                  if (e.ctrlKey || e.metaKey || multiSelect) {
+                    const cur = getState().wallSel || []
+                    const next = cur.includes(w.id) ? cur.filter((x) => x !== w.id) : [...cur, w.id]
+                    setState({ wallSel: next, selected: null })
+                  } else {
+                    setState({ wallSel: [w.id], selected: null })
+                  }
+                }
                 : undefined}
             >
               <boxGeometry args={[len, view2d ? 0.01 : h, thick]} />
               {view2d
-                ? <meshBasicMaterial color="#3a4a66" />
-                : <WallMaterial texture={w.texture} color={wallColor} opacity={wallOpacityVal} />}
+                ? <meshBasicMaterial color={isSel ? '#2f7fe0' : '#3a4a66'} />
+                : <WallMaterial texture={w.texture} color={wallColor} opacity={wallOpacityVal} selected={isSel} />}
             </mesh>
           )
           })

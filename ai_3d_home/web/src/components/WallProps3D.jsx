@@ -27,9 +27,10 @@ const saveFav = (list) => { try { localStorage.setItem(FAV_KEY, JSON.stringify(l
 
 export default function WallProps3D({ floorIndex }) {
   const selected = useStore((s) => s.selected)
+  const wallSelIds = useStore((s) => s.wallSel)
   const wallOpacity = useStore((s) => s.wallOpacity)
   const [favColors, setFavColors] = useState(getFav())
-  if (!selected) return null
+  if (!selected && wallSelIds.length === 0) return null
 
   const toggleFav = (c) => {
     const next = favColors.includes(c) ? favColors.filter((x) => x !== c) : [...favColors, c]
@@ -40,13 +41,52 @@ export default function WallProps3D({ floorIndex }) {
   const fl = getState().project.floors[floorIndex]
   const commit = (fn) => {
     fn()
-    if (selected.type === 'wall') fl.rooms = recomputeRooms(fl)
+    if (wallSelIds.length > 0) fl.rooms = recomputeRooms(fl)
     setState({ project: { ...getState().project }, saved: false })
   }
 
-  // ---------- 墙 ----------
-  if (selected.type === 'wall') {
-    const wall = selected.ref
+  // ---------- 批量墙（多选） ----------
+  if (wallSelIds.length > 1) {
+    const walls = (fl.walls || []).filter((w) => wallSelIds.includes(w.id))
+    const setAll = (patch) => commit(() => walls.forEach((w) => Object.assign(w, patch)))
+    const curColor = walls.length ? (walls[0].color || '#d5e0f1') : '#d5e0f1'
+    return (
+      <div className="plan-props">
+        <div className="plan-props-head"><span>已选 {walls.length} 面墙</span></div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">高度</span>
+          <input type="number" step="0.1" min="1" max="6" placeholder="统一" onChange={(e) => { if (e.target.value) setAll({ height: Number(e.target.value) || 2.8 }) }} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">厚度</span>
+          <input type="number" step="0.02" min="0.05" max="0.5" placeholder="统一" onChange={(e) => { if (e.target.value) setAll({ thickness: Number(e.target.value) || 0.12 }) }} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="plan-props-label">颜色</span>
+          {WALL_COLORS.map((c) => (
+            <button key={c} title={c} className={`plan-props-swatch ${curColor === c ? 'active' : ''}`} style={{ background: c }} onClick={() => setAll({ color: c })} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', margin: '4px 0 8px' }}>
+          {FULL_PALETTE.map((c) => (
+            <button key={c} title={c} style={{ width: 16, height: 16, margin: 1, borderRadius: 3, border: curColor === c ? '2px solid var(--accent)' : '1px solid var(--border)', background: c, cursor: 'pointer', padding: 0 }} onClick={() => setAll({ color: c })} />
+          ))}
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">不透明度</span>
+          <input type="range" min="10" max="100" step="5" style={{ flex: 1 }} value={walls.length ? (walls[0].opacity != null ? walls[0].opacity : wallOpacity) : wallOpacity} onChange={(e) => setAll({ opacity: Number(e.target.value) })} />
+          <span className="plan-props-unit">{walls.length ? (walls[0].opacity != null ? walls[0].opacity : wallOpacity) : wallOpacity}%</span>
+        </div>
+      </div>
+    )
+  }
+
+  // ---------- 墙（单选） ----------
+  if (wallSelIds.length === 1) {
+    const wall = (fl.walls || []).find((w) => w.id === wallSelIds[0])
+    if (!wall) return null
     return (
       <div className="plan-props">
         <div className="plan-props-head"><span>墙</span></div>
