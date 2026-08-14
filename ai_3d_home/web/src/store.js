@@ -41,6 +41,7 @@ let state = {
   showFurnitureLabels: true,   // 显示家具名字标签
   showWalls: true,             // 显示墙体（关=去除墙壁只看户型内部）
   showOpenings: true,          // 显示门窗（关=去除门窗）
+  showCeiling: true,           // 显示屋顶（关=去除房间顶面）
   showDimensions: false,       // 显示尺寸标注（墙长度）
   immersive: false,           // 纯净沉浸模式（隐藏所有 UI，双击退出）
   deviceListOpen: false,      // 设备列表弹窗（查看已绑定设备）

@@ -951,6 +951,7 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
 function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   const pts = room.points || []
   const view2d = useStore((s) => s.view2d)
+  const showCeiling = useStore((s) => s.showCeiling)
   if (pts.length < 3) return null
   // 所有房间地板同一高度（对齐原版 0.025m；房间不重叠，无需高度差）
   const floorY = level + 0.025
@@ -966,6 +967,12 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
           ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} side={THREE.DoubleSide} />
           : <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.46} metalness={0.02} clearcoat={0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} />}
       </mesh>
+      {/* 屋顶（顶面）：半透明，可开关 */}
+      {showCeiling && !view2d && (
+        <mesh geometry={floorGeo} position={[0, level + (floor.height || 2.8), 0]} rotation={[Math.PI, 0, 0]} renderOrder={2}>
+          <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.5} metalness={0.02} transparent opacity={0.55} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
+      )}
       {/* 2D 地板描边：让房间范围一目了然 */}
       {view2d && (
         <lineLoop position={[0, floorY + 0.02, 0]}>

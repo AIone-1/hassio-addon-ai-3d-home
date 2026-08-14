@@ -13,6 +13,7 @@ export default function BottomBar() {
   const shadows = useStore((s) => s.shadows)
   const showWalls = useStore((s) => s.showWalls)
   const showOpenings = useStore((s) => s.showOpenings)
+  const showCeiling = useStore((s) => s.showCeiling)
   const night = useStore((s) => s.night)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
@@ -174,6 +175,9 @@ export default function BottomBar() {
         </button>
         <button className={`bb-btn ${showOpenings ? 'active' : ''}`} onClick={() => setState({ showOpenings: !showOpenings })} title="显示/去除门窗">
           🚪 门窗
+        </button>
+        <button className={`bb-btn ${showCeiling ? 'active' : ''}`} onClick={() => setState({ showCeiling: !showCeiling })} title="显示/去除屋顶">
+          🏠 屋顶
         </button>
         <div style={{ position: 'relative' }}>
           <button className="bb-btn" onClick={() => setViewOpen(!viewOpen)} title="切换视角">👁 视图</button>

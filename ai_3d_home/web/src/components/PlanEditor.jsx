@@ -52,13 +52,14 @@ const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
 const MAX_ZOOM = 6
 
-// 户型包围盒（只按已完成的房间+家具+设备取景；正在画的墙不纳入，否则视口会缩到第一段墙导致后续点超出屏幕）
-function floorBounds(floor) {
+// 户型包围盒（按房间+家具+设备+墙取景；正在画的墙不纳入，否则视口会缩到第一段墙导致后续点超出屏幕）
+function floorBounds(floor, walls) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   const add = (x, y) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   ;(floor?.rooms || []).forEach(r => (r.points || []).forEach(p => add(p[0], p[1])))
   ;(floor?.furniture || []).forEach(f => add(f.pos[0], f.pos[2]))
   ;(floor?.devices || []).forEach(d => add(d.pos[0], d.pos[2]))
+  ;(walls || []).forEach(w => { add(w.start[0], w.start[1]); add(w.end[0], w.end[1]) })
   if (!isFinite(minX)) { minX = -5; minY = -5; maxX = 5; maxY = 5 }
   // 四周留 5m 边距，保证画完一个房间后视口还有空间画相邻房间（否则视口缩到房间边缘，共用墙的第二个房间画不下）
   const pad = 5
@@ -136,7 +137,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const rightClickRef = useRef(0)               // 最近一次右键时间戳，用于区分单击取消 / 双击切移动
 
   // 房间由 recomputeRooms 返回新数组，引用变化会触发重算（画墙过程中视口保持稳定）
-  const bounds = useMemo(() => floorBounds(floor), [floor?.rooms, floor?.furniture, floor?.devices])
+  const bounds = useMemo(() => {
+    // 墙也纳入取景（这样只画墙没房间时户型也在画布中央），但排除正在画的草稿墙
+    const draftIds = new Set((draft?.walls || []).map((w) => w.id))
+    const committed = (floor?.walls || []).filter((w) => !draftIds.has(w.id))
+    return floorBounds(floor, committed)
+  }, [floor?.rooms, floor?.furniture, floor?.devices, floor?.walls, draft?.walls])
   const aspect = size.w / size.h
   const fitted = useMemo(() => fitBounds(bounds, aspect), [bounds, aspect])
   const vbW = fitted.width / zoom
