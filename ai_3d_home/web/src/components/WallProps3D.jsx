@@ -1,14 +1,40 @@
 // 3D 视图里的属性面板（简化版）：墙/家具/设备 选中后弹面板改常用属性
-// 和 2D 编辑器共用同一份数据；墙=长度/高度/厚度/颜色/不透明度，家具=高度/旋转/缩放/删除，设备=高度/删除
+// 和 2D 编辑器共用同一份数据；墙=长度/高度/厚度/颜色/不透明度/壁纸，家具=高度/旋转/缩放/删除，设备=高度/删除
+import { useState } from 'react'
 import { useStore, setState, getState, toast } from '../store'
 import { recomputeRooms } from '../three/geometry'
+import { api, BASE } from '../api'
 
 const WALL_COLORS = ['#ffffff', '#d5e0f1', '#f5f7fa', '#e8e4dc', '#c9c9c9', '#d8e8f0', '#e0d8e8', '#d0e8d8', '#f0e0d0']
+
+// 全色系调色板（蜂窝/网格状选色器：每个色相两档明度 + 灰度）
+const FULL_PALETTE = (() => {
+  const out = []
+  for (let h = 0; h < 360; h += 15) {
+    out.push(`hsl(${h}, 72%, 55%)`)
+    out.push(`hsl(${h}, 88%, 72%)`)
+    out.push(`hsl(${h}, 60%, 38%)`)
+  }
+  out.push('#ffffff', '#e5e7eb', '#cbd5e1', '#94a3b8', '#64748b', '#334155', '#0f172a', '#1f2937')
+  return out
+})()
+
+// 常用颜色（localStorage 持久化）
+const FAV_KEY = 'ai3d_fav_colors'
+const getFav = () => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]') } catch { return [] } }
+const saveFav = (list) => { try { localStorage.setItem(FAV_KEY, JSON.stringify(list)) } catch {} }
 
 export default function WallProps3D({ floorIndex }) {
   const selected = useStore((s) => s.selected)
   const wallOpacity = useStore((s) => s.wallOpacity)
+  const [favColors, setFavColors] = useState(getFav())
   if (!selected) return null
+
+  const toggleFav = (c) => {
+    const next = favColors.includes(c) ? favColors.filter((x) => x !== c) : [...favColors, c]
+    setFavColors(next)
+    saveFav(next)
+  }
 
   const fl = getState().project.floors[floorIndex]
   const commit = (fn) => {
@@ -45,13 +71,54 @@ export default function WallProps3D({ floorIndex }) {
           <button onClick={() => commit(() => { wall.thickness = (wall.thickness || 0.12) + 0.02 })}>＋</button>
           <span className="plan-props-unit">m</span>
         </div>
-        <div className="plan-props-row">
+        <div className="plan-props-row" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
           <span className="plan-props-label">颜色</span>
           {WALL_COLORS.map((c) => (
             <button key={c} title={c}
               className={`plan-props-swatch ${(wall.color || '#d5e0f1') === c ? 'active' : ''}`}
               style={{ background: c }} onClick={() => commit(() => { wall.color = c })} />
           ))}
+          <button style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => toggleFav(wall.color || '#d5e0f1')}>
+            {favColors.includes(wall.color || '#d5e0f1') ? '★ 已收藏' : '☆ 收藏'}
+          </button>
+        </div>
+        {favColors.length > 0 && (
+          <div className="plan-props-row" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+            <span className="plan-props-label">常用</span>
+            {favColors.map((c) => (
+              <button key={c} title={c}
+                className={`plan-props-swatch ${wall.color === c ? 'active' : ''}`}
+                style={{ background: c }} onClick={() => commit(() => { wall.color = c })} />
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 16px)', gap: 3, margin: '4px 0 8px' }}>
+          {FULL_PALETTE.map((c) => (
+            <button key={c} title={c} style={{ width: 16, height: 16, borderRadius: 3, border: wall.color === c ? '2px solid var(--accent)' : '1px solid var(--border)', background: c, cursor: 'pointer', padding: 0 }} onClick={() => commit(() => { wall.color = c })} />
+          ))}
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">壁纸</span>
+          <input type="file" accept="image/*" id="wall-texture-file" style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = async () => {
+                try {
+                  const r = await fetch(BASE + 'api/background', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: reader.result }),
+                  })
+                  const res = await r.json()
+                  if (res.ok && res.name) { commit(() => { wall.texture = res.name }); toast('壁纸已上传') }
+                } catch (err) { toast('上传失败') }
+              }
+              reader.readAsDataURL(file)
+            }} />
+          <button onClick={() => document.getElementById('wall-texture-file').click()}>{wall.texture ? '更换壁纸' : '上传壁纸'}</button>
+          {wall.texture && <button style={{ color: 'var(--danger)' }} onClick={() => commit(() => { wall.texture = '' })}>清除</button>}
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">不透明度</span>

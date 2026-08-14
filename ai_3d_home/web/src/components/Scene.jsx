@@ -1293,6 +1293,27 @@ function PlacePlane({ height, onPlace }) {
   )
 }
 
+// 墙面材质（支持壁纸贴图）
+function WallMaterial({ texture, color, opacity }) {
+  const [map, setMap] = useState(null)
+  useEffect(() => {
+    if (!texture) { setMap(null); return }
+    let cancelled = false
+    const loader = new THREE.TextureLoader()
+    loader.crossOrigin = 'anonymous'
+    loader.load(MODEL_BASE + 'api/background/' + texture, (t) => {
+      if (cancelled) return
+      t.colorSpace = THREE.SRGBColorSpace
+      setMap(t)
+    }, undefined, () => { if (!cancelled) setMap(null) })
+    return () => { cancelled = true }
+  }, [texture])
+  return (
+    <meshPhysicalMaterial map={map || undefined} color={map ? '#ffffff' : color} transparent opacity={opacity}
+      roughness={0.5} metalness={0} clearcoat={0.16} clearcoatRoughness={0.72} depthWrite={false} />
+  )
+}
+
 export default function Scene({ onSelect, floorIndex }) {
   const project = useStore((s) => s.project)
   const floor = useStore((s) => s.project.floors[floorIndex])
@@ -1418,7 +1439,7 @@ export default function Scene({ onSelect, floorIndex }) {
               <boxGeometry args={[len, view2d ? 0.01 : h, thick]} />
               {view2d
                 ? <meshBasicMaterial color="#3a4a66" />
-                : <meshPhysicalMaterial color={wallColor} transparent opacity={wallOpacityVal} roughness={0.5} metalness={0} clearcoat={0.16} clearcoatRoughness={0.72} depthWrite={false} />}
+                : <WallMaterial texture={w.texture} color={wallColor} opacity={wallOpacityVal} />}
             </mesh>
           )
           })
