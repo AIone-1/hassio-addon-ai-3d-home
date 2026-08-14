@@ -3,7 +3,7 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useStore, setState } from '../store'
-import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, DOOR_COLORS, robustFloorGeometry } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, DOOR_COLORS, robustFloorGeometry, wallKey } from '../three/geometry'
 import { getCatalogItem } from '../catalog'
 
 // 对齐原版主题（glass 视觉风格）：墙=半透明毛玻璃，地板=冷色调色板
@@ -872,10 +872,20 @@ export default function Scene({ onSelect, floorIndex }) {
         )}
 
         {/* 墙（持久化线段，毛玻璃材质对齐原版；删除模式可点；showWalls 关闭则去除墙壁） */}
-        {showWalls && (floor.walls || []).map((w, i) => {
+        {showWalls && (() => {
+          // 重叠/共用墙去重（相同位置只渲染一层，避免透明墙重叠变厚变暗）
+          const seen = new Set()
+          const deduped = (floor.walls || []).filter((w) => {
+            const k = wallKey({ a: w.start, b: w.end })
+            if (seen.has(k)) return false
+            seen.add(k); return true
+          })
+          return deduped.map((w, i) => {
           const len = Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
           if (len < 0.001) return null
           const h = w.height || floor.height || 2.8
+          const thick = w.thickness || WALL_THICK
+          const wallColor = w.color || th.wallColor
           const mx = (w.start[0] + w.end[0]) / 2
           const mz = (w.start[1] + w.end[1]) / 2
           const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0])
@@ -886,13 +896,14 @@ export default function Scene({ onSelect, floorIndex }) {
               rotation={[0, -ang, 0]}
               onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) } : undefined}
             >
-              <boxGeometry args={[len, view2d ? 0.01 : h, WALL_THICK]} />
+              <boxGeometry args={[len, view2d ? 0.01 : h, thick]} />
               {view2d
                 ? <meshBasicMaterial color="#3a4a66" />
-                : <meshPhysicalMaterial color={th.wallColor} transparent opacity={th.wallOpacity} roughness={0.5} metalness={0} clearcoat={0.16} clearcoatRoughness={0.72} depthWrite={false} />}
+                : <meshPhysicalMaterial color={wallColor} transparent opacity={th.wallOpacity} roughness={0.5} metalness={0} clearcoat={0.16} clearcoatRoughness={0.72} depthWrite={false} />}
             </mesh>
           )
-        })}
+          })
+        })()}
 
         {/* 房间 */}
         {(floor.rooms || []).map((room, idx) => (

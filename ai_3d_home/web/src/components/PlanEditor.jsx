@@ -24,6 +24,8 @@ const BUILTIN_DEVICES = [
 ]
 // 地板颜色（选中房间可改）
 const FLOOR_COLORS = ['#7789ad', '#8a9bbd', '#a58b6f', '#8b8b8b', '#c9a675', '#7d8f7a', '#a08090', '#6b7f9e']
+// 墙颜色（选中墙可改）
+const WALL_COLORS = ['#d5e0f1', '#f5f7fa', '#e8e4dc', '#c9c9c9', '#d8e8f0', '#e0d8e8', '#d0e8d8', '#f0e0d0']
 const WALL_T = 0.12    // 墙线宽
 const MIN_ZOOM = 0.12
 const MAX_ZOOM = 6
@@ -980,6 +982,20 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <input type="number" step="0.1" min="1" max="6" value={selWall.height || floor?.height || 2.8}
             onChange={(e) => patchWall(selWall, { height: Number(e.target.value) || 2.8 })} />
           <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">厚度</span>
+          <input type="number" step="0.02" min="0.05" max="0.5" value={selWall.thickness || 0.12}
+            onChange={(e) => patchWall(selWall, { thickness: Number(e.target.value) || 0.12 })} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          {WALL_COLORS.map((c) => (
+            <button key={c} title={c} onClick={() => patchWall(selWall, { color: c })}
+              className={`plan-props-swatch ${(selWall.color || '#d5e0f1') === c ? 'active' : ''}`}
+              style={{ background: c }} />
+          ))}
         </div>
       </div>
     )}
