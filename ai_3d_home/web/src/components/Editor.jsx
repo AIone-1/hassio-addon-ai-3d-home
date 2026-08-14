@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useStore, setState, currentFloor, getState, toast } from '../store'
 import { api } from '../api'
-import { FURNITURE_LIB, FURNITURE_COLORS } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea } from '../three/geometry'
 import { thumbUrl } from '../catalog'
 import ModelPreview from './ModelPreview'
 
@@ -250,6 +250,12 @@ export default function Editor() {
     setState({ project: { ...project }, currentFloor: Math.max(0, idx - 1) })
   }
 
+  // 户型信息统计
+  const infoArea = (floor?.rooms || []).reduce((s, r) => s + polygonArea(r.points || []), 0)
+  const infoRoomCount = (floor?.rooms || []).length
+  const infoFurnCount = (floor?.furniture || []).length
+  const infoDevCount = new Set((floor?.devices || []).map(d => d.entity_id)).size
+
   return (
     <>
       {/* 顶部工具栏 */}
@@ -298,7 +304,7 @@ export default function Editor() {
                 {FURNITURE_LIB.filter((f) => !(settings.hiddenModels || []).includes(f.type)).map((f) => (
                   <button key={f.type}
                     className={`furn-item ${furnitureType === f.type ? 'active' : ''}`}
-                    onClick={() => setPreviewModel({ type: f.type, label: f.type, w: f.w, d: f.d, h: f.h, color: FURNITURE_COLORS[f.type] || '#888', builtin: true })} title="点击预览">
+                    onClick={() => { setPreviewModel({ type: f.type, label: f.type, w: f.w, d: f.d, h: f.h, color: FURNITURE_COLORS[f.type] || '#888', builtin: true }); setShow3d(true) }} title="点击预览">
                     <span className="furn-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{FURNITURE_ICONS[f.type] || '📦'}</span>
                     {f.type}
                     <span className="furn-dim"> {f.w}×{f.d}m</span>
@@ -366,6 +372,16 @@ export default function Editor() {
             {t.label}<span className="k">{t.k}</span>
           </button>
         ))}
+      </div>
+
+      {/* 右侧信息栏 */}
+      <div className="editor-info">
+        <div className="editor-info-title">户型信息</div>
+        <div className="editor-info-row"><span>楼层</span><b>{currentFloor + 1} / {project.floors.length}</b></div>
+        <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
+        <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
+        <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
+        <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
       </div>
 
       {/* 存档列表弹窗 */}
