@@ -104,6 +104,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     let [x, y] = pt
     if (snapOn) { x = Math.round(x / snapStep) * snapStep; y = Math.round(y / snapStep) * snapStep }
     if (tool === 'wall' && draft && draft.pts.length) {
+      // 起点吸附：靠近画墙起点时吸附，便于闭合（肉眼看不到闭合点，靠这个）
+      const first = draft.pts[0]
+      if (Math.hypot(x - first[0], y - first[1]) < CLOSE) { x = first[0]; y = first[1] }
       const last = draft.pts[draft.pts.length - 1]
       const dx = x - last[0], dy = y - last[1]
       if (Math.abs(dx) > 0.01 && Math.abs(dy / dx) < 0.18) y = last[1]
@@ -709,6 +712,13 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           className="plan-preview"
           strokeDasharray="0.3 0.28"
         />
+      )}
+
+      {/* 画墙起点标记（绿色圆点，提示闭合点在哪） */}
+      {draft && draft.pts.length > 0 && tool === 'wall' && (
+        <g transform={`translate(${draft.pts[0][0]} ${draft.pts[0][1]})`} className="plan-start-marker">
+          <circle r="0.18" />
+        </g>
       )}
 
       {/* 放置/画墙时的吸附点标记 */}
