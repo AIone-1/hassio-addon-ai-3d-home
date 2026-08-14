@@ -360,7 +360,7 @@ export function recomputeRooms(floor) {
       name: match ? match.room.name : `房间${i + 1}`,
       points: poly,
       height: (match ? match.room.height : undefined) || floor.height || 2.8,
-      color: FLOOR_PALETTE[0],
+      color: (match && match.room.color) || FLOOR_PALETTE[0],
     }
   })
 }

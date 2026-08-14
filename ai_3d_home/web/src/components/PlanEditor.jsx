@@ -208,7 +208,16 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     if (Math.hypot(x - last[0], y - last[1]) < 0.01) return  // 点重复，忽略
     const w = { id: uid(), start: [...last], end: [x, y], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor }
     fl.walls.push(w)
-    setDraft({ pts: [...draft.pts, [x, y]], walls: [...draft.walls, w] })
+    // 每加一面墙就增量识别一次：墙一闭合（含和已有墙重合/共用墙）就立刻出房间，不用非得点回起点或按 Enter
+    const prevCount = (fl.rooms || []).length
+    fl.rooms = recomputeRooms(fl)
+    if (fl.rooms.length > prevCount) {
+      // 已靠已有墙闭合出新房间 → 自动结束本次画墙（不加闭合墙，避免和共用墙重复）
+      setDraft(null)
+      toast(fl.rooms.length ? `已识别 ${fl.rooms.length} 个房间` : '墙体尚未形成封闭房间')
+    } else {
+      setDraft({ pts: [...draft.pts, [x, y]], walls: [...draft.walls, w] })
+    }
     setState({ project: { ...getState().project }, saved: false })
   }
 
