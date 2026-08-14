@@ -448,7 +448,9 @@ export default function Editor() {
           <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
           <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
           <div className="editor-info-row"><span>墙</span><b>{infoWallCount} 条</b></div>
-          <div className="editor-info-row"><span>水平 / 竖直 / 斜线</span><b>{infoHorizCount} / {infoVertCount} / {infoDiagCount}</b></div>
+          <div className="editor-info-row"><span>水平</span><b>{infoHorizCount} 条</b></div>
+          <div className="editor-info-row"><span>竖直</span><b>{infoVertCount} 条</b></div>
+          <div className="editor-info-row"><span>斜线</span><b>{infoDiagCount} 条</b></div>
           <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
           <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
         </div>

@@ -11,6 +11,7 @@ export default function BottomBar() {
   const quality = useStore((s) => s.quality)
   const shadows = useStore((s) => s.shadows)
   const showWalls = useStore((s) => s.showWalls)
+  const showOpenings = useStore((s) => s.showOpenings)
   const night = useStore((s) => s.night)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
@@ -139,6 +140,9 @@ export default function BottomBar() {
         </div>
         <button className={`bb-btn ${showWalls ? 'active' : ''}`} onClick={() => setState({ showWalls: !showWalls })} title="去除/显示墙壁">
           🧱 墙
+        </button>
+        <button className={`bb-btn ${showOpenings ? 'active' : ''}`} onClick={() => setState({ showOpenings: !showOpenings })} title="显示/去除门窗">
+          🚪 门窗
         </button>
         <button className={`bb-btn ${night ? 'active' : ''}`} onClick={() => setState({ night: !night })} title="日间/夜间">
           {night ? '🌙 夜间' : '☀️ 日间'}

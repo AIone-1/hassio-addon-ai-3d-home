@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import Scene from './Scene'
 import { Controls } from '../three/Controls'
 import { useStore, setState } from '../store'
+import { BASE } from '../api'
 
 export const QUALITY = {
   eco: { dprMax: 1.0, shadow: 256, aa: false },
@@ -143,9 +144,13 @@ function SceneBackground({ mode, night, bgImage, bgMode }) {
     }
 
     if (bgMode === 'image' && bgImage) {
+      // bgImage 可能是本地图片名（存的名字），也可能是外部 URL / data URL，分别处理
+      const url = (bgImage.startsWith('http') || bgImage.startsWith('data:'))
+        ? bgImage
+        : BASE + 'api/background/' + bgImage
       const loader = new THREE.TextureLoader()
       loader.crossOrigin = 'anonymous'
-      loader.load(bgImage + (bgImage.includes('?') ? '&' : '?') + 't=' + Date.now(), (tex) => {
+      loader.load(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace
         scene.background = tex
       }, undefined, () => {

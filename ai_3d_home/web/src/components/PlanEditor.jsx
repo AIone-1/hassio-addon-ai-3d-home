@@ -25,7 +25,7 @@ const BUILTIN_DEVICES = [
 // 地板颜色（选中房间可改）
 const FLOOR_COLORS = ['#7789ad', '#8a9bbd', '#a58b6f', '#8b8b8b', '#c9a675', '#7d8f7a', '#a08090', '#6b7f9e']
 // 墙颜色（选中墙可改）
-const WALL_COLORS = ['#d5e0f1', '#f5f7fa', '#e8e4dc', '#c9c9c9', '#d8e8f0', '#e0d8e8', '#d0e8d8', '#f0e0d0']
+const WALL_COLORS = ['#ffffff', '#d5e0f1', '#f5f7fa', '#e8e4dc', '#c9c9c9', '#d8e8f0', '#e0d8e8', '#d0e8d8', '#f0e0d0']
 
 // 描述两墙的几何状态与关系（墙1方向 · 墙2方向 · 关系）
 function wallRelText(ids, walls) {
@@ -832,11 +832,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
               className={`plan-wall ${selW ? 'selected' : ''}`}
               strokeWidth={WALL_T}
               strokeOpacity={((w.opacity != null ? w.opacity : wallOpacity) / 100)}
-              onClick={(e) => {
+              onPointerDown={(e) => {
                 if (tool === 'delete') { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
                 else if (tool === 'select') {
+                  // 用 onPointerDown + stopPropagation：阻止 SVG 的 handleFloorDown 先清掉 wallSel，
+                  // 否则多选时点第二面墙会把第一面的选择清掉
                   e.stopPropagation()
-                  // Ctrl/Cmd 或多选模式开关 多选；普通点击单选（替换）
                   if (e.ctrlKey || e.metaKey || multiSelect) toggleWallSel(w.id)
                   else setState({ wallSel: [w.id], selected: null })
                 }

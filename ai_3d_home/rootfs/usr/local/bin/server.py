@@ -24,6 +24,7 @@ DATA_DIR = os.environ.get("DATA_DIR", "/share/ai_3d_home")
 PROJECT_FILE = os.path.join(DATA_DIR, "project.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+BG_DIR = os.path.join(DATA_DIR, "backgrounds")
 
 MIME = {
     ".html": "text/html; charset=utf-8",
@@ -272,15 +273,29 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"backups": items})
             except Exception:
                 return self._send(200, {"backups": []})
-        if p == "/api/background":
-            # 背景图：有则返回图片，无则 404
-            bg = os.path.join(DATA_DIR, "background.png")
-            if os.path.isfile(bg):
+        if p == "/api/backgrounds":
+            # 列出所有背景图（文件名 + 修改时间）
+            try:
+                os.makedirs(BG_DIR, exist_ok=True)
+                items = []
+                for f in sorted(os.listdir(BG_DIR), reverse=True):
+                    if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                        fp = os.path.join(BG_DIR, f)
+                        items.append({"name": f, "time": os.path.getmtime(fp)})
+                return self._send(200, {"images": items})
+            except Exception:
+                return self._send(200, {"images": []})
+        if p.startswith("/api/background/"):
+            # 背景图：按文件名返回图片
+            name = os.path.basename(p[len("/api/background/"):])
+            fp = os.path.join(BG_DIR, name)
+            if os.path.isfile(fp):
                 try:
-                    with open(bg, "rb") as f:
+                    with open(fp, "rb") as f:
                         raw = f.read()
+                    ext = os.path.splitext(name)[1].lower()
                     self.send_response(200)
-                    self.send_header("Content-Type", "image/png")
+                    self.send_header("Content-Type", MIME.get(ext, "image/png"))
                     self.send_header("Content-Length", str(len(raw)))
                     self.send_header("Cache-Control", "no-store")
                     self.end_headers()
@@ -354,18 +369,40 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True})
 
         if p == "/api/background":
-            # 上传背景图（base64 data URL）
+            # 上传背景图（base64 data URL），存成带时间戳的文件
             body = self._json_body() or {}
             data = body.get("data", "")
             if data.startswith("data:"):
                 import base64
+                import datetime
                 idx = data.find(",")
                 if idx > 0:
+                    mime = data[5:idx].split(";")[0]
+                    ext = "png"
+                    if "jpeg" in mime or "jpg" in mime:
+                        ext = "jpg"
+                    elif "webp" in mime:
+                        ext = "webp"
                     raw = base64.b64decode(data[idx + 1:])
-                    with open(os.path.join(DATA_DIR, "background.png"), "wb") as f:
+                    os.makedirs(BG_DIR, exist_ok=True)
+                    name = "bg_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "." + ext
+                    with open(os.path.join(BG_DIR, name), "wb") as f:
                         f.write(raw)
-                    return self._send(200, {"ok": True, "url": "/api/background"})
+                    return self._send(200, {"ok": True, "name": name})
             return self._send(400, {"error": "bad image"})
+
+        if p == "/api/background/delete":
+            # 删除背景图：body 带 name
+            body = self._json_body() or {}
+            name = os.path.basename(body.get("name", ""))
+            fp = os.path.join(BG_DIR, name)
+            if not name or not os.path.isfile(fp):
+                return self._send(400, {"error": "bad name"})
+            try:
+                os.remove(fp)
+            except Exception:
+                return self._send(400, {"error": "delete failed"})
+            return self._send(200, {"ok": True})
 
         if p == "/api/ha/service":
             body = self._json_body() or {}

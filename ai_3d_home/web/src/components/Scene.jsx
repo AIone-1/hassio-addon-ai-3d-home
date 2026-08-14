@@ -823,6 +823,7 @@ export default function Scene({ onSelect, floorIndex }) {
   const view2d = useStore((s) => s.view2d)
   const editing = useStore((s) => s.editing)
   const showWalls = useStore((s) => s.showWalls)
+  const showOpenings = useStore((s) => s.showOpenings)
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
   const interactive = tool === 'select' || tool === 'delete'
@@ -886,7 +887,7 @@ export default function Scene({ onSelect, floorIndex }) {
           const h = w.height || floor.height || 2.8
           const thick = w.thickness || WALL_THICK
           const wallColor = w.color || th.wallColor
-          const wallOpacityVal = w.opacity != null ? w.opacity / 100 : th.wallOpacity
+          const wallOpacityVal = (w.opacity != null ? w.opacity : 100) / 100
           const mx = (w.start[0] + w.end[0]) / 2
           const mz = (w.start[1] + w.end[1]) / 2
           const ang = Math.atan2(w.end[1] - w.start[1], w.end[0] - w.start[0])
@@ -913,8 +914,8 @@ export default function Scene({ onSelect, floorIndex }) {
             onSelect={(r) => onSelect({ type: 'room', ref: r })} />
         ))}
 
-        {/* 门窗 */}
-        {(floor.openings || []).map((op) => <Opening key={op.id} op={op} floor={floor} level={level} />)}
+        {/* 门窗（showOpenings 关闭则去除） */}
+        {showOpenings && (floor.openings || []).map((op) => <Opening key={op.id} op={op} floor={floor} level={level} />)}
 
         {/* 家具（纯户型图模式隐藏摆设，只看户型结构） */}
         {mode !== '纯户型' && (floor.furniture || []).map((f) => (

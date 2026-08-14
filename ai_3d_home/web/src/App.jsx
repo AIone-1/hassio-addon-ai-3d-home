@@ -33,6 +33,7 @@ export default function App() {
   const rotateDir = useStore((s) => s.rotateDir)
   const rotateSpeed = useStore((s) => s.rotateSpeed)
   const [deviceModal, setDeviceModal] = useState(null)
+  const [bgImages, setBgImages] = useState([])
   const saveTimer = useRef(null)
   const fpsRef = useRef(null)
 
@@ -215,6 +216,29 @@ export default function App() {
     api.saveSettings(s).catch(() => {})
   }
 
+  // 背景图：加载列表 / 选中 / 删除
+  const loadBgImages = async () => {
+    try {
+      const r = await api.backgrounds()
+      setBgImages(r.images || [])
+    } catch (e) { setBgImages([]) }
+  }
+  const selectBg = (name) => {
+    setState({ bgImage: name, bgMode: 'image' })
+    api.saveSettings({ ...getState().settings, bgImage: name, bgMode: 'image' }).catch(() => {})
+  }
+  const deleteBg = async (name) => {
+    if (!confirm('删除这张背景图？')) return
+    try {
+      await api.backgroundDelete(name)
+      if (getState().bgImage === name) setState({ bgImage: '', bgMode: 'color' })
+      loadBgImages()
+    } catch (e) { toast('删除失败') }
+  }
+  useEffect(() => {
+    if (settingsOpen) loadBgImages()
+  }, [settingsOpen])
+
   // ---------- 键盘快捷键 ----------
   useEffect(() => {
     const onKey = (e) => {
@@ -360,17 +384,38 @@ export default function App() {
                         body: JSON.stringify({ data: reader.result }),
                       })
                       const res = await r.json()
-                      if (res.ok) {
-                        const url = BASE + 'api/background'
-                        setState({ bgImage: url, bgMode: 'image', settingsOpen: false })
-                        api.saveSettings({ ...getState().settings, bgImage: url, bgMode: 'image' }).catch(() => {})
+                      if (res.ok && res.name) {
+                        setState({ bgImage: res.name, bgMode: 'image' })
+                        api.saveSettings({ ...getState().settings, bgImage: res.name, bgMode: 'image' }).catch(() => {})
                         toast('背景图已上传')
+                        loadBgImages()
                       }
                     } catch (err) { toast('上传失败') }
                   }
                   reader.readAsDataURL(file)
                 }}
               />
+            </div>
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>已保存的背景图（点选使用，✕删除）</label>
+              {bgImages.length === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>还没有上传背景图</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                  {bgImages.map((img) => (
+                    <div key={img.name} style={{ position: 'relative' }}>
+                      <img src={BASE + 'api/background/' + img.name} alt={img.name}
+                        style={{ width: 72, height: 48, objectFit: 'cover', borderRadius: 6, cursor: 'pointer',
+                          border: bgImage === img.name ? '2px solid var(--accent)' : '1px solid var(--border)' }}
+                        onClick={() => selectBg(img.name)} />
+                      <button title="删除" onClick={() => deleteBg(img.name)}
+                        style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, lineHeight: '16px', textAlign: 'center',
+                          borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--panel-solid)', color: 'var(--danger)',
+                          fontSize: 10, cursor: 'pointer', padding: 0 }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="field" style={{ margin: '12px 0' }}>
               <label>或填图片 URL（网络图片）</label>
