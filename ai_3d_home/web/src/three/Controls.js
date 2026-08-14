@@ -72,6 +72,13 @@ export function Controls({ enabled = true }) {
     if (viewSignal.type === 'top') {
       ref.current.target.set(t[0], t[1], t[2])
       camera.position.set(t[0], t[1] + dist * 1.4, t[2] + 0.01)
+    } else if (viewSignal.type === 'default') {
+      // 默认 iso 视角（对齐 CameraFocus 原版公式）
+      const b = dist * 0.88
+      ref.current.target.set(t[0], 0.55, t[2])
+      camera.position.set(t[0] + 0.86 * b, 0.55 + 0.86 * b, t[2] + 1.04 * b)
+      if (camera.fov !== 36) { camera.fov = 36; camera.updateProjectionMatrix() }
+      camera.lookAt(t[0], 0.55, t[2])
     } else if (viewSignal.type === 'front') {
       ref.current.target.set(t[0], t[1] + 0.3, t[2])
       camera.position.set(t[0], t[1] + 0.3, t[2] + dist)

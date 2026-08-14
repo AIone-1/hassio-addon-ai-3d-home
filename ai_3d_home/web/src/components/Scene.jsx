@@ -891,6 +891,18 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
     return raycaster.ray.intersectPlane(plane, p) ? p : null
   }
 
+  // 拾起状态下每帧跟随鼠标（不依赖 pointermove，鼠标快速移动也不丢目标）
+  useFrame((state) => {
+    if (!isPicked) return
+    raycaster.setFromCamera(state.pointer, camera)
+    const p = new THREE.Vector3()
+    if (raycaster.ray.intersectPlane(plane, p)) {
+      item.pos[0] = Math.round(p.x * 10) / 10
+      item.pos[2] = Math.round(p.z * 10) / 10
+      onMove(item)
+    }
+  })
+
   return (
     <group
       position={[pos[0], level + (pos[1] || 0), pos[2]]}
@@ -1195,10 +1207,10 @@ const MODE_LIGHT = {
 
 // ---------- 主场景 ----------
 // 3D 放置平面（家具工具下点击地面放置）
-function PlacePlane({ level, onPlace }) {
+function PlacePlane({ height, onPlace }) {
   const { camera, gl } = useThree()
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
-  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -level), [level])
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -height), [height])
   const toWorld = (e) => {
     const rect = gl.domElement.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
@@ -1208,7 +1220,7 @@ function PlacePlane({ level, onPlace }) {
     return raycaster.ray.intersectPlane(plane, p) ? p : null
   }
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, level, 0]}
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, height, 0]}
       onClick={(e) => { const p = toWorld(e); if (p) onPlace(p.x, p.z) }}>
       <planeGeometry args={[1000, 1000]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -1263,6 +1275,17 @@ export default function Scene({ onSelect, floorIndex }) {
   if (!floor) return null
   const level = floor.level || 0
   const sel = selected
+  // 放置平面高度：房顶模型用房顶高度平面、墙面用墙面高度，俯视时鼠标才能和模型对齐
+  const placePlaneHeight = (() => {
+    const ft = getState().furnitureType
+    const lib = FURNITURE_LIB.find((f) => f.type === ft)
+    const devModel = DEVICE_MODELS.find((m) => m.id === ft)
+    const placement = (lib && lib.placement) || (devModel && devModel.placement) || 'floor'
+    const floorH = floor.height || 2.8
+    if (placement === 'ceiling') return level + floorH
+    if (placement === 'wall') return level + (devModel ? (devModel.defaultHeight || FURNITURE_WALL_HEIGHT) : FURNITURE_WALL_HEIGHT)
+    return level
+  })()
 
   return (
     <>
@@ -1295,9 +1318,9 @@ export default function Scene({ onSelect, floorIndex }) {
             position={[camTarget[0], level + 0.005, camTarget[2]]}
           />
         )}
-        {/* 3D 放置平面：家具工具下点击地面放置；移动工具拾起后点击地面放下 */}
-        {editing && tool === 'furniture' && <PlacePlane level={level} onPlace={placeFurniture} />}
-        {editing && tool === 'move' && pickItem && <PlacePlane level={level} onPlace={() => setState({ pickItem: null })} />}
+        {/* 3D 放置平面：家具工具下点击地面/房顶放置；移动工具拾起后点击放下 */}
+        {editing && tool === 'furniture' && <PlacePlane height={placePlaneHeight} onPlace={placeFurniture} />}
+        {editing && tool === 'move' && pickItem && <PlacePlane height={level} onPlace={() => setState({ pickItem: null })} />}
 
         {/* 墙（持久化线段，毛玻璃材质对齐原版；删除模式可点；showWalls 关闭则去除墙壁） */}
         {showWalls && (() => {

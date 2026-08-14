@@ -25,18 +25,30 @@ export default function BottomBar() {
     setState((s) => ({ camViewSignal: { type, n: s.camViewSignal.n + 1 } }))
     setViewOpen(false)
   }
+  const persistViews = (vs) => { try { localStorage.setItem('ai3d_custom_views', JSON.stringify(vs)) } catch (e) {} }
   const saveView = () => {
     const cam = window.__cam3d
     if (!cam || !cam.pos) { toast('相机还没就绪'); return }
     const name = prompt('给这个视角起个名字：', `视角${customViews.length + 1}`)
     if (!name || !name.trim()) return
     const v = { id: 'v' + Date.now(), name: name.trim(), pos: [...cam.pos], target: [...cam.target] }
-    setState({ customViews: [...customViews, v] })
+    const next = [...customViews, v]
+    setState({ customViews: next })
+    persistViews(next)
     toast('已保存视角「' + v.name + '」')
   }
   const delView = (id) => {
-    setState({ customViews: customViews.filter((v) => v.id !== id) })
+    const next = customViews.filter((v) => v.id !== id)
+    setState({ customViews: next })
+    persistViews(next)
   }
+  // 启动时从 localStorage 恢复已存视角（刷新不丢）
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ai3d_custom_views') || '[]')
+      if (Array.isArray(saved) && saved.length) setState({ customViews: saved })
+    } catch (e) {}
+  }, [])
 
   // 点击空白处关闭 分享/画质/视图 菜单
   useEffect(() => {
@@ -167,6 +179,7 @@ export default function BottomBar() {
           <button className="bb-btn" onClick={() => setViewOpen(!viewOpen)} title="切换视角">👁 视图</button>
           {viewOpen && (
             <div className="bb-menu">
+              <button className="bb-menu-item" onClick={() => setView('default')}>🏠 默认视图</button>
               <button className="bb-menu-item" onClick={() => setView('top')}>⬇ 上视图</button>
               <button className="bb-menu-item" onClick={() => setView('front')}>⬆ 前视图</button>
               <div className="bb-menu-sep" />

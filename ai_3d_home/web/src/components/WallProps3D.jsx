@@ -76,20 +76,26 @@ export default function WallProps3D({ floorIndex }) {
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">高度</span>
+          <button onClick={() => commit(() => { f.pos[1] = Math.max(0, (f.pos[1] || 0) - 0.1) })}>−</button>
           <input type="number" step="0.1" min="0" max="6" value={Math.round((f.pos[1] || 0) * 100) / 100}
             onChange={(e) => commit(() => { f.pos[1] = Number(e.target.value) || 0 })} />
+          <button onClick={() => commit(() => { f.pos[1] = (f.pos[1] || 0) + 0.1 })}>＋</button>
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">旋转</span>
+          <button onClick={() => commit(() => { f.rot = ((f.rot || 0) - 15 + 360) % 360 })}>−</button>
           <input type="number" step="5" value={Math.round(f.rot || 0)}
             onChange={(e) => commit(() => { f.rot = (Number(e.target.value) % 360 + 360) % 360 })} />
+          <button onClick={() => commit(() => { f.rot = ((f.rot || 0) + 15) % 360 })}>＋</button>
           <span className="plan-props-unit">°</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">缩放</span>
+          <button onClick={() => { const v = Math.max(0.1, s - 0.1); commit(() => { f.scale = [v, v, v] }) }}>−</button>
           <input type="number" step="5" min="10" value={Math.round(s * 100)}
             onChange={(e) => { const v = Math.max(0.1, (Number(e.target.value) || 100) / 100); commit(() => { f.scale = [v, v, v] }) }} />
+          <button onClick={() => { const v = s + 0.1; commit(() => { f.scale = [v, v, v] }) }}>＋</button>
           <span className="plan-props-unit">%</span>
         </div>
       </div>

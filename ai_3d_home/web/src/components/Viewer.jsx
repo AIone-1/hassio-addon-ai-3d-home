@@ -184,11 +184,11 @@ export default function Viewer({ onSelect, floorIndex }) {
   const q = QUALITY[quality] || QUALITY.balanced
   const fogColor = night ? '#0a1020' : (MODE_FOG[mode] || MODE_FOG['全屋'])
 
-  // 3D 视图右键 = 取消（取消选中/墙多选）
+  // 3D 视图右键 = 取消（取消选中/墙多选/拾起的家具 + 退出删除/放置/移动工具）
   useEffect(() => {
     const onCtx = (e) => {
       e.preventDefault()
-      setState({ selected: null, wallSel: [] })
+      setState({ tool: 'select', selected: null, wallSel: [], pickItem: null })
     }
     document.addEventListener('contextmenu', onCtx)
     return () => document.removeEventListener('contextmenu', onCtx)
