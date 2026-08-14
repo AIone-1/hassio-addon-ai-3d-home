@@ -41,6 +41,7 @@ export default function Editor() {
   const [backupOpen, setBackupOpen] = useState(false)
   const [defaultOpen, setDefaultOpen] = useState(false)
   const [previewModel, setPreviewModel] = useState(null)
+  const [show3d, setShow3d] = useState(false)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -158,6 +159,7 @@ export default function Editor() {
     api.saveSettings(s).catch(() => {})
     toast(`已隐藏「${m.label}」`)
   }
+  const closePreview = () => { setPreviewModel(null); setShow3d(false) }
 
   const importJson = () => {
     const input = document.createElement('input')
@@ -410,12 +412,25 @@ export default function Editor() {
       )}
       {/* 模型预览弹窗（3D 预览 + 尺寸 + 缩放 + 放置/删除） */}
       {previewModel && (
-        <div className="modal-mask" onClick={() => setPreviewModel(null)}>
+        <div className="modal-mask" onClick={() => closePreview()}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 400 }}>
             <div className="dname">{previewModel.label}</div>
-            <div style={{ height: 280, borderRadius: 8, background: 'rgba(0,0,0,0.25)', margin: '10px 0', overflow: 'hidden' }}>
-              <ModelPreview model={previewModel} />
-            </div>
+            {show3d ? (
+              <div style={{ height: 280, borderRadius: 8, background: 'rgba(0,0,0,0.25)', margin: '10px 0', overflow: 'hidden' }}>
+                <ModelPreview model={previewModel} />
+              </div>
+            ) : previewModel.builtin ? (
+              <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }}>
+                <span style={{ width: 110, height: 110, borderRadius: 12, background: previewModel.color, border: '2px solid rgba(255,255,255,0.3)' }} />
+              </div>
+            ) : (
+              <img src={thumbUrl(previewModel.thumb)} alt={previewModel.label}
+                style={{ width: '100%', maxHeight: 280, objectFit: 'contain', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }} />
+            )}
+            <button onClick={() => setShow3d(!show3d)}
+              style={{ display: 'block', width: '100%', padding: '7px', marginBottom: 10, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }}>
+              {show3d ? '🖼️ 返回图片' : '🧊 3D预览'}
+            </button>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
               尺寸约 {previewModel.w}×{previewModel.d}×{previewModel.h} 米
             </div>
@@ -429,10 +444,10 @@ export default function Editor() {
               ))}
             </div>
             <div className="dev-actions">
-              <button className="primary" onClick={() => { setState({ furnitureType: previewModel.type, tool: 'furniture' }); setFurnOpen(false); setPreviewModel(null) }}>放置</button>
+              <button className="primary" onClick={() => { setState({ furnitureType: previewModel.type, tool: 'furniture' }); setFurnOpen(false); closePreview() }}>放置</button>
               <button style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 13 }}
-                onClick={() => { if (confirm(`确认删除「${previewModel.label}」？`)) { hideModel(previewModel); setPreviewModel(null) } }}>删除</button>
-              <button className="close-btn" onClick={() => setPreviewModel(null)}>关闭</button>
+                onClick={() => { if (confirm(`确认删除「${previewModel.label}」？`)) { hideModel(previewModel); closePreview() } }}>删除</button>
+              <button className="close-btn" onClick={() => closePreview()}>关闭</button>
             </div>
           </div>
         </div>
