@@ -43,6 +43,7 @@ export default function HexColorPicker({ value = '#5879ad', onChange }) {
   const canvasRef = useRef(null)
   const [hsv, setHsv] = useState(() => hexToHsv(value))
   const [hex, setHex] = useState(value)
+  const [favColors, setFavColors] = useState(() => { try { return JSON.parse(localStorage.getItem('ai3d_bg_fav_colors') || '[]') } catch { return [] } })
   const hsvRef = useRef(hsv)
   hsvRef.current = hsv
 
@@ -52,6 +53,12 @@ export default function HexColorPicker({ value = '#5879ad', onChange }) {
     const hx = toHex(r, g, b)
     setHex(hx)
     onChange && onChange(hx)
+  }
+
+  const toggleFav = (c) => {
+    const next = favColors.includes(c) ? favColors.filter((x) => x !== c) : [...favColors, c]
+    setFavColors(next)
+    try { localStorage.setItem('ai3d_bg_fav_colors', JSON.stringify(next)) } catch {}
   }
 
   // 绘制六边形色盘（逐像素：角度→H，距离→S，V=1）
@@ -133,6 +140,19 @@ export default function HexColorPicker({ value = '#5879ad', onChange }) {
         {['#000000', '#333333', '#666666', '#999999', '#cccccc', '#ffffff'].map((c) => (
           <button key={c} title={c} style={{ width: 24, height: 24, borderRadius: 5, border: hex === c ? '2px solid var(--accent)' : '1px solid var(--border)', background: c, cursor: 'pointer', padding: 0 }} onClick={() => { const [h, s, vv] = hexToHsv(c); emit(h, s, vv) }} />
         ))}
+      </div>
+      {/* 收藏 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+        <button style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', borderRadius: 5, cursor: 'pointer' }} onClick={() => toggleFav(hex)}>
+          {favColors.includes(hex) ? '★ 已收藏' : '☆ 收藏'}
+        </button>
+        {favColors.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: 1 }}>
+            {favColors.map((c) => (
+              <button key={c} title={c} style={{ width: 20, height: 20, borderRadius: 4, border: hex === c ? '2px solid var(--accent)' : '1px solid var(--border)', background: c, cursor: 'pointer', padding: 0 }} onClick={() => { const [h, s, vv] = hexToHsv(c); emit(h, s, vv) }} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
