@@ -2,7 +2,7 @@
 // 墙是线段（floor.walls 持久化），房间由墙段的封闭环自动检测（recomputeRooms）——这就是"共用墙/相交也封闭"的机制
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
-import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg, segmentIntersect } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg, segmentIntersect, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
 import { getCatalogItem, thumbUrl } from '../catalog'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
@@ -271,11 +271,11 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const cancelDraft = () => {
     if (!draft) return
     const fl = getState().project.floors[floorIndex]
-    fl.walls = (fl.walls || []).filter(w => !draft.walls.includes(w))
+    // 右键取消：结束画墙，但保留已画的墙（哪怕没封闭成房间也不删）
     fl.rooms = recomputeRooms(fl)
     setDraft(null)
     setState({ project: { ...getState().project }, saved: false })
-    toast('已取消')
+    toast('已取消画墙（保留已画的墙）')
   }
 
   // ---------- 移动整个户型 ----------
@@ -1265,14 +1265,25 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             <button onClick={() => patchDevice(selDevice, { modelId: undefined })}
               style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', background: !selDevice.modelId ? 'var(--accent)' : 'var(--panel2)', color: !selDevice.modelId ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12, alignSelf: 'flex-start' }}>无（圆球）</button>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 3px' }}>家电/设备</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 3px' }}>设备模型</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {BUILTIN_DEVICES.map((b) => (
-                  <button key={b.type} title={b.type} onClick={() => patchDevice(selDevice, { modelId: b.type })}
-                    style={{ padding: 5, borderRadius: 6, border: selDevice.modelId === b.type ? '2px solid var(--accent)' : '1px solid var(--border)', background: 'var(--panel2)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
-                    {b.icon}
-                  </button>
-                ))}
+                {DEVICE_KINDS.map((k) => {
+                  const items = DEVICE_MODELS.filter((m) => m.kind === k.kind)
+                  if (items.length === 0) return null
+                  return (
+                    <div key={k.kind} style={{ width: '100%', marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', margin: '2px 0' }}>{k.label}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {items.map((m) => (
+                          <button key={m.id} title={m.label} onClick={() => patchDevice(selDevice, { modelId: m.id })}
+                            style={{ padding: '3px 8px', borderRadius: 6, border: selDevice.modelId === m.id ? '2px solid var(--accent)' : '1px solid var(--border)', background: 'var(--panel2)', color: selDevice.modelId === m.id ? 'var(--accent)' : 'var(--text)', cursor: 'pointer', fontSize: 11 }}>
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
             {DEVICE_MODEL_GROUPS.map((g) => {

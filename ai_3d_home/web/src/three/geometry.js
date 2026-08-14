@@ -32,6 +32,85 @@ export const FURNITURE_LIB = [
 // 挂墙家具默认离地高度（m）；挂顶用层高、地面为 0
 export const FURNITURE_WALL_HEIGHT = 1.2
 
+// 设备模型目录（对齐 JMGLink 原版：id + kind 分类 + label + placement + defaultHeight + 尺寸 w/d/h 米）
+// 这里从原版 bundle 里完整提取了设备模型清单，程序化几何渲染在 Scene.jsx 的 DeviceModel
+export const DEVICE_MODELS = [
+  // 灯光 light
+  { id: 'light.ceiling', kind: 'light', label: '吸顶灯', placement: 'ceiling', defaultHeight: 1.62, w: 0.42, d: 0.42, h: 0.1 },
+  { id: 'light.downlight', kind: 'light', label: '筒灯/射灯', placement: 'ceiling', defaultHeight: 1.66, w: 0.13, d: 0.13, h: 0.06 },
+  { id: 'light.chandelier', kind: 'light', label: '吊灯', placement: 'ceiling', defaultHeight: 1.48, w: 0.4, d: 0.4, h: 0.7 },
+  { id: 'light.floor_lamp', kind: 'light', label: '落地灯', placement: 'floor', defaultHeight: 0, w: 0.3, d: 0.3, h: 1.5 },
+  { id: 'light.strip', kind: 'light', label: '灯带', placement: 'ceiling', defaultHeight: 1.44, w: 1.0, d: 0.05, h: 0.03 },
+  // 开关 switch
+  { id: 'switch.wall', kind: 'switch', label: '单键开关', placement: 'wall', defaultHeight: 0.92, w: 0.09, d: 0.03, h: 0.09 },
+  { id: 'switch.double', kind: 'switch', label: '双键开关', placement: 'wall', defaultHeight: 0.92, w: 0.09, d: 0.03, h: 0.14 },
+  { id: 'switch.triple', kind: 'switch', label: '三键开关', placement: 'wall', defaultHeight: 0.92, w: 0.09, d: 0.03, h: 0.2 },
+  { id: 'switch.scene', kind: 'switch', label: '场景按钮', placement: 'wall', defaultHeight: 0.88, w: 0.09, d: 0.03, h: 0.09 },
+  { id: 'switch.ac_airflow', kind: 'switch', label: '空调开关', placement: 'wall', defaultHeight: 0.94, w: 0.09, d: 0.03, h: 0.14 },
+  { id: 'switch.outlet', kind: 'switch', label: '智能插座', placement: 'wall', defaultHeight: 0.28, w: 0.09, d: 0.04, h: 0.09 },
+  // 窗帘 cover
+  { id: 'cover.curtain', kind: 'cover', label: '窗帘', placement: 'wall', defaultHeight: 1.12, w: 1.5, d: 0.12, h: 2.0 },
+  { id: 'cover.blind', kind: 'cover', label: '百叶/卷帘', placement: 'wall', defaultHeight: 1.12, w: 1.2, d: 0.08, h: 1.5 },
+  // 空调 climate
+  { id: 'climate.wall_ac', kind: 'climate', label: '壁挂空调', placement: 'wall', defaultHeight: 1.32, w: 0.8, d: 0.22, h: 0.3 },
+  { id: 'climate.central_ac', kind: 'climate', label: '中央空调', placement: 'ceiling', defaultHeight: 1.58, w: 0.6, d: 0.6, h: 0.3 },
+  { id: 'climate.floor_ac', kind: 'climate', label: '柜式空调', placement: 'floor', defaultHeight: 0, w: 0.5, d: 0.4, h: 1.7 },
+  { id: 'climate.thermostat', kind: 'climate', label: '温控面板', placement: 'wall', defaultHeight: 0.96, w: 0.09, d: 0.03, h: 0.13 },
+  // 传感器 sensor
+  { id: 'sensor.wall', kind: 'sensor', label: '通用传感器', placement: 'wall', defaultHeight: 1, w: 0.12, d: 0.12, h: 0.04 },
+  { id: 'sensor.temperature', kind: 'sensor', label: '温度传感器', placement: 'wall', defaultHeight: 0.98, w: 0.08, d: 0.1, h: 0.03 },
+  { id: 'sensor.humidity', kind: 'sensor', label: '湿度传感器', placement: 'wall', defaultHeight: 0.98, w: 0.08, d: 0.1, h: 0.03 },
+  { id: 'sensor.light_level', kind: 'sensor', label: '照度传感器', placement: 'ceiling', defaultHeight: 1.45, w: 0.1, d: 0.1, h: 0.04 },
+  { id: 'sensor.co2', kind: 'sensor', label: 'CO₂ 传感器', placement: 'wall', defaultHeight: 0.98, w: 0.1, d: 0.1, h: 0.04 },
+  { id: 'sensor.pm25', kind: 'sensor', label: 'PM2.5 传感器', placement: 'wall', defaultHeight: 0.98, w: 0.1, d: 0.1, h: 0.04 },
+  { id: 'sensor.air_quality', kind: 'sensor', label: '空气质量', placement: 'wall', defaultHeight: 0.96, w: 0.1, d: 0.1, h: 0.04 },
+  { id: 'sensor.power', kind: 'sensor', label: '电量仪表', placement: 'wall', defaultHeight: 0.9, w: 0.08, d: 0.08, h: 0.03 },
+  // 安防感应 binary_sensor
+  { id: 'binary_sensor.wall', kind: 'binary_sensor', label: '安防传感器', placement: 'wall', defaultHeight: 1, w: 0.1, d: 0.1, h: 0.04 },
+  { id: 'binary_sensor.door', kind: 'binary_sensor', label: '门窗传感器', placement: 'wall', defaultHeight: 1, w: 0.04, d: 0.08, h: 0.02 },
+  { id: 'binary_sensor.motion', kind: 'binary_sensor', label: '人体传感器', placement: 'ceiling', defaultHeight: 1.5, w: 0.12, d: 0.12, h: 0.06 },
+  { id: 'binary_sensor.presence', kind: 'binary_sensor', label: '存在传感器', placement: 'ceiling', defaultHeight: 1.48, w: 0.1, d: 0.1, h: 0.04 },
+  { id: 'binary_sensor.smoke', kind: 'binary_sensor', label: '烟雾燃气', placement: 'ceiling', defaultHeight: 1.55, w: 0.13, d: 0.13, h: 0.05 },
+  { id: 'binary_sensor.water', kind: 'binary_sensor', label: '水浸传感器', placement: 'floor', defaultHeight: 0.04, w: 0.06, d: 0.06, h: 0.02 },
+  // 摄像机 camera
+  { id: 'camera.wall', kind: 'camera', label: '摄像头', placement: 'wall', defaultHeight: 1.25, w: 0.1, d: 0.1, h: 0.09 },
+  { id: 'camera.dome', kind: 'camera', label: '云台球机', placement: 'ceiling', defaultHeight: 1.5, w: 0.12, d: 0.12, h: 0.1 },
+  { id: 'camera.bullet', kind: 'camera', label: '枪机摄像头', placement: 'wall', defaultHeight: 1.35, w: 0.22, d: 0.1, h: 0.1 },
+  { id: 'camera.doorbell', kind: 'camera', label: '可视门铃', placement: 'wall', defaultHeight: 1.08, w: 0.08, d: 0.05, h: 0.16 },
+  // 门锁 lock
+  { id: 'lock.door', kind: 'lock', label: '智能门锁', placement: 'wall', defaultHeight: 0.96, w: 0.14, d: 0.06, h: 0.3 },
+  // 风扇 fan
+  { id: 'fan.ceiling', kind: 'fan', label: '吊扇', placement: 'ceiling', defaultHeight: 1.5, w: 0.9, d: 0.9, h: 0.28 },
+  { id: 'fan.floor', kind: 'fan', label: '落地扇', placement: 'floor', defaultHeight: 0, w: 0.4, d: 0.4, h: 1.0 },
+  { id: 'fan.tower', kind: 'fan', label: '塔扇', placement: 'floor', defaultHeight: 0, w: 0.25, d: 0.25, h: 1.0 },
+  // 影音 media_player
+  { id: 'media_player.tv', kind: 'media_player', label: '电视', placement: 'wall', defaultHeight: 1, w: 1.4, d: 0.08, h: 0.85 },
+  { id: 'media_player.speaker', kind: 'media_player', label: '音箱', placement: 'surface', defaultHeight: 0.55, w: 0.2, d: 0.2, h: 0.3 },
+  // 扫地机器人 vacuum
+  { id: 'vacuum.robot', kind: 'vacuum', label: '扫地机器人', placement: 'floor', defaultHeight: 0.04, w: 0.35, d: 0.35, h: 0.09 },
+  // 安防面板 alarm_control_panel
+  { id: 'alarm.panel', kind: 'alarm_control_panel', label: '安防面板', placement: 'wall', defaultHeight: 0.95, w: 0.2, d: 0.05, h: 0.3 },
+  // 通用 custom
+  { id: 'custom.point', kind: 'custom', label: '通用设备', placement: 'surface', defaultHeight: 0.75, w: 0.15, d: 0.15, h: 0.1 },
+]
+
+// 设备模型按 kind 分组（显示用）
+export const DEVICE_KINDS = [
+  { kind: 'light', label: '灯光' },
+  { kind: 'switch', label: '开关' },
+  { kind: 'cover', label: '窗帘' },
+  { kind: 'climate', label: '空调' },
+  { kind: 'sensor', label: '传感器' },
+  { kind: 'binary_sensor', label: '感应器' },
+  { kind: 'camera', label: '摄像机' },
+  { kind: 'fan', label: '风扇' },
+  { kind: 'lock', label: '门锁' },
+  { kind: 'media_player', label: '影音' },
+  { kind: 'vacuum', label: '扫地机' },
+  { kind: 'alarm_control_panel', label: '安防' },
+  { kind: 'custom', label: '通用' },
+]
+
 // 门颜色（5 色）+ 门/窗类型（key 存数据，label 面板显示）
 export const DOOR_COLORS = { 木色: '#a97c50', 白: '#e8ecef', 灰: '#8b9298', 黑: '#2c3035', 蓝: '#4a7ab5' }
 

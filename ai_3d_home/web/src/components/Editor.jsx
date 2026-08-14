@@ -54,6 +54,7 @@ export default function Editor() {
   const furnitureScale = useStore((s) => s.furnitureScale)
   const selected = useStore((s) => s.selected)
   const multiSelect = useStore((s) => s.multiSelect)
+  const wallSelIds = useStore((s) => s.wallSel)
   const floor = currentFloor()
   const currentFloorIdx = useStore((s) => s.currentFloor)
   const [furnOpen, setFurnOpen] = useState(false)
@@ -329,8 +330,8 @@ export default function Editor() {
       {/* 顶部工具栏 */}
       <div className="editor-top">
         <button className="et-btn" onClick={() => { loadBackups(); setProjectManagerOpen(true) }}>项目</button>
-        <button className="et-btn" onClick={() => undo()} title="撤销上一次操作">↩️ 撤销</button>
-        <button className="et-btn" onClick={() => redo()} title="恢复撤销">↪️ 重做</button>
+        <button className="et-btn" onClick={() => undo()} title="撤销">↩️</button>
+        <button className="et-btn" onClick={() => redo()} title="重做">↪️</button>
         <button className="et-btn" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>
         <button className="et-btn" onClick={importPlanImage}>导入底图</button>
         {planImage && (
@@ -447,8 +448,8 @@ export default function Editor() {
         </button>
       </div>
 
-      {/* 右侧信息栏（未选中且不是墙体/门/窗工具时显示户型信息；点这些工具会弹出各自的设置信息框，户型信息应自动收回） */}
-      {!selected && !['wall', 'door', 'window'].includes(tool) && (
+      {/* 右侧信息栏（未选中、不是墙体/门/窗工具、且没选墙时显示户型信息；否则和墙面板/约束面板重叠） */}
+      {!selected && !['wall', 'door', 'window'].includes(tool) && wallSelIds.length === 0 && (
         <div className="editor-info">
           <div className="editor-info-title">户型信息</div>
           <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>

@@ -71,25 +71,68 @@ export async function loadCatalog() {
 export function getCatalog() { return catalog }
 export function getCatalogItem(type) { return catalog.find((m) => m.type === type) }
 
-// 根据实体域/名推断设备默认模型（返回 model name，即 catalog 项的 type；找不到返回 null 用小球兜底）
+// 根据实体域/名推断设备默认模型（返回 DEVICE_MODELS 的 id，对齐 JMGLink 原版 no 映射 + 名字细分）
 export function inferDeviceModel(entityId, name = '') {
   const domain = (entityId || '').split('.')[0]
   const s = `${name} ${entityId}`.toLowerCase()
-  const find = (label) => {
-    const m = catalog.find((x) => x.label === label)
-    return m ? m.type : null
+  const defaultByDomain = {
+    light: 'light.ceiling', switch: 'switch.wall', cover: 'cover.curtain',
+    climate: 'climate.wall_ac', sensor: 'sensor.wall', binary_sensor: 'binary_sensor.wall',
+    camera: 'camera.wall', fan: 'fan.ceiling', lock: 'lock.door',
+    media_player: 'media_player.tv', vacuum: 'vacuum.robot', alarm_control_panel: 'alarm.panel',
   }
+  const dflt = defaultByDomain[domain]
   if (domain === 'light' || domain === 'switch') {
-    if (/(吊灯|chandelier|pendant)/.test(s)) return find('吊灯')
-    if (/(吸顶灯|ceiling)/.test(s)) return find('吸顶灯')
-    if (/(台灯|table ?lamp)/.test(s)) return find('台灯')
-    if (/(落地灯|floor ?lamp)/.test(s)) return find('落地灯')
-    if (/(筒灯|射灯|downlight|spotlight)/.test(s)) return find('筒灯')
-    if (/(壁灯|wall ?lamp)/.test(s)) return find('壁灯')
-    return find('吸顶灯') || find('吊灯')
+    if (/(吊灯|chandelier|pendant)/.test(s)) return 'light.chandelier'
+    if (/(落地灯|floor ?lamp)/.test(s)) return 'light.floor_lamp'
+    if (/(筒灯|射灯|downlight|spotlight)/.test(s)) return 'light.downlight'
+    if (/(灯带|strip|led ?strip)/.test(s)) return 'light.strip'
+    return dflt || 'light.ceiling'
   }
-  if (domain === 'climate') return find('空调')
-  return null
+  if (domain === 'fan') {
+    if (/(塔扇|tower)/.test(s)) return 'fan.tower'
+    if (/(落地|floor|stand|pedestal|circulator)/.test(s)) return 'fan.floor'
+    return 'fan.ceiling'
+  }
+  if (domain === 'cover') {
+    if (/(百叶|卷帘|blind|shutter)/.test(s)) return 'cover.blind'
+    return 'cover.curtain'
+  }
+  if (domain === 'climate') {
+    if (/(中央|central)/.test(s)) return 'climate.central_ac'
+    if (/(柜|立式|floor|tower)/.test(s)) return 'climate.floor_ac'
+    if (/(温控|面板|thermostat)/.test(s)) return 'climate.thermostat'
+    return 'climate.wall_ac'
+  }
+  if (domain === 'camera') {
+    if (/(球机|云台|dome|ptz)/.test(s)) return 'camera.dome'
+    if (/(枪机|bullet)/.test(s)) return 'camera.bullet'
+    if (/(门铃|doorbell)/.test(s)) return 'camera.doorbell'
+    return 'camera.wall'
+  }
+  if (domain === 'binary_sensor') {
+    if (/(门|窗|door|window)/.test(s)) return 'binary_sensor.door'
+    if (/(人|motion|pir|move)/.test(s)) return 'binary_sensor.motion'
+    if (/(存在|presence|mmwave)/.test(s)) return 'binary_sensor.presence'
+    if (/(烟|气|smoke|gas)/.test(s)) return 'binary_sensor.smoke'
+    if (/(水|leak|water|flood)/.test(s)) return 'binary_sensor.water'
+    return 'binary_sensor.wall'
+  }
+  if (domain === 'sensor') {
+    if (/(温度|temperature)/.test(s)) return 'sensor.temperature'
+    if (/(湿度|humidity)/.test(s)) return 'sensor.humidity'
+    if (/(光照|照度|illuminance)/.test(s)) return 'sensor.light_level'
+    if (/(co2|二氧化碳)/.test(s)) return 'sensor.co2'
+    if (/(pm2\.5|pm25|颗粒)/.test(s)) return 'sensor.pm25'
+    if (/(空气质量|air ?quality)/.test(s)) return 'sensor.air_quality'
+    if (/(电量|功率|power|energy|electric)/.test(s)) return 'sensor.power'
+    return 'sensor.wall'
+  }
+  if (domain === 'media_player') {
+    if (/(音箱|音响|speaker|sound|sonos|homepod)/.test(s)) return 'media_player.speaker'
+    return 'media_player.tv'
+  }
+  return dflt || 'custom.point'
 }
 export function glbUrl(name) { return modelBase() + 'models/' + name }
 export function thumbUrl(name) { return modelBase() + 'models/thumbs/' + name }

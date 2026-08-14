@@ -3,7 +3,7 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useStore, setState } from '../store'
-import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, DOOR_COLORS, robustFloorGeometry, wallKey } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, DOOR_COLORS, robustFloorGeometry, wallKey, DEVICE_MODELS } from '../three/geometry'
 import { getCatalogItem } from '../catalog'
 
 // 对齐原版主题（glass 视觉风格）：墙=半透明毛玻璃，地板=冷色调色板
@@ -550,6 +550,203 @@ export function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
   }
 }
 
+// ---------- 设备模型（对齐 JMGLink 原版 49 个设备模型，程序化几何） ----------
+// id 形如 "light.ceiling" / "switch.wall" / "fan.ceiling"，kind 是第一段，variant 是第二段
+export function DeviceModel({ id, w, d, h, isOn }) {
+  const kind = (id || '').split('.')[0]
+  const variant = (id || '').split('.')[1] || ''
+  const light = isOn ? '#ffd166' : '#e8edf2'
+
+  if (kind === 'light') {
+    if (variant === 'chandelier') {
+      return <group>
+        <mesh position={[0, h * 0.35, 0]}><cylinderGeometry args={[0.015, 0.015, h * 0.6, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
+        <mesh position={[0, 0, 0]}><sphereGeometry args={[w * 0.28, 16, 12]} /><meshStandardMaterial color={light} emissive="#ffd166" emissiveIntensity={isOn ? 0.8 : 0.1} /></mesh>
+      </group>
+    }
+    if (variant === 'floor_lamp') {
+      return <group>
+        <mesh position={[0, h * 0.45, 0]}><cylinderGeometry args={[0.015, 0.015, h * 0.9, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
+        <mesh position={[0, 0, 0]}><coneGeometry args={[w * 0.5, h * 0.18, 16]} /><meshStandardMaterial color={light} emissive="#ffd166" emissiveIntensity={isOn ? 0.8 : 0.1} /></mesh>
+      </group>
+    }
+    if (variant === 'strip') {
+      return <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#ffe9a8" emissive="#ffd166" emissiveIntensity={0.8} /></mesh>
+    }
+    if (variant === 'downlight') {
+      return <mesh><cylinderGeometry args={[w * 0.5, w * 0.55, h, 16]} /><meshStandardMaterial color={light} emissive="#ffd166" emissiveIntensity={isOn ? 0.9 : 0.15} /></mesh>
+    }
+    // ceiling 吸顶灯
+    return <group>
+      <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color={light} emissive="#ffd166" emissiveIntensity={isOn ? 0.7 : 0.1} /></mesh>
+    </group>
+  }
+
+  if (kind === 'switch') {
+    const n = variant === 'double' ? 2 : variant === 'triple' ? 3 : 1
+    return <group>
+      <FBox position={[0, 0, 0]} size={[w, h, d]} color="#eef2f5" roughness={0.35} />
+      {Array.from({ length: n }).map((_, i) => (
+        <mesh key={i} position={[0, (i - (n - 1) / 2) * (h / (n + 1)), d / 2 + 0.002]}>
+          <boxGeometry args={[w * 0.5, h / (n + 1) * 0.5, d * 0.2]} />
+          <meshStandardMaterial color="#c3ccd4" roughness={0.42} />
+        </mesh>
+      ))}
+    </group>
+  }
+
+  if (kind === 'cover') {
+    return <group>
+      <mesh position={[0, h * 0.48, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.02, 0.02, w, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
+      {variant === 'blind' ? (
+        Array.from({ length: 8 }).map((_, i) => (
+          <mesh key={i} position={[0, h * 0.42 - i * (h * 0.1), 0]}><boxGeometry args={[w * 0.92, 0.012, d * 0.4]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
+        ))
+      ) : (
+        [-0.3, -0.1, 0.1, 0.3].map((V) => (
+          <mesh key={V} position={[V * w, -h * 0.26, 0]}><boxGeometry args={[w * 0.18, h * 0.5, d * 0.5]} /><meshStandardMaterial color="#9fb8c8" roughness={0.7} /></mesh>
+        ))
+      )}
+    </group>
+  }
+
+  if (kind === 'climate') {
+    if (variant === 'central_ac') {
+      return <group>
+        <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+        <mesh position={[0, 0, d / 2 + 0.002]}><planeGeometry args={[w * 0.8, h * 0.7]} /><meshStandardMaterial color="#c3ccd4" /></mesh>
+      </group>
+    }
+    if (variant === 'floor_ac') {
+      return <group><FBox position={[0, 0, 0]} size={[w, h, d]} color="#f5f7fa" roughness={0.35} /><mesh position={[0, h * 0.36, d / 2 + 0.002]}><planeGeometry args={[w * 0.8, h * 0.18]} /><meshStandardMaterial color="#c3ccd4" /></mesh></group>
+    }
+    if (variant === 'thermostat') {
+      return <group>
+        <FBox position={[0, 0, 0]} size={[w, h, d]} color="#eef2f5" roughness={0.35} />
+        <mesh position={[0, 0, d / 2 + 0.002]}><planeGeometry args={[w * 0.7, h * 0.6]} /><meshStandardMaterial color="#4a5560" /></mesh>
+      </group>
+    }
+    // wall_ac 壁挂空调
+    return <group>
+      <FBox position={[0, 0, 0]} size={[w, h, d]} color="#f5f7fa" roughness={0.32} />
+      <mesh position={[0, -h * 0.18, d / 2 + 0.002]}><planeGeometry args={[w * 0.82, h * 0.34]} /><meshStandardMaterial color="#c3ccd4" /></mesh>
+      <mesh position={[w * 0.32, h * 0.16, d / 2 + 0.004]}><sphereGeometry args={[0.015, 8, 8]} /><meshBasicMaterial color="#4ade80" /></mesh>
+    </group>
+  }
+
+  if (kind === 'sensor') {
+    return <group>
+      <mesh><cylinderGeometry args={[w * 0.5, w * 0.5, h, 16]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+      <mesh position={[0, 0, d * 0.35]}><sphereGeometry args={[w * 0.14, 8, 8]} /><meshBasicMaterial color="#4ade80" /></mesh>
+    </group>
+  }
+
+  if (kind === 'binary_sensor') {
+    if (variant === 'door') {
+      return <group>
+        <FBox position={[0, h * 0.4, 0]} size={[w, h * 0.5, d]} color="#eef2f5" />
+        <FBox position={[0, -h * 0.4, 0]} size={[w, h * 0.5, d]} color="#eef2f5" />
+      </group>
+    }
+    if (variant === 'smoke') {
+      return <group>
+        <mesh><cylinderGeometry args={[w * 0.5, w * 0.55, h, 20]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+        <mesh position={[0, h * 0.15, 0]}><sphereGeometry args={[w * 0.2, 8, 8]} /><meshStandardMaterial color={isOn ? '#ff6b6b' : '#d8dee4'} emissive={isOn ? '#ff4444' : '#000'} emissiveIntensity={isOn ? 0.8 : 0} /></mesh>
+      </group>
+    }
+    if (variant === 'water') {
+      return <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color={isOn ? '#ff6b6b' : '#d8e8f0'} /></mesh>
+    }
+    // motion / presence / wall 人体/存在/通用安防传感器
+    return <group>
+      <mesh><cylinderGeometry args={[w * 0.5, w * 0.5, h, 16]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+      <mesh position={[0, 0, d * 0.4]}><sphereGeometry args={[w * 0.32, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color={isOn ? '#ff6b6b' : '#3a4658'} emissive={isOn ? '#ff4444' : '#000'} emissiveIntensity={isOn ? 0.6 : 0} /></mesh>
+    </group>
+  }
+
+  if (kind === 'camera') {
+    if (variant === 'dome') {
+      return <group>
+        <mesh><cylinderGeometry args={[w * 0.5, w * 0.55, h * 0.5, 16]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+        <mesh position={[0, h * 0.25, 0]}><sphereGeometry args={[w * 0.42, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#1a2030" /></mesh>
+      </group>
+    }
+    if (variant === 'bullet') {
+      return <group>
+        <mesh><boxGeometry args={[w, d, h]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+        <mesh position={[w * 0.5, 0, 0]}><cylinderGeometry args={[d * 0.4, d * 0.4, d * 0.1, 16]} /><meshStandardMaterial color="#1a2030" /></mesh>
+      </group>
+    }
+    if (variant === 'doorbell') {
+      return <group>
+        <FBox position={[0, 0, 0]} size={[w, h, d]} color="#eef2f5" roughness={0.35} />
+        <mesh position={[0, 0, d / 2 + 0.002]}><sphereGeometry args={[w * 0.22, 12, 8]} /><meshStandardMaterial color="#1a2030" /></mesh>
+      </group>
+    }
+    // wall 摄像头
+    return <group>
+      <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+      <mesh position={[0, 0, d / 2 + 0.002]}><cylinderGeometry args={[w * 0.28, w * 0.28, d * 0.2, 16]} /><meshStandardMaterial color="#1a2030" /></mesh>
+    </group>
+  }
+
+  if (kind === 'lock') {
+    return <group>
+      <FBox position={[0, 0, 0]} size={[w, h, d]} color="#8a9aa8" roughness={0.3} metalness={0.3} />
+      <mesh position={[0, 0, d / 2 + 0.002]}><cylinderGeometry args={[w * 0.18, w * 0.18, d * 0.15, 12]} /><meshStandardMaterial color="#1a2030" /></mesh>
+    </group>
+  }
+
+  if (kind === 'fan') {
+    if (variant === 'floor') {
+      return <group>
+        <mesh position={[0, h * 0.4, 0]}><cylinderGeometry args={[0.02, 0.02, h * 0.8, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
+        <mesh position={[0, 0, 0]}><cylinderGeometry args={[w * 0.5, w * 0.5, h * 0.1, 20]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
+        <mesh position={[0, 0, 0]}><sphereGeometry args={[w * 0.16, 12, 8]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+      </group>
+    }
+    if (variant === 'tower') {
+      return <mesh><cylinderGeometry args={[w * 0.5, w * 0.5, h, 20]} /><meshStandardMaterial color="#e8edf2" /></mesh>
+    }
+    // ceiling 吊扇
+    return <group>
+      <mesh><cylinderGeometry args={[w * 0.12, w * 0.12, h * 0.5, 16]} /><meshStandardMaterial color="#e8edf2" /></mesh>
+      {[0, 1, 2, 3].map((i) => {
+        const ang = i * Math.PI / 2
+        return <mesh key={i} position={[Math.cos(ang) * w * 0.3, 0, Math.sin(ang) * w * 0.3]} rotation={[0, -ang, 0]}><boxGeometry args={[w * 0.42, d * 0.04, h * 0.1]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
+      })}
+    </group>
+  }
+
+  if (kind === 'media_player') {
+    if (variant === 'speaker') {
+      return <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#3a4658" /></mesh>
+    }
+    // tv 电视
+    return <group>
+      <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#11151c" /></mesh>
+      <mesh position={[0, 0, d / 2 + 0.002]}><planeGeometry args={[w * 0.94, h * 0.94]} /><meshStandardMaterial color="#1a2030" emissive="#3a5a8a" emissiveIntensity={isOn ? 0.4 : 0.05} /></mesh>
+    </group>
+  }
+
+  if (kind === 'vacuum') {
+    return <group>
+      <mesh><cylinderGeometry args={[w * 0.5, w * 0.5, h, 24]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+      <mesh position={[0, h * 0.5, 0]}><cylinderGeometry args={[w * 0.35, w * 0.35, h * 0.2, 24]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
+    </group>
+  }
+
+  if (kind === 'alarm_control_panel') {
+    return <group>
+      <FBox position={[0, 0, 0]} size={[w, h, d]} color="#eef2f5" roughness={0.35} />
+      <mesh position={[0, 0, d / 2 + 0.002]}><planeGeometry args={[w * 0.7, h * 0.6]} /><meshStandardMaterial color="#1a2030" emissive={isOn ? '#ff4444' : '#2f3a48'} emissiveIntensity={isOn ? 0.5 : 0.1} /></mesh>
+    </group>
+  }
+
+  // custom 通用设备
+  return <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#8f9fbb" /></mesh>
+}
+
 // 选中高亮框（蓝色线框）
 function SelectBox({ center, size, rot }) {
   const geo = useMemo(() => {
@@ -801,6 +998,7 @@ function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
   const domain = (dev.entity_id || '').split('.')[0]
   const isOn = state && state.state === 'on'
   const cat = dev.modelId ? getCatalogItem(dev.modelId) : null
+  const devModel = dev.modelId ? DEVICE_MODELS.find((m) => m.id === dev.modelId) : null
   const isLight = domain === 'light' || domain === 'switch'
 
   let color = '#556677', emissive = '#334455'
@@ -823,8 +1021,11 @@ function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
       onClick={interactive ? (e) => { e.stopPropagation(); onSelect(dev) } : undefined}
     >
       {cat ? (
-        // 有绑定的模型：用下载的 GLB 模型渲染（灯/热水器/空调等）
+        // 下载的 GLB 模型（家具/家电）
         <GltfModel name={cat.glb} w={cat.w} d={cat.d} h={cat.h} />
+      ) : devModel ? (
+        // 设备模型目录里的程序化模型（灯光/开关/空调/摄像机/风扇…）
+        <DeviceModel id={devModel.id} w={devModel.w} d={devModel.d} h={devModel.h} isOn={isOn} />
       ) : (
         // 无模型：小球兜底
         <mesh>

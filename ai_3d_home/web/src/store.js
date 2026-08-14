@@ -80,35 +80,44 @@ export function toast(msg, ms = 2200) {
 const listeners = new Set()
 let undoStack = []  // 撤销历史（project 深拷贝快照）
 let redoStack = []  // 重做历史
+let lastClean = JSON.parse(JSON.stringify(state.project))  // 上一次已提交的 project 深拷贝（就地修改时快照的基准）
 export function getState() { return state }
 export function setState(partial) {
   const next = typeof partial === 'function' ? partial(state) : partial
   // 修改 project 时保存快照（撤销用），限 50 步；新改动清空重做历史
   if (next.project && next.project !== state.project) {
-    undoStack.push(JSON.parse(JSON.stringify(state.project)))
+    undoStack.push(lastClean)
     if (undoStack.length > 50) undoStack.shift()
     redoStack = []
+    lastClean = JSON.parse(JSON.stringify(next.project))
   }
   state = { ...state, ...next }
   listeners.forEach((l) => l(state))
 }
 export function undo() {
   const prev = undoStack.pop()
-  if (!prev) return
-  redoStack.push(JSON.parse(JSON.stringify(state.project)))
+  if (!prev) { toast('已到撤销上限'); return }
+  redoStack.push(lastClean)
+  lastClean = prev
   state = { ...state, project: prev, saved: false, selected: null, wallSel: [] }
   listeners.forEach((l) => l(state))
+  toast(`已撤销（还可撤销 ${undoStack.length} 步）`)
 }
 export function redo() {
   const next = redoStack.pop()
-  if (!next) return
-  undoStack.push(JSON.parse(JSON.stringify(state.project)))
+  if (!next) { toast('已到恢复上限'); return }
+  undoStack.push(lastClean)
+  lastClean = next
   state = { ...state, project: next, saved: false, selected: null, wallSel: [] }
   listeners.forEach((l) => l(state))
+  toast(`已恢复（还可恢复 ${redoStack.length} 步）`)
 }
 // 加载项目（启动/恢复），不保存撤销快照
 export function loadProject(p) {
   state = { ...state, project: p }
+  lastClean = JSON.parse(JSON.stringify(p))
+  undoStack = []
+  redoStack = []
   listeners.forEach((l) => l(state))
 }
 export function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn) }
