@@ -42,6 +42,7 @@ export default function Editor() {
   const modelCatalog = useStore((s) => s.modelCatalog)
   const furnitureScale = useStore((s) => s.furnitureScale)
   const floor = currentFloor()
+  const currentFloorIdx = useStore((s) => s.currentFloor)
   const [furnOpen, setFurnOpen] = useState(false)
   const [catOpen, setCatOpen] = useState(false)
   const [openCats, setOpenCats] = useState({})
@@ -377,7 +378,7 @@ export default function Editor() {
       {/* 右侧信息栏 */}
       <div className="editor-info">
         <div className="editor-info-title">户型信息</div>
-        <div className="editor-info-row"><span>楼层</span><b>{currentFloor + 1} / {project.floors.length}</b></div>
+        <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
         <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
         <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
         <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
@@ -437,10 +438,10 @@ export default function Editor() {
       {/* 模型预览弹窗（3D 预览 + 尺寸 + 缩放 + 放置/删除） */}
       {previewModel && (
         <div className="modal-mask" onClick={() => closePreview()}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 400 }}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
             <div className="dname">{previewModel.label}</div>
             {show3d ? (
-              <div style={{ height: 280, borderRadius: 8, background: 'rgba(0,0,0,0.25)', margin: '10px 0', overflow: 'hidden' }}>
+              <div style={{ height: 400, borderRadius: 8, background: 'rgba(0,0,0,0.25)', margin: '10px 0', overflow: 'hidden' }}>
                 <ModelPreview model={previewModel} />
               </div>
             ) : previewModel.builtin ? (
@@ -449,7 +450,7 @@ export default function Editor() {
               </div>
             ) : (
               <img src={thumbUrl(previewModel.thumb)} alt={previewModel.label}
-                style={{ width: '100%', maxHeight: 280, objectFit: 'contain', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }} />
+                style={{ width: '100%', maxHeight: 400, objectFit: 'contain', borderRadius: 8, background: 'rgba(255,255,255,0.08)', margin: '10px 0' }} />
             )}
             <button onClick={() => setShow3d(!show3d)}
               style={{ display: 'block', width: '100%', padding: '7px', marginBottom: 10, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }}>
