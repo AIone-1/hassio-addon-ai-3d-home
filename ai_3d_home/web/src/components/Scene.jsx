@@ -553,10 +553,10 @@ export function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
   }
 }
 
-// 风扇叶片旋转（设备开着时转）
-function Spinner({ on, speed = 10, children }) {
+// 风扇叶片旋转（设备开着时转，axis 指定旋转轴）
+function Spinner({ on, speed = 10, axis = 'y', children }) {
   const ref = useRef()
-  useFrame((_, dt) => { if (on && ref.current) ref.current.rotation.y += dt * speed })
+  useFrame((_, dt) => { if (on && ref.current) ref.current.rotation[axis] += dt * speed })
   return <group ref={ref}>{children}</group>
 }
 // 空调气流着色器（直接照搬 JMGLink 原版 AC 气流动画：流动的空气粒子流）
@@ -783,20 +783,32 @@ export function DeviceModel({ id, w, d, h, isOn }) {
   if (kind === 'lock') {
     return <group>
       <FBox position={[0, 0, 0]} size={[w, h, d]} color="#8a9aa8" roughness={0.3} metalness={0.3} />
-      <mesh position={[0, 0, d / 2 + 0.002]}><cylinderGeometry args={[w * 0.18, w * 0.18, d * 0.15, 12]} /><meshStandardMaterial color="#1a2030" /></mesh>
+      <mesh position={[0, 0, d / 2 + 0.002]}><cylinderGeometry args={[w * 0.18, w * 0.18, d * 0.15, 12]} /><meshStandardMaterial color="#1a2030" emissive={isOn ? '#35cfff' : '#000000'} emissiveIntensity={isOn ? 0.5 : 0} /></mesh>
+      <mesh position={[0, h * 0.22, d / 2 + 0.004]}><circleGeometry args={[w * 0.1, 16]} /><meshBasicMaterial color={isOn ? '#35cfff' : '#5a6b7e'} /></mesh>
     </group>
   }
 
   if (kind === 'fan') {
     if (variant === 'floor') {
       return <group>
-        <mesh position={[0, h * 0.4, 0]}><cylinderGeometry args={[0.02, 0.02, h * 0.8, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
-        <mesh position={[0, 0, 0]}><cylinderGeometry args={[w * 0.5, w * 0.5, h * 0.1, 20]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
-        <mesh position={[0, 0, 0]}><sphereGeometry args={[w * 0.16, 12, 8]} /><meshStandardMaterial color="#eef2f5" /></mesh>
+        <mesh position={[0, h * 0.42, 0]}><cylinderGeometry args={[0.02, 0.02, h * 0.8, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
+        <mesh position={[0, 0, 0]}><cylinderGeometry args={[w * 0.5, w * 0.52, h * 0.12, 24]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
+        <Spinner on={isOn} axis="z" speed={14}>
+          {[0, 1, 2].map((i) => (
+            <mesh key={i} rotation={[0, 0, i * Math.PI * 2 / 3]} position={[0, 0, 0]}>
+              <boxGeometry args={[w * 0.42, 0.02, h * 0.1]} />
+              <meshStandardMaterial color="#e8edf2" />
+            </mesh>
+          ))}
+        </Spinner>
+        <mesh position={[0, 0, 0]}><sphereGeometry args={[w * 0.14, 12, 8]} /><meshStandardMaterial color="#aab6c4" /></mesh>
       </group>
     }
     if (variant === 'tower') {
-      return <mesh><cylinderGeometry args={[w * 0.5, w * 0.5, h, 20]} /><meshStandardMaterial color="#e8edf2" /></mesh>
+      return <group>
+        <mesh position={[0, h * 0.45, 0]}><cylinderGeometry args={[w * 0.5, w * 0.52, h * 0.9, 22]} /><meshStandardMaterial color="#e8edf2" /></mesh>
+        {isOn && <mesh position={[0, 0, 0]}><cylinderGeometry args={[w * 0.4, w * 0.42, h * 0.02, 22]} /><meshBasicMaterial color="#35cfff" transparent opacity={0.6} /></mesh>}
+      </group>
     }
     // ceiling 吊扇
     return <group>
@@ -1085,13 +1097,26 @@ function Window3D({ op, px, pz, level, ang, h, wd }) {
   )
 }
 
+// 设备「开」状态按域判断（对齐原版各设备的开状态）
+function deviceIsOn(domain, state) {
+  const h = state && state.state
+  if (!h || h === 'unavailable' || h === 'unknown') return false
+  switch (domain) {
+    case 'climate': return ['cool', 'heat', 'dry', 'fan_only', 'auto'].includes(h)
+    case 'lock': return ['unlocked', 'open', 'opening'].includes(h)
+    case 'vacuum': return ['cleaning', 'returning', 'on'].includes(h)
+    case 'cover': return ['open', 'opening', 'closing'].includes(h)
+    case 'media_player': return h === 'playing' || h === 'on'
+    case 'fan': return h !== 'off'
+    default: return h === 'on'
+  }
+}
+
 // ---------- 设备标记 ----------
 function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
   const state = useStore((s) => s.haStates[dev.entity_id])
   const domain = (dev.entity_id || '').split('.')[0]
-  // 设备「开」：普通设备 state==='on'；空调(climate) 只要不是 off 就是开（cool/heat/dry/fan_only…）
-  const st = state && state.state
-  const isOn = domain === 'climate' ? (st && st !== 'off' && st !== 'unknown' && st !== 'unavailable') : st === 'on'
+  const isOn = deviceIsOn(domain, state)
   const cat = dev.modelId ? getCatalogItem(dev.modelId) : null
   const devModel = dev.modelId ? DEVICE_MODELS.find((m) => m.id === dev.modelId) : null
   const isLight = domain === 'light' || domain === 'switch'
