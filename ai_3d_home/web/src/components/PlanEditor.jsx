@@ -101,6 +101,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const [pan, setPan] = useState([0, 0])
   const [draft, setDraft] = useState(null)     // { pts: [[x,y],...], walls: [墙对象] } 画墙草稿
   const [cursor, setCursor] = useState(null)    // [x,y] 世界坐标（已吸附）
+  const [cursorWall, setCursorWall] = useState(null)  // 光标吸附到已有墙时的墙点（蓝色提示）
   const dragRef = useRef(null)                  // 拖动的家具/设备对象
   const openingDragRef = useRef(null)           // 拖动的门窗对象（沿墙移动）
   const wallDragRef = useRef(null)              // 拖动的墙端点 { wall, which: 'start'|'end' }
@@ -127,29 +128,41 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     return [w.x, w.y]
   }
 
-  // 网格吸附 + 画墙轴向吸附（水平/垂直，让房间规整）+ 端点吸附
+  // 吸附到已有墙（含中点，不只端点），排除本次草稿已画的墙（避免光标吸回刚画的墙）
+  const wallSnapPoint = (pt) => {
+    let best = null, bd = 0.3
+    const exclude = new Set((draft?.walls || []).map((w) => w.id))
+    for (const w of (floor?.walls || [])) {
+      if (exclude.has(w.id)) continue
+      const r = pointToSeg(pt, w.start, w.end)
+      if (r.dist < bd) {
+        bd = r.dist
+        best = [w.start[0] + (w.end[0] - w.start[0]) * r.t, w.start[1] + (w.end[1] - w.start[1]) * r.t]
+      }
+    }
+    return best
+  }
+
+  // 网格吸附 + 画墙轴向吸附（水平/垂直，让房间规整）+ 墙吸附（含中点，便于共用墙/分割墙精准连接）
   const snap = (pt) => {
     let [x, y] = pt
+    if (tool === 'wall' && draft && draft.pts.length) {
+      // 起点吸附优先：靠近画墙起点时吸附（闭合），优先于墙吸附
+      const first = draft.pts[0]
+      if (Math.hypot(x - first[0], y - first[1]) < CLOSE) return [first[0], first[1]]
+    }
+    if (tool === 'wall') {
+      // 墙吸附优先于网格吸附，否则网格吸附会把点从墙上挪开导致分割墙/共用墙连不上
+      const wp = wallSnapPoint(pt)
+      if (wp) return wp
+    }
     if (snapOn) { x = Math.round(x / snapStep) * snapStep; y = Math.round(y / snapStep) * snapStep }
     if (tool === 'wall' && draft && draft.pts.length) {
-      // 起点吸附：靠近画墙起点时吸附，便于闭合（肉眼看不到闭合点，靠这个）
-      const first = draft.pts[0]
-      if (Math.hypot(x - first[0], y - first[1]) < CLOSE) { x = first[0]; y = first[1] }
+      // 轴向吸附：靠近水平/垂直方向时对齐到上一个点，让房间规整
       const last = draft.pts[draft.pts.length - 1]
       const dx = x - last[0], dy = y - last[1]
       if (Math.abs(dx) > 0.01 && Math.abs(dy / dx) < 0.18) y = last[1]
       else if (Math.abs(dy) > 0.01 && Math.abs(dx / dy) < 0.18) x = last[0]
-    }
-    // 端点吸附：吸附到已有墙段端点，便于共用墙精准连接
-    if (tool === 'wall') {
-      let best = null, bd = 0.25
-      for (const w of (floor?.walls || [])) {
-        for (const p of [w.start, w.end]) {
-          const d = Math.hypot(x - p[0], y - p[1])
-          if (d < bd) { bd = d; best = p }
-        }
-      }
-      if (best) { x = best[0]; y = best[1] }
     }
     return [x, y]
   }
@@ -429,7 +442,13 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setCursor([x, y])
       return
     }
-    setCursor((tool === 'wall' || tool === 'furniture' || tool === 'device') ? snap(w) : w)
+    if (tool === 'wall') {
+      setCursor(snap(w))
+      setCursorWall(wallSnapPoint(w))
+    } else {
+      setCursor((tool === 'furniture' || tool === 'device') ? snap(w) : w)
+      setCursorWall(null)
+    }
   }
 
   const handleUp = () => {
@@ -799,8 +818,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         )
       })()}
 
-      {/* 放置/画墙时的吸附点标记 */}
-      {(tool === 'furniture' || tool === 'device' || tool === 'wall') && cursor && (
+      {/* 画墙碰到已有墙时的蓝色提示（吸附点） */}
+      {tool === 'wall' && cursorWall && (
+        <g transform={`translate(${cursorWall[0]} ${cursorWall[1]})`} className="plan-cursor-wall">
+          <circle r="0.24" />
+        </g>
+      )}
+      {/* 放置/画墙时的吸附点标记（非墙上） */}
+      {(tool === 'furniture' || tool === 'device' || (tool === 'wall' && !cursorWall)) && cursor && (
         <g transform={`translate(${cursor[0]} ${cursor[1]})`} className="plan-cursor">
           <circle r="0.14" />
         </g>
