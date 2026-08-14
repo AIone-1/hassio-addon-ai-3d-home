@@ -67,13 +67,35 @@ export default function Editor() {
     a.download = `户型图.json`
     a.click()
   }
-  // 导出 SVG 矢量平面图
-  const exportSVG = () => {
+  // 取 2D 平面图 SVG（内联 .plan-* 样式，否则导出黑白的）
+  const getPlanSvg = () => {
     const svg = document.querySelector('.plan-editor')
-    if (!svg) return toast('请先进 2D 编辑模式')
+    if (!svg) return null
     const clone = svg.cloneNode(true)
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-    const xml = new XMLSerializer().serializeToString(clone)
+    const r = svg.getBoundingClientRect()
+    clone.setAttribute('width', r.width)
+    clone.setAttribute('height', r.height)
+    let css = ''
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of sheet.cssRules) {
+          if (rule.selectorText && rule.selectorText.includes('plan-')) {
+            css += rule.cssText + '\n'
+          }
+        }
+      } catch (e) {}
+    }
+    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style')
+    style.textContent = css
+    clone.insertBefore(style, clone.firstChild)
+    return clone
+  }
+  // 导出 SVG 矢量平面图
+  const exportSVG = () => {
+    const svg = getPlanSvg()
+    if (!svg) return toast('请先进 2D 编辑模式')
+    const xml = new XMLSerializer().serializeToString(svg)
     const blob = new Blob([xml], { type: 'image/svg+xml' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -82,7 +104,7 @@ export default function Editor() {
   }
   // 导出 PNG 图片（2D 平面图截图）
   const exportPNG = () => {
-    const svg = document.querySelector('.plan-editor')
+    const svg = getPlanSvg()
     if (!svg) return toast('请先进 2D 编辑模式')
     const xml = new XMLSerializer().serializeToString(svg)
     const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }))

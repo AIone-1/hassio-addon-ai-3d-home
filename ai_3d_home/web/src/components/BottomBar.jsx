@@ -1,4 +1,4 @@
-import { useStore, setState } from '../store'
+import { useStore, setState, getState, toast } from '../store'
 
 const MODES = ['全屋', '照明', '遮阳', '环境', '安防', '纯户型']
 
@@ -26,6 +26,38 @@ export default function BottomBar() {
     if (document.fullscreenElement) document.exitFullscreen?.()
     else document.documentElement.requestFullscreen?.()
   }
+  // 导出 3D 截图
+  const export3DPng = () => {
+    const canvas = document.querySelector('.canvas-wrap canvas')
+    if (!canvas) return toast('请先在 3D 视图')
+    const a = document.createElement('a')
+    a.href = canvas.toDataURL('image/png')
+    a.download = '户型3D.png'
+    a.click()
+  }
+  // 录制 3D 旋转视频（6 秒 webm）
+  const record3DVideo = () => {
+    const canvas = document.querySelector('.canvas-wrap canvas')
+    if (!canvas) return toast('请先在 3D 视图')
+    if (typeof MediaRecorder === 'undefined') return toast('浏览器不支持录制')
+    const stream = canvas.captureStream(30)
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' })
+    const chunks = []
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data) }
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = '户型3D.webm'
+      a.click()
+      toast('3D 视频已导出')
+    }
+    recorder.start()
+    const wasRotating = getState().autoRotate
+    setState({ autoRotate: true })
+    toast('正在录制 6 秒旋转视频…')
+    setTimeout(() => { recorder.stop(); if (!wasRotating) setState({ autoRotate: false }) }, 6000)
+  }
 
   return (
     <div className="bottom-bar">
@@ -50,6 +82,8 @@ export default function BottomBar() {
         </button>
         <button className="bb-btn" onClick={toggleFullscreen} title="全屏">⛶ 全屏</button>
         <button className="bb-btn" onClick={() => setState({ immersive: true })} title="纯净沉浸模式（双击退出）">👁 沉浸</button>
+        <button className="bb-btn" onClick={export3DPng} title="导出 3D 截图">📷 3D图</button>
+        <button className="bb-btn" onClick={record3DVideo} title="录制 3D 旋转视频">🎬 3D视频</button>
         <button className="bb-btn" onClick={cycleQuality} title="切换画质（流畅/均衡/高清/极致）">
           ⚙️ {qLabel}
         </button>
