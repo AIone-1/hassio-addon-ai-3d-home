@@ -108,7 +108,7 @@ function CameraFocus({ floorIndex }) {
       if (camera.fov !== 36) { camera.fov = 36; camera.updateProjectionMatrix() }
       camera.lookAt(c.x, 0.55, c.z)
     }
-  }, [floorIndex, view2d, recenterKey, JSON.stringify(floor?.rooms), JSON.stringify(floor?.walls), JSON.stringify(floor?.furniture)])
+  }, [floorIndex, view2d, recenterKey])
 
   return null
 }
