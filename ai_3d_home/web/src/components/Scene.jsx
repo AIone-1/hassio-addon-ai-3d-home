@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useStore, setState } from '../store'
@@ -118,6 +118,9 @@ function FBox({ position, size, color, roughness = 0.72 }) {
 // ---------- 家具模型（对齐原版：每个家具用多个盒子拼出具体造型，统一蓝灰主题色） ----------
 export function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
   const lib = FURNITURE_LIB.find((f) => f.type === type)
+  const devModel = DEVICE_MODELS.find((m) => m.id === type)
+  // 设备模型（开关/灯/空调/摄像机/风扇…）统一走 DeviceModel
+  if (devModel) return <DeviceModel id={devModel.id} w={devModel.w} d={devModel.d} h={devModel.h} />
   // 网上下载的 GLB 模型：直接加载渲染（自动缩放对齐）
   if (lib && lib.glb) return <GltfModel name={lib.glb} w={cw || lib.w} d={cd || lib.d} h={ch || lib.h} />
   const cat = getCatalogItem(type)
@@ -550,6 +553,37 @@ export function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
   }
 }
 
+// 风扇叶片旋转（设备开着时转）
+function Spinner({ on, speed = 10, children }) {
+  const ref = useRef()
+  useFrame((_, dt) => { if (on && ref.current) ref.current.rotation.y += dt * speed })
+  return <group ref={ref}>{children}</group>
+}
+// 空调气流（开着时向下流动的半透明风条）
+function Airflow({ on, w }) {
+  const ref = useRef()
+  useFrame((state) => {
+    if (!on || !ref.current) return
+    const t = state.clock.elapsedTime
+    ref.current.children.forEach((c, i) => {
+      const p = (t * 0.9 + i * 0.33) % 1
+      c.position.y = -0.12 - p * 0.55
+      c.material.opacity = 0.6 * (1 - p)
+      c.scale.setScalar(0.65 + 0.5 * p)
+    })
+  })
+  return (
+    <group ref={ref}>
+      {[0, 1, 2].map((i) => (
+        <mesh key={i}>
+          <planeGeometry args={[w * 0.5, w * 0.28]} />
+          <meshBasicMaterial color="#cfe8ff" transparent opacity={0.2} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 // ---------- 设备模型（对齐 JMGLink 原版 49 个设备模型，程序化几何） ----------
 // id 形如 "light.ceiling" / "switch.wall" / "fan.ceiling"，kind 是第一段，variant 是第二段
 export function DeviceModel({ id, w, d, h, isOn }) {
@@ -630,7 +664,8 @@ export function DeviceModel({ id, w, d, h, isOn }) {
     return <group>
       <FBox position={[0, 0, 0]} size={[w, h, d]} color="#f5f7fa" roughness={0.32} />
       <mesh position={[0, -h * 0.18, d / 2 + 0.002]}><planeGeometry args={[w * 0.82, h * 0.34]} /><meshStandardMaterial color="#c3ccd4" /></mesh>
-      <mesh position={[w * 0.32, h * 0.16, d / 2 + 0.004]}><sphereGeometry args={[0.015, 8, 8]} /><meshBasicMaterial color="#4ade80" /></mesh>
+      <mesh position={[w * 0.32, h * 0.16, d / 2 + 0.004]}><sphereGeometry args={[0.015, 8, 8]} /><meshBasicMaterial color={isOn ? '#4ade80' : '#8899aa'} /></mesh>
+      {isOn && <group position={[0, -h * 0.2, d / 2]}><Airflow on={isOn} w={w} /></group>}
     </group>
   }
 
@@ -711,10 +746,12 @@ export function DeviceModel({ id, w, d, h, isOn }) {
     // ceiling 吊扇
     return <group>
       <mesh><cylinderGeometry args={[w * 0.12, w * 0.12, h * 0.5, 16]} /><meshStandardMaterial color="#e8edf2" /></mesh>
-      {[0, 1, 2, 3].map((i) => {
-        const ang = i * Math.PI / 2
-        return <mesh key={i} position={[Math.cos(ang) * w * 0.3, 0, Math.sin(ang) * w * 0.3]} rotation={[0, -ang, 0]}><boxGeometry args={[w * 0.42, d * 0.04, h * 0.1]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
-      })}
+      <Spinner on={isOn}>
+        {[0, 1, 2, 3].map((i) => {
+          const ang = i * Math.PI / 2
+          return <mesh key={i} position={[Math.cos(ang) * w * 0.3, 0, Math.sin(ang) * w * 0.3]} rotation={[0, -ang, 0]}><boxGeometry args={[w * 0.42, d * 0.04, h * 0.1]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
+        })}
+      </Spinner>
     </group>
   }
 
@@ -1069,6 +1106,7 @@ export default function Scene({ onSelect, floorIndex }) {
   const editing = useStore((s) => s.editing)
   const showWalls = useStore((s) => s.showWalls)
   const showOpenings = useStore((s) => s.showOpenings)
+  const camTarget = useStore((s) => s.camTarget)
 
   // 放置工具（墙/家具/设备）时不拦截点击，让交互平面接收
   const interactive = tool === 'select' || tool === 'delete'
@@ -1108,12 +1146,12 @@ export default function Scene({ onSelect, floorIndex }) {
           </mesh>
         )}
 
-        {/* 网格：只在编辑时显示。2D 用加粗清晰网格（1m 格），3D 编辑用细网格 */}
+        {/* 网格：只在编辑时显示。2D 用加粗清晰网格（1m 格），3D 编辑用细网格（居中到户型中心） */}
         {editing && view2d && <DrawingGrid size={20} cell={1} level={level} night={night} />}
         {editing && !view2d && (
           <gridHelper
             args={[30, 30, night ? '#5a6a8a' : '#b8c6d8', night ? '#3a4a6a' : '#dde6ef']}
-            position={[0, level + 0.005, 0]}
+            position={[camTarget[0], level + 0.005, camTarget[2]]}
           />
         )}
 

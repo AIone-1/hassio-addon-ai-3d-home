@@ -392,10 +392,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       fl.furniture = fl.furniture || []
       const s = getState().furnitureScale || 1
       const lib = FURNITURE_LIB.find(f => f.type === furnitureType)
-      const placement = (lib && lib.placement) || 'floor'
+      const devModel = DEVICE_MODELS.find(m => m.id === furnitureType)
+      const placement = (lib && lib.placement) || (devModel && devModel.placement) || 'floor'
       const floorH = fl.height || 2.8
-      // 按放置面决定初始高度：地面 0 / 墙面默认离地 / 屋顶贴天花板
-      const h = placement === 'ceiling' ? floorH : placement === 'wall' ? FURNITURE_WALL_HEIGHT : 0
+      // 按放置面决定初始高度：地面 0 / 墙面默认离地（设备用其 defaultHeight）/ 屋顶贴天花板
+      const wallH = devModel ? (devModel.defaultHeight || FURNITURE_WALL_HEIGHT) : FURNITURE_WALL_HEIGHT
+      const h = placement === 'ceiling' ? floorH : placement === 'wall' ? wallH : 0
       fl.furniture.push({ id: uid(), type: furnitureType, pos: [x, h, y], rot: 0, scale: [s, s, s], placement })
       setState({ project: { ...getState().project }, saved: false })
       return
@@ -986,11 +988,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       {furniture.map(f => {
         const lib = FURNITURE_LIB.find(x => x.type === f.type)
         const cat = getCatalogItem(f.type)
-        const w = (f.width != null ? f.width : (lib ? lib.w : cat ? cat.w : 1)) * (f.scale ? f.scale[0] : 1)
-        const d = (f.depth != null ? f.depth : (lib ? lib.d : cat ? cat.d : 0.6)) * (f.scale ? f.scale[2] : 1)
-        const label = f.name || (lib ? f.type : (cat ? cat.label : f.type))
+        const devModel = DEVICE_MODELS.find(m => m.id === f.type)
+        const w = (f.width != null ? f.width : (lib ? lib.w : cat ? cat.w : devModel ? devModel.w : 1)) * (f.scale ? f.scale[0] : 1)
+        const d = (f.depth != null ? f.depth : (lib ? lib.d : cat ? cat.d : devModel ? devModel.d : 0.6)) * (f.scale ? f.scale[2] : 1)
+        const label = f.name || (lib ? f.type : (cat ? cat.label : devModel ? devModel.label : f.type))
         const selF = isSel('furniture', f.id)
-        const placement = f.placement || (lib && lib.placement) || 'floor'
+        const placement = f.placement || (lib && lib.placement) || (devModel && devModel.placement) || 'floor'
         return (
           <g
             key={f.id}

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore, setState, currentFloor, getState, toast, undo, redo, loadProject } from '../store'
 import { api } from '../api'
-import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
 import { thumbUrl } from '../catalog'
 import ModelPreview from './ModelPreview'
 
@@ -401,6 +401,33 @@ export default function Editor() {
                 )}
               </div>
             ))}
+            {/* 设备模型（开关/灯/空调/摄像机/风扇…统一管理，点击即可放置） */}
+            <div className="furn-cat" onClick={() => setOpenCats(o => ({ ...o, '设备模型': !o['设备模型'] }))}>
+              <span className="furn-cat-label">设备模型</span>
+              <span className="furn-cat-count">{DEVICE_MODELS.length}</span>
+              <span className="furn-cat-arrow">{openCats['设备模型'] ? '▾' : '▸'}</span>
+            </div>
+            {openCats['设备模型'] && (
+              <div style={{ padding: '0 0 8px 12px' }}>
+                {DEVICE_KINDS.map((k) => {
+                  const items = DEVICE_MODELS.filter((m) => m.kind === k.kind)
+                  if (items.length === 0) return null
+                  return (
+                    <div key={k.kind}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', margin: '4px 0' }}>{k.label}</div>
+                      <div className="furn-items">
+                        {items.map((m) => (
+                          <button key={m.id} className={`furn-item ${furnitureType === m.id ? 'active' : ''}`}
+                            onClick={() => { setState({ furnitureType: m.id, tool: 'furniture' }); setFurnOpen(false) }} title={m.label}>
+                            <span>{m.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
         <div className="et-sep" />
