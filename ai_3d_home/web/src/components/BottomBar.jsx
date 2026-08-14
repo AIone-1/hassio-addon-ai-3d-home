@@ -1,5 +1,5 @@
 import { useStore, setState, getState, toast } from '../store'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const MODES = ['全屋', '照明', '遮阳', '环境', '安防', '纯户型']
 
@@ -16,6 +16,18 @@ export default function BottomBar() {
   const deviceCount = new Set(project.floors.flatMap((f) => (f.devices || []).map((d) => d.entity_id))).size
   const [shareOpen, setShareOpen] = useState(false)
   const [qualityOpen, setQualityOpen] = useState(false)
+
+  // 点击空白处关闭 分享/画质 菜单
+  useEffect(() => {
+    const onDown = (e) => {
+      if (!shareOpen && !qualityOpen) return
+      const t = e.target
+      if (t.closest && t.closest('.bb-menu')) return
+      setShareOpen(false); setQualityOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [shareOpen, qualityOpen])
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen?.()

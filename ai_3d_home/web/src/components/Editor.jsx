@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore, setState, currentFloor, getState, toast } from '../store'
 import { api } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea } from '../three/geometry'
@@ -170,6 +170,18 @@ export default function Editor() {
   }
   const closePreview = () => { setPreviewModel(null); setShow3d(false) }
 
+  // 点击空白处关闭 模型选择器/设备分类 弹窗
+  useEffect(() => {
+    const onDown = (e) => {
+      if (!furnOpen && !catOpen) return
+      const t = e.target
+      if (t.closest && (t.closest('.furn-picker') || t.closest('.furn-item') || t.closest('.furn-cat'))) return
+      setFurnOpen(false); setCatOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [furnOpen, catOpen])
+
   const importJson = () => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -256,6 +268,8 @@ export default function Editor() {
   const infoRoomCount = (floor?.rooms || []).length
   const infoFurnCount = (floor?.furniture || []).length
   const infoDevCount = new Set((floor?.devices || []).map(d => d.entity_id)).size
+  const prevFloor = () => { if (currentFloorIdx > 0) setState({ currentFloor: currentFloorIdx - 1 }) }
+  const nextFloor = () => { if (currentFloorIdx < project.floors.length - 1) setState({ currentFloor: currentFloorIdx + 1 }) }
 
   return (
     <>
@@ -378,7 +392,14 @@ export default function Editor() {
       {/* 右侧信息栏 */}
       <div className="editor-info">
         <div className="editor-info-title">户型信息</div>
-        <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
+        <div className="editor-info-row">
+          <span>楼层</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button className="editor-info-nav" onClick={prevFloor}>◀</button>
+            <b>{currentFloorIdx + 1} / {project.floors.length}</b>
+            <button className="editor-info-nav" onClick={nextFloor}>▶</button>
+          </span>
+        </div>
         <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
         <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
         <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
