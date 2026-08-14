@@ -13,6 +13,8 @@ let state = {
   planImage: '',      // 2D 编辑器参考底图（data URL，空=无底图）
   planImageOpacity: 0.4,  // 底图透明度
   planImageScale: 1,  // 底图缩放倍数（1=铺满）
+  calibrating: false, // 标定模式（在底图上选已知长度）
+  calibratePts: [],   // 标定选的点 [[x,y], ...]
   // 视图
   quality: 'high',            // eco | smooth | balanced | high
   shadows: true,

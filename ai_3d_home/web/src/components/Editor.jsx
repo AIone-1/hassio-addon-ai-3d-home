@@ -312,6 +312,9 @@ export default function Editor() {
           )}
         </div>
         <button className="et-btn" onClick={importPlanImage}>导入底图</button>
+        {planImage && (
+          <button className="et-btn" onClick={() => { setState({ calibrating: true, calibratePts: [] }); toast('标定：点底图选一段已知长度的起点') }} title="底图比例尺标定">标定</button>
+        )}
         <button className="et-btn" onClick={() => setDefaultOpen(true)}>默认</button>
         {planImage && (
           <>

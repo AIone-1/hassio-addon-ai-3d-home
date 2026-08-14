@@ -265,10 +265,32 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   // ---------- 交互 ----------
   const handleFloorDown = (e) => {
     if (e.button === 2) {
-      // 右键 = 取消：取消画墙草稿 + 取消删除/画墙工具 + 取消选中
+      // 右键 = 取消：取消画墙草稿 + 取消删除/画墙工具 + 取消选中 + 退出标定
       if (draft) cancelDraft()
       if (tool === 'wall' || tool === 'delete') setState({ tool: 'select' })
       setState({ selected: null })
+      if (getState().calibrating) setState({ calibrating: false, calibratePts: [] })
+      return
+    }
+    // 标定模式：点底图选已知长度
+    if (getState().calibrating) {
+      const [x, y] = toWorld(e)
+      const pts = getState().calibratePts
+      if (pts.length === 0) {
+        setState({ calibratePts: [[x, y]] })
+        toast('标定起点已选，点底图选终点')
+      } else if (pts.length === 1) {
+        const dist = Math.hypot(x - pts[0][0], y - pts[0][1])
+        const real = prompt('这段线代表的实际长度（米）：', '3')
+        if (real && Number(real) > 0) {
+          const realLen = Number(real)
+          const scale = getState().planImageScale || 1
+          setState({ planImageScale: scale * realLen / dist, calibrating: false, calibratePts: [] })
+          toast(`已标定：${realLen} 米`)
+        } else {
+          setState({ calibrating: false, calibratePts: [] })
+        }
+      }
       return
     }
     if (e.button === 1 || tool === 'pan') {
