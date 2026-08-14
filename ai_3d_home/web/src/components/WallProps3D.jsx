@@ -31,14 +31,18 @@ export default function WallProps3D({ floorIndex }) {
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">高度</span>
+          <button onClick={() => commit(() => { wall.height = Math.max(1, (wall.height || 2.8) - 0.1) })}>−</button>
           <input type="number" step="0.1" min="1" max="6" value={wall.height || 2.8}
             onChange={(e) => commit(() => { wall.height = Number(e.target.value) || 2.8 })} />
+          <button onClick={() => commit(() => { wall.height = (wall.height || 2.8) + 0.1 })}>＋</button>
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">厚度</span>
+          <button onClick={() => commit(() => { wall.thickness = Math.max(0.05, (wall.thickness || 0.12) - 0.02) })}>−</button>
           <input type="number" step="0.02" min="0.05" max="0.5" value={wall.thickness || 0.12}
             onChange={(e) => commit(() => { wall.thickness = Number(e.target.value) || 0.12 })} />
+          <button onClick={() => commit(() => { wall.thickness = (wall.thickness || 0.12) + 0.02 })}>＋</button>
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
