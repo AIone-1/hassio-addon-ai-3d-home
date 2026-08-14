@@ -182,8 +182,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       // 轴向吸附：靠近水平/垂直方向时对齐到上一个点，让房间规整
       const last = draft.pts[draft.pts.length - 1]
       const dx = x - last[0], dy = y - last[1]
-      if (Math.abs(dx) > 0.01 && Math.abs(dy / dx) < 0.18) y = last[1]
-      else if (Math.abs(dy) > 0.01 && Math.abs(dx / dy) < 0.18) x = last[0]
+      if (Math.abs(dx) > 0.01 && Math.abs(dy / dx) < 0.0875) y = last[1]
+      else if (Math.abs(dy) > 0.01 && Math.abs(dx / dy) < 0.0875) x = last[0]
     }
     return [x, y]
   }
@@ -191,8 +191,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   // 轴向吸附：把 pt 吸附到相对 anchor 的水平/垂直方向（拖动墙端点时用，水平/竖直有停顿感）
   const snapAxis = (pt, anchor) => {
     const dx = pt[0] - anchor[0], dy = pt[1] - anchor[1]
-    if (Math.abs(dx) > 0.01 && Math.abs(dy / dx) < 0.18) return [pt[0], anchor[1]]
-    if (Math.abs(dy) > 0.01 && Math.abs(dx / dy) < 0.18) return [anchor[0], pt[1]]
+    if (Math.abs(dx) > 0.01 && Math.abs(dy / dx) < 0.0875) return [pt[0], anchor[1]]
+    if (Math.abs(dy) > 0.01 && Math.abs(dx / dy) < 0.0875) return [anchor[0], pt[1]]
     return pt
   }
 
@@ -670,6 +670,65 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     fl.rooms = recomputeRooms(fl)
     setState({ project: { ...getState().project }, saved: false, wallSel: [a.id, b.id] })
   }
+  // 改墙起点 / 终点（坐标直接改）
+  const setWallStart = (w, x, y) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(v => v.id === w.id)
+    if (!target) return
+    target.start = [x, y]
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false })
+  }
+  const setWallEnd = (w, x, y) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(v => v.id === w.id)
+    if (!target) return
+    target.end = [x, y]
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false })
+  }
+  // 调换起点/终点
+  const swapWall = (w) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(v => v.id === w.id)
+    if (!target) return
+    const s = target.start
+    target.start = target.end
+    target.end = s
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false })
+  }
+  // 方向改成水平/竖直（以起点为基准，保持长度，保持左/右、上/下的朝向符号）
+  const setWallDir = (w, dir) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(v => v.id === w.id)
+    if (!target) return
+    const dx = target.end[0] - target.start[0], dy = target.end[1] - target.start[1]
+    const len = Math.hypot(dx, dy)
+    if (len < 1e-6) return
+    if (dir === 'horizontal') {
+      const s = dx >= 0 ? 1 : -1
+      target.end = [target.start[0] + s * len, target.start[1]]
+    } else {
+      const s = dy >= 0 ? 1 : -1
+      target.end = [target.start[0], target.start[1] + s * len]
+    }
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false })
+  }
+  // 按角度改方向（度，以起点为基准、保持长度）
+  const setWallAngle = (w, deg) => {
+    const fl = getState().project.floors[floorIndex]
+    const target = (fl.walls || []).find(v => v.id === w.id)
+    if (!target) return
+    const dx = target.end[0] - target.start[0], dy = target.end[1] - target.start[1]
+    const len = Math.hypot(dx, dy)
+    if (len < 1e-6) return
+    const rad = (Number(deg) || 0) * Math.PI / 180
+    target.end = [target.start[0] + Math.cos(rad) * len, target.start[1] + Math.sin(rad) * len]
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false })
+  }
   // 下载模型按分类分组（设备选模型用）
   const groupedCatalog = useMemo(() => {
     const m = {}
@@ -774,7 +833,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
               strokeOpacity={((w.opacity != null ? w.opacity : wallOpacity) / 100)}
               onClick={(e) => {
                 if (tool === 'delete') { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
-                else if (tool === 'select') { e.stopPropagation(); toggleWallSel(w.id) }
+                else if (tool === 'select') {
+                  e.stopPropagation()
+                  // Ctrl/Cmd 多选；普通点击单选（替换）
+                  if (e.ctrlKey || e.metaKey) toggleWallSel(w.id)
+                  else setState({ wallSel: [w.id], selected: null })
+                }
               }}
             />
             {selW && tool === 'select' && (
@@ -1174,6 +1238,21 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       <div className="plan-props">
         <div className="plan-props-head">
           <span>墙</span>
+          <button className="plan-props-del" onClick={() => swapWall(selWall)} title="调换起点/终点">⇅ 调换</button>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">起点</span>
+          <input type="number" step="0.1" title="X" value={Math.round(selWall.start[0] * 100) / 100}
+            onChange={(e) => setWallStart(selWall, Number(e.target.value) || 0, selWall.start[1])} />
+          <input type="number" step="0.1" title="Y" value={Math.round(selWall.start[1] * 100) / 100}
+            onChange={(e) => setWallStart(selWall, selWall.start[0], Number(e.target.value) || 0)} />
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">终点</span>
+          <input type="number" step="0.1" title="X" value={Math.round(selWall.end[0] * 100) / 100}
+            onChange={(e) => setWallEnd(selWall, Number(e.target.value) || 0, selWall.end[1])} />
+          <input type="number" step="0.1" title="Y" value={Math.round(selWall.end[1] * 100) / 100}
+            onChange={(e) => setWallEnd(selWall, selWall.end[0], Number(e.target.value) || 0)} />
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">长度</span>
@@ -1188,6 +1267,15 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <span style={{ fontSize: 12, color: 'var(--text)' }}>
             {Math.abs(selWall.end[1] - selWall.start[1]) < 0.01 ? '水平' : Math.abs(selWall.end[0] - selWall.start[0]) < 0.01 ? '竖直' : '斜线'}
           </span>
+          <button className="plan-props-seg" onClick={() => setWallDir(selWall, 'horizontal')}>水平</button>
+          <button className="plan-props-seg" onClick={() => setWallDir(selWall, 'vertical')}>竖直</button>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">角度</span>
+          <input type="number" step="5"
+            value={Math.round(Math.atan2(selWall.end[1] - selWall.start[1], selWall.end[0] - selWall.start[0]) * 180 / Math.PI)}
+            onChange={(e) => setWallAngle(selWall, Number(e.target.value) || 0)} />
+          <span className="plan-props-unit">°</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">高度</span>
