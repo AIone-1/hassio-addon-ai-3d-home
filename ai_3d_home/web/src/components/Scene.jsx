@@ -952,6 +952,8 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   const pts = room.points || []
   const view2d = useStore((s) => s.view2d)
   const showCeiling = useStore((s) => s.showCeiling)
+  const roofOpacity = useStore((s) => s.roofOpacity)
+  const roofColor = useStore((s) => s.roofColor)
   const editing = useStore((s) => s.editing)
   // 所有房间地板同一高度（对齐原版 0.025m；房间不重叠，无需高度差）
   const floorY = level + 0.025
@@ -972,7 +974,7 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
       {/* 主界面屋顶：封闭房间顶上加半透明顶面（和地板同一多边形，只在不同高度，不翻转） */}
       {showCeiling && !editing && !view2d && (
         <mesh geometry={floorGeo} position={[0, level + (floor.height || 2.8), 0]} renderOrder={2}>
-          <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.5} metalness={0.02} transparent opacity={0.8} depthWrite={false} side={THREE.DoubleSide} />
+          <meshPhysicalMaterial color={roofColor || room.color || floor.color || '#7789ad'} roughness={0.5} metalness={0.02} transparent opacity={(roofOpacity != null ? roofOpacity : 80) / 100} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
       )}
       {/* 2D 地板描边：让房间范围一目了然 */}

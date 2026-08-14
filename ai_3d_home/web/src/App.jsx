@@ -28,6 +28,8 @@ export default function App() {
   const bgColor = useStore((s) => s.bgColor)
   const bgGradient1 = useStore((s) => s.bgGradient1)
   const bgGradient2 = useStore((s) => s.bgGradient2)
+  const roofOpacity = useStore((s) => s.roofOpacity)
+  const roofColor = useStore((s) => s.roofColor)
   const view2d = useStore((s) => s.view2d)
   const immersive = useStore((s) => s.immersive)
   const settings = useStore((s) => s.settings)
@@ -319,7 +321,7 @@ export default function App() {
       {/* 设置面板：背景图 */}
       {settingsOpen && (
         <div className="modal-mask" onClick={() => setState({ settingsOpen: false })}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '92vw', maxHeight: '88vh', overflowY: 'auto' }}>
             <div className="dname">设置</div>
             {/* 默认选项 */}
             <div className="field" style={{ margin: '12px 0' }}>
@@ -439,6 +441,18 @@ export default function App() {
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>颜色 2（底）</div>
                   <HexColorPicker value={bgGradient2} onChange={(c) => { setState({ bgGradient2: c, bgMode: 'gradient', bgImage: '' }); api.saveSettings({ ...getState().settings, bgGradient2: c, bgMode: 'gradient', bgImage: '' }).catch(() => {}) }} />
                 </div>
+              </div>
+            </div>
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>屋顶</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>不透明度</span>
+                <input type="range" min="10" max="100" step="5" style={{ flex: 1 }} value={roofOpacity != null ? roofOpacity : 80}
+                  onChange={(e) => { const v = Number(e.target.value); setState({ roofOpacity: v }); api.saveSettings({ ...getState().settings, roofOpacity: v }).catch(() => {}) }} />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{roofOpacity != null ? roofOpacity : 80}%</span>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <HexColorPicker value={roofColor || '#7789ad'} onChange={(c) => { setState({ roofColor: c }); api.saveSettings({ ...getState().settings, roofColor: c }).catch(() => {}) }} />
               </div>
             </div>
           </div>
