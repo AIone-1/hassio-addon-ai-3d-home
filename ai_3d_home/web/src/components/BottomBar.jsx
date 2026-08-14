@@ -135,7 +135,7 @@ export default function BottomBar() {
           if (editing) setState({ editing: false, view2d: false, tool: 'select' })
           else setState({ editing: true, view2d: true })
         }}>
-          {editing ? '退出编辑' : '✏️ 编辑'}
+          {editing ? '退出编辑' : '🧊 编辑'}
         </button>
         <button className="bb-btn" onClick={() => setState({ settingsOpen: true })}>设置</button>
       </div>
