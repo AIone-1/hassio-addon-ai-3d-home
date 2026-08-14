@@ -1142,13 +1142,41 @@ function deviceIsOn(domain, state) {
 }
 
 // ---------- 设备标记 ----------
-function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
+function DeviceMarker({ dev, level, selected, onSelect, interactive, canDrag, onMove }) {
   const state = useStore((s) => s.haStates[dev.entity_id])
   const domain = (dev.entity_id || '').split('.')[0]
   const isOn = deviceIsOn(domain, state)
   const cat = dev.modelId ? getCatalogItem(dev.modelId) : null
   const devModel = dev.modelId ? DEVICE_MODELS.find((m) => m.id === dev.modelId) : null
   const isLight = domain === 'light' || domain === 'switch'
+  const { camera, gl } = useThree()
+  const raycaster = useMemo(() => new THREE.Raycaster(), [])
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -level), [level])
+  const dragRef = useRef(false)
+  const tool = useStore((s) => s.tool)
+  const pickItem = useStore((s) => s.pickItem)
+  const isPicked = pickItem && pickItem.type === 'device' && pickItem.id === dev.id
+  const rot = dev.rot || 0
+  const sc = dev.scale || [1, 1, 1]
+
+  const toWorld = (e) => {
+    const rect = gl.domElement.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
+    const p = new THREE.Vector3()
+    return raycaster.ray.intersectPlane(plane, p) ? p : null
+  }
+  useFrame((state) => {
+    if (!isPicked) return
+    raycaster.setFromCamera(state.pointer, camera)
+    const p = new THREE.Vector3()
+    if (raycaster.ray.intersectPlane(plane, p)) {
+      dev.pos[0] = Math.round(p.x * 10) / 10
+      dev.pos[2] = Math.round(p.z * 10) / 10
+      onMove && onMove()
+    }
+  })
 
   let color = '#556677', emissive = '#334455'
   if (domain === 'light' || domain === 'switch') {
@@ -1167,7 +1195,39 @@ function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
   return (
     <group
       position={[dev.pos[0], level + (dev.pos[1] || 1.4), dev.pos[2]]}
-      onClick={interactive ? (e) => { e.stopPropagation(); onSelect(dev) } : undefined}
+      rotation={[0, rot * Math.PI / 180, 0]}
+      scale={sc}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (tool === 'move') {
+          if (isPicked) setState({ pickItem: null })
+          else { onSelect(dev); setState({ pickItem: { type: 'device', id: dev.id } }) }
+        } else if (tool === 'select' || tool === 'delete') {
+          onSelect(dev)
+        }
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        onSelect(dev)
+        setState({ tool: 'move', pickItem: { type: 'device', id: dev.id } })
+      }}
+      onPointerDown={canDrag ? (e) => {
+        e.stopPropagation()
+        onSelect(dev)
+        dragRef.current = true
+        e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId)
+      } : undefined}
+      onPointerMove={canDrag ? (e) => {
+        if (!dragRef.current && !isPicked) return
+        e.stopPropagation()
+        const p = toWorld(e)
+        if (p) {
+          dev.pos[0] = Math.round(p.x * 10) / 10
+          dev.pos[2] = Math.round(p.z * 10) / 10
+          onMove && onMove()
+        }
+      } : undefined}
+      onPointerUp={canDrag ? () => { dragRef.current = false } : undefined}
     >
       {cat ? (
         // 下载的 GLB 模型（家具/家电）
@@ -1389,6 +1449,8 @@ export default function Scene({ onSelect, floorIndex }) {
           <DeviceMarker key={dev.id} dev={dev} level={level}
             selected={sel && sel.type === 'device' && sel.ref.id === dev.id}
             interactive={interactive}
+            canDrag={canDrag}
+            onMove={handleMoveFurniture}
             onSelect={(d) => onSelect({ type: 'device', ref: d })} />
         ))}
       </group>

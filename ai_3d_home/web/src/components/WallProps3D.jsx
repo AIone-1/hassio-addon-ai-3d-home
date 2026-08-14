@@ -122,9 +122,32 @@ export default function WallProps3D({ floorIndex }) {
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">高度</span>
+          <button onClick={() => commit(() => { d.pos[1] = Math.max(0, (d.pos[1] || 1.4) - 0.1) })}>−</button>
           <input type="number" step="0.1" min="0" max="6" value={Math.round((d.pos[1] || 1.4) * 100) / 100}
             onChange={(e) => commit(() => { d.pos[1] = Number(e.target.value) || 0 })} />
+          <button onClick={() => commit(() => { d.pos[1] = (d.pos[1] || 1.4) + 0.1 })}>＋</button>
           <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">位置</span>
+          <button className="plan-props-seg" onClick={() => commit(() => { d.pos[1] = 0 })}>地面</button>
+          <button className="plan-props-seg" onClick={() => commit(() => { d.pos[1] = fl.height || 2.8 })}>屋顶</button>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">旋转</span>
+          <button onClick={() => commit(() => { d.rot = ((d.rot || 0) - 15 + 360) % 360 })}>−</button>
+          <input type="number" step="5" value={Math.round(d.rot || 0)}
+            onChange={(e) => commit(() => { d.rot = (Number(e.target.value) % 360 + 360) % 360 })} />
+          <button onClick={() => commit(() => { d.rot = ((d.rot || 0) + 15) % 360 })}>＋</button>
+          <span className="plan-props-unit">°</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">缩放</span>
+          <button onClick={() => { const v = Math.max(0.1, (d.scale ? d.scale[0] : 1) - 0.1); commit(() => { d.scale = [v, v, v] }) }}>−</button>
+          <input type="number" step="5" min="10" value={Math.round((d.scale ? d.scale[0] : 1) * 100)}
+            onChange={(e) => { const v = Math.max(0.1, (Number(e.target.value) || 100) / 100); commit(() => { d.scale = [v, v, v] }) }} />
+          <button onClick={() => { const v = (d.scale ? d.scale[0] : 1) + 0.1; commit(() => { d.scale = [v, v, v] }) }}>＋</button>
+          <span className="plan-props-unit">%</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">实体</span>
