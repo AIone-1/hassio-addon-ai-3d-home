@@ -83,6 +83,11 @@ export default function WallProps3D({ floorIndex }) {
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
+          <span className="plan-props-label">位置</span>
+          <button className="plan-props-seg" onClick={() => commit(() => { f.pos[1] = 0; f.placement = 'floor' })}>地面</button>
+          <button className="plan-props-seg" onClick={() => commit(() => { f.pos[1] = fl.height || 2.8; f.placement = 'ceiling' })}>屋顶</button>
+        </div>
+        <div className="plan-props-row">
           <span className="plan-props-label">旋转</span>
           <button onClick={() => commit(() => { f.rot = ((f.rot || 0) - 15 + 360) % 360 })}>−</button>
           <input type="number" step="5" value={Math.round(f.rot || 0)}

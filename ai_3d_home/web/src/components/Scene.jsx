@@ -1192,6 +1192,11 @@ function DeviceMarker({ dev, level, selected, onSelect, interactive }) {
           <meshBasicMaterial color="#2f7fe0" side={THREE.DoubleSide} transparent opacity={0.8} />
         </mesh>
       )}
+      {/* 透明点击区域：让小的设备（吊扇等薄片/小球）也容易选中 */}
+      <mesh>
+        <sphereGeometry args={[0.32, 8, 8]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
     </group>
   )
 }

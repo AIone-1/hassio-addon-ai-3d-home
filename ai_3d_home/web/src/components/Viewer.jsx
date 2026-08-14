@@ -184,14 +184,25 @@ export default function Viewer({ onSelect, floorIndex }) {
   const q = QUALITY[quality] || QUALITY.balanced
   const fogColor = night ? '#0a1020' : (MODE_FOG[mode] || MODE_FOG['全屋'])
 
-  // 3D 视图右键 = 取消（取消选中/墙多选/拾起的家具 + 退出删除/放置/移动工具）
+  // 3D 视图右键 = 取消（单击右键取消；按住右键拖动=平移，不算取消）
   useEffect(() => {
-    const onCtx = (e) => {
-      e.preventDefault()
-      setState({ tool: 'select', selected: null, wallSel: [], pickItem: null })
+    let down = null
+    const onDown = (e) => { if (e.button === 2) down = [e.clientX, e.clientY] }
+    const onUp = (e) => {
+      if (e.button !== 2 || !down) { down = null; return }
+      const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1])
+      down = null
+      if (moved < 5) setState({ tool: 'select', selected: null, wallSel: [], pickItem: null })
     }
+    const onCtx = (e) => e.preventDefault()
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('pointerup', onUp)
     document.addEventListener('contextmenu', onCtx)
-    return () => document.removeEventListener('contextmenu', onCtx)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('contextmenu', onCtx)
+    }
   }, [])
 
   return (
