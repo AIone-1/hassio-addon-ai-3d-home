@@ -41,6 +41,7 @@ export default function Editor() {
   const project = useStore((s) => s.project)
   const modelCatalog = useStore((s) => s.modelCatalog)
   const furnitureScale = useStore((s) => s.furnitureScale)
+  const selected = useStore((s) => s.selected)
   const floor = currentFloor()
   const currentFloorIdx = useStore((s) => s.currentFloor)
   const [furnOpen, setFurnOpen] = useState(false)
@@ -51,6 +52,7 @@ export default function Editor() {
   const [defaultOpen, setDefaultOpen] = useState(false)
   const [previewModel, setPreviewModel] = useState(null)
   const [show3d, setShow3d] = useState(false)
+  const [floorManagerOpen, setFloorManagerOpen] = useState(false)
 
   // 下载模型按中文分类分组
   const groupedCatalog = useMemo(() => {
@@ -254,6 +256,14 @@ export default function Editor() {
     project.floors.splice(idx + 1, 0, copy)
     setState({ project: { ...project }, currentFloor: idx + 1 })
   }
+  // 新建空白楼层
+  const newFloor = () => {
+    const n = project.floors.length
+    const fl = { id: Math.random().toString(36).slice(2, 10), name: `第${n + 1}层`, level: n * 3, height: 2.8, color: '#e6dcc8', rooms: [], walls: [], furniture: [], devices: [], openings: [] }
+    project.floors.push(fl)
+    setState({ project: { ...project }, currentFloor: n, saved: false })
+    toast(`已新建「${fl.name}」`)
+  }
 
   const deleteFloor = () => {
     if (project.floors.length <= 1) { alert('至少保留一层'); return }
@@ -270,6 +280,12 @@ export default function Editor() {
   const infoDevCount = new Set((floor?.devices || []).map(d => d.entity_id)).size
   const prevFloor = () => { if (currentFloorIdx > 0) setState({ currentFloor: currentFloorIdx - 1 }) }
   const nextFloor = () => { if (currentFloorIdx < project.floors.length - 1) setState({ currentFloor: currentFloorIdx + 1 }) }
+  const selRoom = selected && selected.type === 'room' ? selected.ref : null
+  const renameRoom = (name) => {
+    const fl = getState().project.floors[currentFloorIdx]
+    const target = (fl.rooms || []).find(r => r.id === selRoom.id)
+    if (target) { target.name = name; setState({ project: { ...getState().project }, saved: false }) }
+  }
 
   return (
     <>
@@ -392,19 +408,45 @@ export default function Editor() {
       {/* 右侧信息栏 */}
       <div className="editor-info">
         <div className="editor-info-title">户型信息</div>
-        <div className="editor-info-row">
-          <span>楼层</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button className="editor-info-nav" onClick={prevFloor}>◀</button>
-            <b>{currentFloorIdx + 1} / {project.floors.length}</b>
-            <button className="editor-info-nav" onClick={nextFloor}>▶</button>
-          </span>
-        </div>
+        {selRoom && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>当前房间名</div>
+            <input type="text" value={selRoom.name || ''} onChange={(e) => renameRoom(e.target.value)}
+              style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+        )}
+        <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
         <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
         <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
         <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
         <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
+        <button className="editor-info-manage" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>
       </div>
+
+      {/* 楼层管理弹窗 */}
+      {floorManagerOpen && (
+        <div className="modal-mask" onClick={() => setFloorManagerOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="dname">楼层管理</div>
+            <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, margin: '10px 0' }}>
+              {project.floors.map((f, i) => (
+                <div key={f.id} onClick={() => { setState({ currentFloor: i }); setFloorManagerOpen(false) }}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 6, background: i === currentFloorIdx ? 'var(--accent)' : 'var(--panel2)', color: i === currentFloorIdx ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12 }}>
+                  <span>{f.name}</span>
+                  {i === currentFloorIdx && <span style={{ fontSize: 10 }}>当前</span>}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              <button style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--accent)', color: '#081018', cursor: 'pointer', fontSize: 12 }} onClick={() => { newFloor(); setFloorManagerOpen(false) }}>新建楼层</button>
+              <button style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={() => { duplicateFloor(); setFloorManagerOpen(false) }}>复制当前层</button>
+              <button style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={() => { resetFloor(); setFloorManagerOpen(false) }}>清空当前层</button>
+              <button style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 12 }} onClick={() => { deleteFloor(); setFloorManagerOpen(false) }}>删除楼层</button>
+            </div>
+            <button className="close-btn" onClick={() => setFloorManagerOpen(false)}>关闭</button>
+          </div>
+        </div>
+      )}
 
       {/* 存档列表弹窗 */}
       {backupOpen && (

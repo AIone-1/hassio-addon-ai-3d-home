@@ -501,15 +501,6 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     return Object.entries(m)
   }, [modelCatalog])
 
-  // ---------- 房间属性编辑（改名） ----------
-  const selRoom = selected && selected.type === 'room' ? selected.ref : null
-  const patchRoom = (r, patch) => {
-    const fl = getState().project.floors[floorIndex]
-    const target = (fl.rooms || []).find(x => x.id === r.id)
-    if (!target) return
-    Object.assign(target, patch)
-    setState({ project: { ...getState().project }, saved: false })
-  }
   const rooms = floor?.rooms || []
   const walls = floor?.walls || []
   const openings = floor?.openings || []
@@ -873,18 +864,6 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         <div className="plan-props-row">
           <span className="plan-props-label">实体</span>
           <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selDevice.entity_id}</span>
-        </div>
-      </div>
-    )}
-    {selRoom && (
-      <div className="plan-props">
-        <div className="plan-props-head">
-          <span>房间</span>
-        </div>
-        <div className="plan-props-row">
-          <span className="plan-props-label">名字</span>
-          <input type="text" value={selRoom.name || ''}
-            onChange={(e) => patchRoom(selRoom, { name: e.target.value })} />
         </div>
       </div>
     )}
