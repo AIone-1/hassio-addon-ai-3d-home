@@ -20,6 +20,9 @@ const BUILTIN_DEVICES = [
   { type: '热水器', icon: '♨️' },
   { type: '窗帘', icon: '🪟' },
   { type: '传感器', icon: '📡' },
+  { type: '开关', icon: '🔘' },
+  { type: '感应器', icon: '👁️' },
+  { type: '风扇', icon: '🌀' },
   { type: '灯带', icon: '✨' },
 ]
 // 地板颜色（选中房间可改）
@@ -124,6 +127,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const [draft, setDraft] = useState(null)     // { pts: [[x,y],...], walls: [墙对象] } 画墙草稿
   const [cursor, setCursor] = useState(null)    // [x,y] 世界坐标（已吸附）
   const [cursorWall, setCursorWall] = useState(null)  // 光标吸附到已有墙时的墙点（蓝色提示）
+  const [cutPoint, setCutPoint] = useState(null)      // 裁剪时的交点提示（橙色）
   const dragRef = useRef(null)                  // 拖动的家具/设备对象
   const openingDragRef = useRef(null)           // 拖动的门窗对象（沿墙移动）
   const wallDragRef = useRef(null)              // 拖动的墙端点 { wall, which: 'start'|'end' }
@@ -372,14 +376,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     if (tool === 'wall') { addWallPoint(toWorld(e)); return }
     if (tool === 'cut') {
       // 裁剪：找离点击最近的墙，在与其它墙的交点处切成两段
-      const p = toWorld(e)
-      let best = null, bd = 0.5
-      for (const w of (floor?.walls || [])) {
-        const r = pointToSeg(p, w.start, w.end)
-        if (r.dist < bd) { bd = r.dist; best = w }
-      }
-      if (best) cutWall(best, p)
-      else toast('请点击要裁剪的墙')
+      const t = findCutTarget(toWorld(e))
+      if (t) cutWall(t.wall, t.point)
+      else toast('请点击要裁剪的墙（和其它墙相交处）')
       return
     }
     if (tool === 'movePlan') {
@@ -486,12 +485,19 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setCursor([x, y])
       return
     }
-    if (tool === 'wall') {
+    if (tool === 'cut') {
+      const t = findCutTarget(w)
+      setCutPoint(t ? t.point : null)
+      setCursorWall(null)
+      setCursor(null)
+    } else if (tool === 'wall') {
       setCursor(snap(w))
       setCursorWall(wallSnapPoint(w))
+      setCutPoint(null)
     } else {
       setCursor((tool === 'furniture' || tool === 'device') ? snap(w) : w)
       setCursorWall(null)
+      setCutPoint(null)
     }
   }
 
@@ -706,28 +712,34 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     fl.rooms = recomputeRooms(fl)
     setState({ project: { ...getState().project }, saved: false })
   }
-  // 裁剪：把墙在与其它墙的交点处切成两段（吸附到交点，切完房间仍闭合）
-  const cutWall = (w, clickPt) => {
+  // 找裁剪目标：离 p 最近的墙 + 它和别的墙的交点（交点不能在端点）
+  const findCutTarget = (p) => {
     const fl = getState().project.floors[floorIndex]
-    const target = (fl.walls || []).find(v => v.id === w.id)
-    if (!target) return
+    let wBest = null, wD = 0.5
+    for (const w of (fl.walls || [])) {
+      const r = pointToSeg(p, w.start, w.end)
+      if (r.dist < wD) { wD = r.dist; wBest = w }
+    }
+    if (!wBest) return null
     let best = null, bd = Infinity
     for (const o of (fl.walls || [])) {
-      if (o.id === target.id) continue
-      const ip = segmentIntersect(target.start, target.end, o.start, o.end)
+      if (o.id === wBest.id) continue
+      const ip = segmentIntersect(wBest.start, wBest.end, o.start, o.end)
       if (ip) {
-        const d = Math.hypot(ip[0] - clickPt[0], ip[1] - clickPt[1])
+        const d = Math.hypot(ip[0] - p[0], ip[1] - p[1])
         if (d < bd) { bd = d; best = ip }
       }
     }
-    if (!best) { toast('这面墙没有和其他墙相交'); return }
-    if (Math.hypot(best[0] - target.start[0], best[1] - target.start[1]) < 0.01 ||
-        Math.hypot(best[0] - target.end[0], best[1] - target.end[1]) < 0.01) {
-      toast('交点就在端点，无需裁剪')
-      return
-    }
-    const w2 = { id: uid(), start: [...best], end: [...target.end], height: target.height, thickness: target.thickness, color: target.color, opacity: target.opacity }
-    target.end = [...best]
+    if (!best) return null
+    if (Math.hypot(best[0] - wBest.start[0], best[1] - wBest.start[1]) < 0.01 ||
+        Math.hypot(best[0] - wBest.end[0], best[1] - wBest.end[1]) < 0.01) return null
+    return { wall: wBest, point: best }
+  }
+  // 裁剪：把墙在与其它墙的交点处切成两段（吸附到交点，切完房间仍闭合）
+  const cutWall = (target, pt) => {
+    const fl = getState().project.floors[floorIndex]
+    const w2 = { id: uid(), start: [...pt], end: [...target.end], height: target.height, thickness: target.thickness, color: target.color, opacity: target.opacity }
+    target.end = [...pt]
     fl.walls.push(w2)
     fl.rooms = recomputeRooms(fl)
     setState({ project: { ...getState().project }, saved: false, wallSel: [target.id, w2.id] })
@@ -760,6 +772,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     target.end = s
     fl.rooms = recomputeRooms(fl)
     setState({ project: { ...getState().project }, saved: false })
+  }
+  // 删除选中墙
+  const deleteWall = (w) => {
+    const fl = getState().project.floors[floorIndex]
+    fl.walls = (fl.walls || []).filter(x => x.id !== w.id)
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...getState().project }, saved: false, wallSel: [], selected: null })
+    toast('已删除墙')
   }
   // 方向改成水平/竖直（以起点为基准，保持长度，保持左/右、上/下的朝向符号）
   const setWallDir = (w, dir) => {
@@ -1052,6 +1072,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <circle r="0.14" />
         </g>
       )}
+      {/* 裁剪时的交点提示（橙色，吸附到两条墙的交点） */}
+      {tool === 'cut' && cutPoint && (
+        <g transform={`translate(${cutPoint[0]} ${cutPoint[1]})`} className="plan-cut-point">
+          <circle r="0.26" />
+        </g>
+      )}
     </svg>
     {/* 工具设置面板（点击左侧工具时右侧显示，改默认参数） */}
     {tool === 'wall' && !selected && (
@@ -1303,6 +1329,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         <div className="plan-props-head">
           <span>墙</span>
           <button className="plan-props-del" onClick={() => swapWall(selWall)} title="调换起点/终点">⇅ 调换</button>
+          <button className="plan-props-del" onClick={() => deleteWall(selWall)}>删除</button>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">起点</span>

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useStore, setState, currentFloor, getState, toast, undo, loadProject } from '../store'
+import { useStore, setState, currentFloor, getState, toast, undo, redo, loadProject } from '../store'
 import { api } from '../api'
 import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea } from '../three/geometry'
 import { thumbUrl } from '../catalog'
@@ -11,6 +11,7 @@ const FURNITURE_ICONS = {
   橱柜: '🗄️', 岛台: '🍳', 茶几: '🪵', 书架: '📚', 马桶: '🚽',
   空气净化器: '🌀', 电视机: '📺', 壁灯: '💡', 挂画: '🖼️', 吊灯: '🛎️',
   吸顶灯: '💡', 筒灯: '💡', 空调: '❄️', 热水器: '♨️', 灯带: '✨',
+  开关: '🔘', 感应器: '👁️', 风扇: '🌀',
 }
 
 // 地板颜色（选中房间可改）
@@ -329,6 +330,7 @@ export default function Editor() {
       <div className="editor-top">
         <button className="et-btn" onClick={() => { loadBackups(); setProjectManagerOpen(true) }}>项目</button>
         <button className="et-btn" onClick={() => undo()} title="撤销上一次操作">↩️ 撤销</button>
+        <button className="et-btn" onClick={() => redo()} title="恢复撤销">↪️ 重做</button>
         <button className="et-btn" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>
         <button className="et-btn" onClick={importPlanImage}>导入底图</button>
         {planImage && (

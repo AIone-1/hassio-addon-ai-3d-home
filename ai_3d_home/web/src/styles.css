@@ -168,6 +168,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .plan-device-label.selected { fill: #2f7fe0; font-weight: 700; }
 .plan-cursor circle { fill: #9aa7b5; }
 .plan-cursor-wall circle { fill: #2f7fe0; stroke: #fff; stroke-width: 0.05; }
+.plan-cut-point circle { fill: #ff8a4a; stroke: #fff; stroke-width: 0.05; }
 .plan-start-marker { pointer-events: none; }
 .plan-start-marker circle { fill: #2ecc71; stroke: #fff; stroke-width: 0.05; }
 .plan-start-marker.near circle { fill: #27e07a; stroke: #fff; stroke-width: 0.08; }

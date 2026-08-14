@@ -79,13 +79,15 @@ export function toast(msg, ms = 2200) {
 
 const listeners = new Set()
 let undoStack = []  // 撤销历史（project 深拷贝快照）
+let redoStack = []  // 重做历史
 export function getState() { return state }
 export function setState(partial) {
   const next = typeof partial === 'function' ? partial(state) : partial
-  // 修改 project 时保存快照（撤销用），限 50 步
+  // 修改 project 时保存快照（撤销用），限 50 步；新改动清空重做历史
   if (next.project && next.project !== state.project) {
     undoStack.push(JSON.parse(JSON.stringify(state.project)))
     if (undoStack.length > 50) undoStack.shift()
+    redoStack = []
   }
   state = { ...state, ...next }
   listeners.forEach((l) => l(state))
@@ -93,7 +95,15 @@ export function setState(partial) {
 export function undo() {
   const prev = undoStack.pop()
   if (!prev) return
-  state = { ...state, project: prev, saved: false }
+  redoStack.push(JSON.parse(JSON.stringify(state.project)))
+  state = { ...state, project: prev, saved: false, selected: null, wallSel: [] }
+  listeners.forEach((l) => l(state))
+}
+export function redo() {
+  const next = redoStack.pop()
+  if (!next) return
+  undoStack.push(JSON.parse(JSON.stringify(state.project)))
+  state = { ...state, project: next, saved: false, selected: null, wallSel: [] }
   listeners.forEach((l) => l(state))
 }
 // 加载项目（启动/恢复），不保存撤销快照

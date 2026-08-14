@@ -501,6 +501,50 @@ export function FurnitureModel({ type, color, w: cw, d: cd, h: ch }) {
           </mesh>
         </group>
       )
+    case '开关':
+      return (
+        <group>
+          {/* 墙面开关：小面板 + 翘板按键 */}
+          <FBox position={[0, 0, 0]} size={[w, h, d]} color="#eef2f5" roughness={0.35} />
+          <mesh position={[0, h * 0.1, d / 2 + 0.002]}>
+            <boxGeometry args={[w * 0.56, h * 0.44, d * 0.25]} />
+            <meshStandardMaterial color="#c3ccd4" roughness={0.42} />
+          </mesh>
+        </group>
+      )
+    case '感应器':
+      return (
+        <group>
+          {/* 人体感应器：底座 + 半球透镜 */}
+          <mesh position={[0, 0, 0]}>
+            <cylinderGeometry args={[w * 0.5, w * 0.5, h, 16]} />
+            <meshStandardMaterial color="#eef2f5" roughness={0.35} />
+          </mesh>
+          <mesh position={[0, 0, d * 0.42]}>
+            <sphereGeometry args={[w * 0.35, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#3a4658" roughness={0.2} metalness={0.15} />
+          </mesh>
+        </group>
+      )
+    case '风扇':
+      return (
+        <group>
+          {/* 吊扇：中间电机 + 4 片扇叶 */}
+          <mesh position={[0, 0, 0]}>
+            <cylinderGeometry args={[w * 0.12, w * 0.12, h * 0.5, 16]} />
+            <meshStandardMaterial color="#e8edf2" roughness={0.4} />
+          </mesh>
+          {[0, 1, 2, 3].map((i) => {
+            const ang = i * Math.PI / 2
+            return (
+              <mesh key={i} position={[Math.cos(ang) * w * 0.3, 0, Math.sin(ang) * w * 0.3]} rotation={[0, -ang, 0]}>
+                <boxGeometry args={[w * 0.42, d * 0.04, h * 0.1]} />
+                <meshStandardMaterial color="#cfd8e2" roughness={0.5} />
+              </mesh>
+            )
+          })}
+        </group>
+      )
     default:
       return <FBox position={[0, h / 2, 0]} size={[w, h, d]} color={M} />
   }
