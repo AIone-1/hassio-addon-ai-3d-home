@@ -517,7 +517,7 @@ export default function App() {
             <p className="side-panel-empty">没有 scene 实体</p>
           ) : (
             scenes.map((s) => (
-              <button key={s.entity_id} className="side-panel-item" onClick={() => { activateScene(s.entity_id); setState({ sceneOpen: false }) }}>
+              <button key={s.entity_id} className="side-panel-item" onClick={() => activateScene(s.entity_id)}>
                 {(s.attributes && s.attributes.friendly_name) || s.entity_id.split('.').pop()}
               </button>
             ))
