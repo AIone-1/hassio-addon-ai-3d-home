@@ -443,12 +443,10 @@ export default function App() {
     <div className="app" onDoubleClick={() => immersive && setState({ immersive: false })}>
       {view2d ? <PlanEditor onSelect={handleSelect} floorIndex={currentFloor} /> : <Viewer onSelect={handleSelect} floorIndex={currentFloor} />}
 
-      {/* 左上角状态（沉浸模式隐藏） */}
+      {/* 左上角状态（沉浸模式隐藏）：只留房间数 + 天气 + 温度，连接状态和帧率移进设置 */}
       {!immersive && <div className="status-tl">
-        <span className="dot" style={{ background: haConnected ? 'var(--ok)' : 'var(--danger)' }} />
-        {haConnected ? 'Home Assistant 已连接' : '未连接'}
         <span style={{ color: 'var(--accent2)' }}>
-          {editing ? `· 房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
+          {editing ? `房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
         </span>
         {weatherSt && (
           <span>{(WEATHER_ICON[weatherSt.state] || '🌡️')} {weatherSt.state}</span>
@@ -456,7 +454,6 @@ export default function App() {
         {tempSt && (
           <span>🌡️ {tempSt.state}{tempSt.attributes?.unit_of_measurement || '°C'}</span>
         )}
-        <span ref={fpsRef} style={{ fontSize: '16px', fontWeight: 700 }} />
       </div>}
 
       {!immersive && <BottomBar />}
@@ -577,6 +574,14 @@ export default function App() {
         <div className="modal-mask" onClick={() => setState({ settingsOpen: false })}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '92vw', maxHeight: '88vh', overflowY: 'auto' }}>
             <div className="dname">设置</div>
+            {/* 连接状态 + 帧率（从主页移到这里） */}
+            <div className="field" style={{ margin: '10px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <span className="dot" style={{ background: haConnected ? 'var(--ok)' : 'var(--danger)' }} />
+                <span style={{ color: 'var(--text)' }}>{haConnected ? 'Home Assistant 已连接' : 'Home Assistant 未连接'}</span>
+                <span ref={fpsRef} style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: 'var(--muted)' }} />
+              </div>
+            </div>
             {/* 三个 tab 切换 */}
             <div style={{ display: 'flex', gap: 6, margin: '10px 0' }}>
               {[['default', '默认选项'], ['background', '背景配置'], ['quality', '画质'], ['share', '分享']].map(([k, l]) => (
