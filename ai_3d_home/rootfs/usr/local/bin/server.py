@@ -216,17 +216,32 @@ def ws_loop():
                         await asyncio.sleep(5)
                         continue
                     await ws.send(json.dumps({"id": 1, "type": "subscribe_events", "event_type": "state_changed"}))
+                    # 同时订阅 call_service，实时捕捉 notify / persistent_notification 通知
+                    await ws.send(json.dumps({"id": 2, "type": "subscribe_events", "event_type": "call_service"}))
                     # 订阅成功后先补一次全量
                     CACHE.refresh()
                     notify_stream({"type": "snapshot", "states": CACHE.snapshot()})
                     while True:
                         msg = json.loads(await ws.recv())
-                        if msg.get("type") == "event" and msg.get("event", {}).get("event_type") == "state_changed":
-                            d = msg["event"].get("data", {})
+                        ev = msg.get("event") or {}
+                        if msg.get("type") == "event" and ev.get("event_type") == "state_changed":
+                            d = ev.get("data", {})
                             eid = d.get("entity_id")
                             ns = d.get("new_state")
                             if eid and CACHE.update(eid, ns):
                                 notify_stream({"type": "state", "entity_id": eid, "new_state": ns})
+                        elif msg.get("type") == "event" and ev.get("event_type") == "call_service":
+                            d = ev.get("data", {})
+                            domain = d.get("domain")
+                            service = d.get("service")
+                            sd = d.get("service_data") or {}
+                            message = sd.get("message")
+                            title = sd.get("title")
+                            # 只推通知类：notify.*（任意目标）或 persistent_notification.create
+                            if domain == "notify" or (domain == "persistent_notification" and service == "create"):
+                                text = title or message or ""
+                                if text:
+                                    notify_stream({"type": "notification", "message": str(text)})
             except Exception:
                 await asyncio.sleep(5)
 

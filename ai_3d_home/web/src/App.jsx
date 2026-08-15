@@ -193,6 +193,9 @@ export default function App() {
               if (msg.new_state) next[msg.entity_id] = msg.new_state
               else delete next[msg.entity_id]
               setState({ haStates: next, haConnected: true })
+            } else if (msg.type === 'notification' && msg.message) {
+              // HA 那边发通知（notify / 持久通知），app 里实时弹提示
+              toast(String(msg.message))
             }
           } catch (e) { /* 忽略坏消息 */ }
         }
