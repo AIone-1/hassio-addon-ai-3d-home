@@ -4,6 +4,13 @@ import { useState, useEffect } from 'react'
 
 const MODES = ['全屋', '结构']
 
+// 线图图标（统一 stroke 风格，简单清晰）
+const Ic = ({ children }) => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 3 }}>
+    {children}
+  </svg>
+)
+
 export default function BottomBar() {
   const mode = useStore((s) => s.mode)
   const autoRotate = useStore((s) => s.autoRotate)
@@ -15,6 +22,8 @@ export default function BottomBar() {
   const night = useStore((s) => s.night)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
+  const sceneOpen = useStore((s) => s.sceneOpen)
+  const notifOpen = useStore((s) => s.notifOpen)
   const deviceCount = new Set(project.floors.flatMap((f) => (f.devices || []).map((d) => d.entity_id))).size
   const [viewOpen, setViewOpen] = useState(false)
   const customViews = useStore((s) => s.customViews)
@@ -94,31 +103,37 @@ export default function BottomBar() {
           </span>
         )}
         <button className="bb-btn" onClick={() => setState((s) => ({ recenterKey: s.recenterKey + 1 }))} title="居中视角">
-          ⌖ 居中
+          <Ic><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></Ic>居中
         </button>
-        <button className="bb-btn" onClick={toggleFullscreen} title="全屏">⛶ 全屏</button>
-        <button className="bb-btn" onClick={() => setState({ immersive: true })} title="纯净沉浸模式（双击退出）">👁 沉浸</button>
+        <button className="bb-btn" onClick={toggleFullscreen} title="全屏">
+          <Ic><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></Ic>全屏
+        </button>
+        <button className="bb-btn" onClick={() => setState({ immersive: true })} title="纯净沉浸模式（双击退出）">
+          <Ic><path d="M17.94 17.94A10 10 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22" /></Ic>沉浸
+        </button>
         <button className={`bb-btn ${showWalls ? 'active' : ''}`} onClick={() => setState({ showWalls: !showWalls })} title="去除/显示墙壁">
-          🧱 墙
+          <Ic><rect x="3" y="3" width="18" height="18" rx="1" /><path d="M3 9h18M3 15h18M9 9v6M15 15v6" /></Ic>墙
         </button>
         <button className={`bb-btn ${showOpenings ? 'active' : ''}`} onClick={() => setState({ showOpenings: !showOpenings })} title="显示/去除门窗">
-          🚪 门窗
+          <Ic><rect x="4" y="3" width="16" height="18" rx="1" /><path d="M12 3v18" /><circle cx="16" cy="12" r="0.5" /></Ic>门窗
         </button>
         <button className={`bb-btn ${showCeiling ? 'active' : ''}`} onClick={() => setState({ showCeiling: !showCeiling })} title="显示/去除屋顶">
-          🏠 屋顶
+          <Ic><path d="M3 10l9-7 9 7" /><path d="M5 9v11h14V9" /></Ic>屋顶
         </button>
         <div style={{ position: 'relative' }}>
-          <button className="bb-btn" onClick={() => setViewOpen(!viewOpen)} title="切换视角">👁 视图</button>
+          <button className="bb-btn" onClick={() => setViewOpen(!viewOpen)} title="切换视角">
+            <Ic><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></Ic>视图
+          </button>
           {viewOpen && (
             <div className="bb-menu">
-              <button className="bb-menu-item" onClick={() => setView('default')}>🏠 默认视图</button>
-              <button className="bb-menu-item" onClick={() => setView('top')}>⬇ 上视图</button>
-              <button className="bb-menu-item" onClick={() => setView('front')}>⬆ 前视图</button>
+              <button className="bb-menu-item" onClick={() => setView('default')}><Ic><path d="M3 10l9-7 9 7" /><path d="M5 9v11h14V9" /></Ic>默认视图</button>
+              <button className="bb-menu-item" onClick={() => setView('top')}><Ic><path d="M12 3v18M6 15l6 6 6-6" /></Ic>上视图</button>
+              <button className="bb-menu-item" onClick={() => setView('front')}><Ic><path d="M12 21V3M6 9l6-6 6 6" /></Ic>前视图</button>
               <div className="bb-menu-sep" />
-              <button className="bb-menu-item" onClick={() => { saveView(); setViewOpen(false) }}>💾 保存当前视角</button>
+              <button className="bb-menu-item" onClick={() => { saveView(); setViewOpen(false) }}><Ic><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><path d="M17 21v-8H7v8M7 3v5h8" /></Ic>保存当前视角</button>
               {customViews.map((v) => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center' }}>
-                  <button className="bb-menu-item" style={{ flex: 1 }} onClick={() => setView('custom:' + v.id)}>📷 {v.name}</button>
+                  <button className="bb-menu-item" style={{ flex: 1 }} onClick={() => setView('custom:' + v.id)}><Ic><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></Ic>{v.name}</button>
                   <button style={{ padding: '2px 6px', background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }} onClick={() => delView(v.id)} title="删除">✕</button>
                 </div>
               ))}
@@ -126,13 +141,22 @@ export default function BottomBar() {
           )}
         </div>
         <button className={`bb-btn ${night ? 'active' : ''}`} onClick={() => setState({ night: !night, sunAuto: false })} title="日间/夜间（点一次后改为手动，不再跟太阳）">
-          {night ? '🌙 夜间' : '☀️ 日间'}
+          {night
+            ? <Ic><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></Ic>
+            : <Ic><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></Ic>}
+          {night ? '夜间' : '日间'}
         </button>
       </div>
       <div className="bb-group">
-        <button className="bb-btn" onClick={() => setState({ sceneOpen: true })} title="场景同步">🎬 场景</button>
-        <button className="bb-btn" onClick={() => setState({ notifOpen: true })} title="通知中心">🔔 通知</button>
-        <button className="bb-btn" onClick={() => setState({ deviceListOpen: true })} title="查看已绑定设备">设备{deviceCount}</button>
+        <button className={`bb-btn ${sceneOpen ? 'active' : ''}`} onClick={() => setState((s) => ({ sceneOpen: !s.sceneOpen }))} title="场景同步">
+          <Ic><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></Ic>场景
+        </button>
+        <button className={`bb-btn ${notifOpen ? 'active' : ''}`} onClick={() => setState((s) => ({ notifOpen: !s.notifOpen }))} title="通知中心">
+          <Ic><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></Ic>通知
+        </button>
+        <button className="bb-btn" onClick={() => setState({ deviceListOpen: true })} title="查看已绑定设备">
+          <Ic><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" /></Ic>设备{deviceCount}
+        </button>
         <button className={`bb-btn ${editing ? 'active' : ''}`} onClick={() => {
           if (editing) setState({ editing: false, view2d: false, tool: 'select' })
           else setState({ editing: true, view2d: true })

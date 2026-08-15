@@ -498,51 +498,40 @@ export default function App() {
         </div>
       )}
 
-      {/* 场景同步面板 */}
+      {/* 场景同步面板（右侧半透明） */}
       {sceneOpen && (
-        <div className="modal-mask" onClick={() => setState({ sceneOpen: false })}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 360 }}>
-            <div className="dname">🎬 场景</div>
-            {scenes.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--muted)' }}>没有 scene 实体</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxHeight: '60vh', overflowY: 'auto' }}>
-                {scenes.map((s) => (
-                  <button key={s.entity_id} onClick={() => { activateScene(s.entity_id); setState({ sceneOpen: false }) }}
-                    style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
-                    {(s.attributes && s.attributes.friendly_name) || s.entity_id.split('.').pop()}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button className="close-btn" onClick={() => setState({ sceneOpen: false })}>关闭</button>
-          </div>
+        <div className="side-panel">
+          <div className="side-panel-head">🎬 场景</div>
+          {scenes.length === 0 ? (
+            <p className="side-panel-empty">没有 scene 实体</p>
+          ) : (
+            scenes.map((s) => (
+              <button key={s.entity_id} className="side-panel-item" onClick={() => { activateScene(s.entity_id); setState({ sceneOpen: false }) }}>
+                {(s.attributes && s.attributes.friendly_name) || s.entity_id.split('.').pop()}
+              </button>
+            ))
+          )}
         </div>
       )}
 
-      {/* 通知中心面板 */}
+      {/* 通知中心面板（右侧半透明） */}
       {notifOpen && (
-        <div className="modal-mask" onClick={() => setState({ notifOpen: false })}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
-            <div className="dname">🔔 通知</div>
-            {notifications.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--muted)' }}>没有通知</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, maxHeight: '60vh', overflowY: 'auto' }}>
-                {notifications.map((n) => (
-                  <div key={n.notification_id} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{n.created_at || ''}</span>
-                      <button onClick={() => dismissNotification(n.notification_id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>✕</button>
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 4 }}>{n.message || ''}</div>
-                    {n.title && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.title}</div>}
-                  </div>
-                ))}
+        <div className="side-panel">
+          <div className="side-panel-head">🔔 通知</div>
+          {notifications.length === 0 ? (
+            <p className="side-panel-empty">没有通知</p>
+          ) : (
+            notifications.map((n) => (
+              <div key={n.notification_id} className="side-panel-item" style={{ cursor: 'default' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{n.created_at || ''}</span>
+                  <button onClick={() => dismissNotification(n.notification_id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                </div>
+                {n.title && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>{n.title}</div>}
+                <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 3, whiteSpace: 'pre-wrap' }}>{n.message || ''}</div>
               </div>
-            )}
-            <button className="close-btn" onClick={() => setState({ notifOpen: false })}>关闭</button>
-          </div>
+            ))
+          )}
         </div>
       )}
 
