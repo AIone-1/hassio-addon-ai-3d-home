@@ -11,6 +11,7 @@ export default function BottomBar() {
   const rotateSpeed = useStore((s) => s.rotateSpeed)
   const quality = useStore((s) => s.quality)
   const shadows = useStore((s) => s.shadows)
+  const bloom = useStore((s) => s.bloom)
   const showWalls = useStore((s) => s.showWalls)
   const showOpenings = useStore((s) => s.showOpenings)
   const showCeiling = useStore((s) => s.showCeiling)
@@ -167,6 +168,7 @@ export default function BottomBar() {
               ))}
               <div className="bb-menu-sep" />
               <button className={`bb-menu-item ${shadows ? 'active' : ''}`} onClick={() => setState({ shadows: !shadows })}>☀️ 投影{shadows ? '：开' : '：关'}</button>
+              <button className={`bb-menu-item ${bloom ? 'active' : ''}`} onClick={() => setState({ bloom: !bloom })}>✨ 泛光{bloom ? '：开' : '：关'}</button>
             </div>
           )}
         </div>

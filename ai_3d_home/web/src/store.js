@@ -29,6 +29,7 @@ let state = {
   // 视图
   quality: 'high',            // eco | smooth | balanced | high
   shadows: true,
+  bloom: true,                // 泛光（发光设备/灯带的光晕）
   autoRotate: false,
   rotateDir: 1,              // 自动旋转方向：1=顺时针，-1=逆时针
   rotateSpeed: 1,            // 自动旋转速度倍率（0.5~3）

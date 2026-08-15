@@ -1,6 +1,10 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import Scene from './Scene'
 import WallProps3D from './WallProps3D'
 import { Controls } from '../three/Controls'
@@ -164,9 +168,46 @@ function SceneBackground({ bgMode, bgImage, bgColor, bgGradient1, bgGradient2 })
   return null
 }
 
+// 后期处理：泛光 Bloom + 电影级色调映射（让发光设备/灯带有柔和光晕）
+function Effects({ bloom }) {
+  const { gl, scene, camera, size } = useThree()
+  const composer = useMemo(() => {
+    const c = new EffectComposer(gl)
+    c.addPass(new RenderPass(scene, camera))
+    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 0.6, 0.55, 0.8))
+    c.addPass(new OutputPass())
+    return c
+  }, [gl, scene, camera])
+
+  useEffect(() => {
+    gl.toneMapping = THREE.ACESFilmicToneMapping
+    gl.toneMappingExposure = 1.1
+  }, [gl])
+
+  useEffect(() => {
+    composer.setSize(size.width, size.height)
+  }, [composer, size])
+
+  useEffect(() => () => composer.dispose(), [composer])
+
+  // 泛光开关：直接改 bloom pass 强度（0=关）
+  useEffect(() => {
+    const p = composer.passes.find((x) => x instanceof UnrealBloomPass)
+    if (p) p.strength = bloom ? 0.6 : 0
+  }, [composer, bloom])
+
+  // renderPriority=1 接管渲染循环，用 composer 渲染（R3F 不再自动渲染）
+  useFrame((_, delta) => {
+    composer.render(delta)
+  }, 1)
+
+  return null
+}
+
 export default function Viewer({ onSelect, floorIndex }) {
   const quality = useStore((s) => s.quality)
   const shadows = useStore((s) => s.shadows)
+  const bloom = useStore((s) => s.bloom)
   const night = useStore((s) => s.night)
   const mode = useStore((s) => s.mode)
   const floor = useStore((s) => s.project.floors[floorIndex])
@@ -226,6 +267,7 @@ export default function Viewer({ onSelect, floorIndex }) {
         <SceneBackground bgMode={editing ? editorBgMode : bgMode} bgImage={editing ? editorBgImage : bgImage} bgColor={bgColor} bgGradient1={bgGradient1} bgGradient2={bgGradient2} />
         <fog attach="fog" args={[fogColor, night ? 30 : 40, night ? 70 : 90]} />
         <Scene onSelect={onSelect} floorIndex={floorIndex} />
+        <Effects bloom={bloom} />
         <Controls />
         <CameraFocus floorIndex={floorIndex} />
         <DeviceLabels floorIndex={floorIndex} containerRef={containerRef} />
