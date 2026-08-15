@@ -4,6 +4,8 @@ import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
 import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg, segmentIntersect, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
 import { getCatalogItem, thumbUrl } from '../catalog'
+import HexColorPicker from './HexColorPicker'
+import { api, BASE } from '../api'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
 const CLOSE = 0.8      // 画墙闭合半径（点回起点 <0.8m 闭合，大一点更容易合上）
@@ -129,12 +131,15 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const [cursor, setCursor] = useState(null)    // [x,y] 世界坐标（已吸附）
   const [cursorWall, setCursorWall] = useState(null)  // 光标吸附到已有墙时的墙点（蓝色提示）
   const [cutPoint, setCutPoint] = useState(null)      // 裁剪时的交点提示（橙色）
+  const [bgList, setBgList] = useState([])            // 已上传背景图（地板壁纸缩略图用）
   const dragRef = useRef(null)                  // 拖动的家具/设备对象
   const openingDragRef = useRef(null)           // 拖动的门窗对象（沿墙移动）
   const wallDragRef = useRef(null)              // 拖动的墙端点 { wall, which: 'start'|'end' }
   const panRef = useRef(null)                   // { w:[x,y], p:[x,y] } 平移起点
   const planMoveRef = useRef(null)              // 移动户型的起点世界坐标
   const rightClickRef = useRef(0)               // 最近一次右键时间戳，用于区分单击取消 / 双击切移动
+
+  useEffect(() => { api.backgrounds().then((r) => setBgList(r.images || [])).catch(() => {}) }, [])
 
   // 房间由 recomputeRooms 返回新数组，引用变化会触发重算（画墙过程中视口保持稳定）
   const bounds = useMemo(() => {
@@ -1341,13 +1346,43 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <span style={{ fontSize: 12, color: 'var(--text)' }}>{polygonArea(selRoom.points || []).toFixed(1)} ㎡</span>
         </div>
         <div className="plan-props-row">
-          <span className="plan-props-label">颜色</span>
-          {FLOOR_COLORS.map((c) => (
-            <button key={c} title={c} onClick={() => patchRoom(selRoom, { color: c })}
-              className={`plan-props-swatch ${selRoom.color === c ? 'active' : ''}`}
-              style={{ background: c }} />
-          ))}
+          <span className="plan-props-label">厚度</span>
+          <input type="number" step="0.01" min="0.02" max="1" value={selRoom.thickness || 0.05}
+            onChange={(e) => patchRoom(selRoom, { thickness: Number(e.target.value) || 0.05 })} />
+          <span className="plan-props-unit">m</span>
         </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          <HexColorPicker value={selRoom.color || '#7789ad'} onChange={(c) => patchRoom(selRoom, { color: c })} />
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">壁纸</span>
+          <input type="file" accept="image/*" id="floor-texture-file" style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = async () => {
+                try {
+                  const r = await fetch(BASE + 'api/background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: reader.result }) })
+                  const res = await r.json()
+                  if (res.ok && res.name) { patchRoom(selRoom, { texture: res.name }); setBgList([{ name: res.name }, ...bgList]); toast('地板壁纸已上传') }
+                } catch (err) { toast('上传失败') }
+              }
+              reader.readAsDataURL(file)
+            }} />
+          <button onClick={() => document.getElementById('floor-texture-file').click()}>{selRoom.texture ? '更换壁纸' : '上传壁纸'}</button>
+          {selRoom.texture && <button style={{ color: 'var(--danger)' }} onClick={() => patchRoom(selRoom, { texture: '' })}>清除</button>}
+        </div>
+        {bgList.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+            {bgList.map((img) => (
+              <img key={img.name} src={BASE + 'api/background/' + img.name} alt=""
+                style={{ width: 48, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: selRoom.texture === img.name ? '2px solid var(--accent)' : '1px solid var(--border)' }}
+                onClick={() => patchRoom(selRoom, { texture: img.name })} />
+            ))}
+          </div>
+        )}
       </div>
     )}
     {selWall && (

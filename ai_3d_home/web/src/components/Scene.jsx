@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { useStore, setState, getState } from '../store'
+import { useStore, setState, getState, toast } from '../store'
 import { FURNITURE_LIB, FURNITURE_MAIN, FURNITURE_DETAIL, FURNITURE_ACCENT, WALL_THICK, DOOR_COLORS, robustFloorGeometry, wallKey, DEVICE_MODELS, FURNITURE_WALL_HEIGHT } from '../three/geometry'
 import { getCatalogItem } from '../catalog'
 
@@ -911,6 +911,7 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
       onClick={(e) => {
         e.stopPropagation()
         if (tool === 'move') {
+          if (item.locked) { toast('已锁定，无法移动'); return }
           // 移动工具：单击拾起，再单击放下
           if (isPicked) setState({ pickItem: null })
           else { onSelect(item); setState({ pickItem: { type: 'furniture', id: item.id } }) }

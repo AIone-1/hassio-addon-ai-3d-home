@@ -40,6 +40,7 @@ export default function App() {
   const rotateSpeed = useStore((s) => s.rotateSpeed)
   const [deviceModal, setDeviceModal] = useState(null)
   const [bgImages, setBgImages] = useState([])
+  const [settingsTab, setSettingsTab] = useState('default')
   const saveTimer = useRef(null)
   const fpsRef = useRef(null)
 
@@ -245,6 +246,57 @@ export default function App() {
     if (settingsOpen) loadBgImages()
   }, [settingsOpen])
 
+  // ---------- 3D 导出（分享 tab） ----------
+  const export3DPng = (count = 1) => {
+    const canvas = document.querySelector('.canvas-wrap canvas')
+    if (!canvas) return toast('请先在 3D 视图')
+    const snap = (i) => {
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = count <= 1 ? '户型3D.png' : `户型3D_${i}.png`
+      a.click()
+    }
+    if (count <= 1) { snap(1); return }
+    const wasRotating = getState().autoRotate
+    setState({ autoRotate: true, rotateSpeed: 3 })
+    toast(`正在截取 ${count} 张不同角度…`)
+    let n = 0
+    const timer = setInterval(() => {
+      snap(n + 1)
+      n++
+      if (n >= count) {
+        clearInterval(timer)
+        if (!wasRotating) setState({ autoRotate: false })
+        toast(`已导出 ${count} 张截图`)
+      }
+    }, 900)
+  }
+  const record3DVideo = (seconds = 6) => {
+    const canvas = document.querySelector('.canvas-wrap canvas')
+    if (!canvas) return toast('请先在 3D 视图')
+    if (typeof MediaRecorder === 'undefined') return toast('浏览器不支持录制')
+    const isMp4 = MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('video/mp4')
+    const mime = isMp4 ? 'video/mp4' : 'video/webm'
+    const ext = isMp4 ? 'mp4' : 'webm'
+    const stream = canvas.captureStream(30)
+    const recorder = new MediaRecorder(stream, { mimeType: mime })
+    const chunks = []
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data) }
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mime })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `户型3D.${ext}`
+      a.click()
+      toast('3D 视频已导出')
+    }
+    recorder.start()
+    const wasRotating = getState().autoRotate
+    setState({ autoRotate: true })
+    toast(`正在录制 ${seconds} 秒旋转视频…`)
+    setTimeout(() => { recorder.stop(); if (!wasRotating) setState({ autoRotate: false }) }, seconds * 1000)
+  }
+
   // ---------- 键盘快捷键 ----------
   useEffect(() => {
     const onKey = (e) => {
@@ -323,7 +375,13 @@ export default function App() {
         <div className="modal-mask" onClick={() => setState({ settingsOpen: false })}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '92vw', maxHeight: '88vh', overflowY: 'auto' }}>
             <div className="dname">设置</div>
-            {/* 默认选项 */}
+            {/* 三个 tab 切换 */}
+            <div style={{ display: 'flex', gap: 6, margin: '10px 0' }}>
+              {[['default', '默认选项'], ['background', '背景配置'], ['share', '分享']].map(([k, l]) => (
+                <button key={k} style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: '1px solid var(--border)', background: settingsTab === k ? 'var(--accent)' : 'var(--panel2)', color: settingsTab === k ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={() => setSettingsTab(k)}>{l}</button>
+              ))}
+            </div>
+            {settingsTab === 'default' && (
             <div className="field" style={{ margin: '12px 0' }}>
               <label>默认选项（下次打开生效）</label>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
@@ -359,6 +417,8 @@ export default function App() {
                 <button onClick={() => saveDefault({ immersive: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !settings.immersive ? 'var(--accent)' : 'var(--panel2)', color: !settings.immersive ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
               </div>
             </div>
+            )}
+            {settingsTab === 'background' && (<>
             <div className="field" style={{ margin: '12px 0' }}>
               <label>背景颜色（六边形色盘）</label>
               <HexColorPicker value={bgColor} onChange={(c) => { setState({ bgColor: c, bgMode: 'color', bgImage: '' }); api.saveSettings({ ...getState().settings, bgColor: c, bgMode: 'color', bgImage: '' }).catch(() => {}) }} />
@@ -455,6 +515,17 @@ export default function App() {
                 <HexColorPicker value={roofColor || '#7789ad'} onChange={(c) => { setState({ roofColor: c }); api.saveSettings({ ...getState().settings, roofColor: c }).catch(() => {}) }} />
               </div>
             </div>
+            </>)}
+            {settingsTab === 'share' && (
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>分享 / 导出</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                <button className="primary" onClick={() => export3DPng(1)}>📷 导出 3D 图片</button>
+                <button style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }} onClick={() => export3DPng(4)}>4 张（不同角度）</button>
+                <button style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }} onClick={() => record3DVideo(6)}>🎬 录制 3D 视频</button>
+              </div>
+            </div>
+            )}
           </div>
         </div>
       )}
