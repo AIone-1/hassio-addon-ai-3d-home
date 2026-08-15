@@ -1503,8 +1503,6 @@ export default function Scene({ onSelect, floorIndex }) {
 
   return (
     <>
-      {/* 天空球：日夜/太阳高度角渐变 */}
-      <SkyDome night={night} elevation={sunElevation} />
       {/* 环境光（随渲染模式变化，默认提亮便于看清） */}
       <ambientLight intensity={night ? 0.4 : Math.max(ml.ambient, 0.7)} />
       <hemisphereLight args={[ml.tint, '#6a7a9a', night ? 0.35 : Math.max(ml.hemi, 0.6)]} />

@@ -580,11 +580,10 @@ export default function App() {
 
       {toastMsg && <div className="toast">{toastMsg}</div>}
 
-      {/* 设置面板：背景图 */}
+      {/* 设置面板：右侧半屏（左侧主视图仍可旋转/点击） */}
       {settingsOpen && (
-        <div className="modal-mask" onClick={() => setState({ settingsOpen: false })}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '92vw', maxHeight: '88vh', overflowY: 'auto' }}>
-            <div className="dname">设置</div>
+        <div className="settings-panel">
+          <div className="dname">设置</div>
             {/* 连接状态 + 帧率（从主页移到这里） */}
             <div className="field" style={{ margin: '10px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -763,7 +762,6 @@ export default function App() {
               </div>
             </div>
             )}
-          </div>
         </div>
       )}
     </div>
