@@ -552,6 +552,23 @@ class Handler(BaseHTTPRequestHandler):
                 "POST", "/persistent_notification/dismiss", {"notification_id": nid})
             return self._send(200, {"code": code, "result": data})
 
+        if p == "/api/deploy":
+            # 本地更新通道：接收 base64 的 tar.gz（含 server.py + webui/），解压到 DATA_DIR，
+            # 重启后 run.sh 会用 share 里的新代码。不用走 GitHub。
+            body = self._json_body() or {}
+            tar_b64 = body.get("tar")
+            if not tar_b64:
+                return self._send(400, {"error": "need tar"})
+            try:
+                import base64, tarfile, io
+                raw = base64.b64decode(tar_b64)
+                os.makedirs(DATA_DIR, exist_ok=True)
+                with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tf:
+                    tf.extractall(DATA_DIR)
+                return self._send(200, {"ok": True})
+            except Exception as e:
+                return self._send(500, {"error": str(e)})
+
         return self._send(404, {"error": "not found"})
 
 
