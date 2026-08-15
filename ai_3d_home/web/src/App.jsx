@@ -322,6 +322,8 @@ export default function App() {
     if (notifOpen) loadNotifications()
   }, [notifOpen])
 
+  // 太阳（sun.sun）：自动切日夜 + 日照高度角（要放在 useEffect 之前，否则 TDZ 报错）
+  const sunEnt = (haEntities || []).find(e => e.entity_id === 'sun.sun')
   // 自动跟随太阳切日夜（sun.sun；手动切日夜时关掉 sunAuto）
   useEffect(() => {
     if (!sunEnt || !getState().sunAuto) return
@@ -405,8 +407,6 @@ export default function App() {
   const scenes = (haEntities || []).filter(e => e.entity_id.startsWith('scene.'))
   const devAttrs = devState && devState.attributes ? devState.attributes : {}
   const devDomain = deviceModal ? deviceModal.entity_id.split('.')[0] : ''
-  // 太阳（sun.sun）：自动切日夜 + 日照高度角
-  const sunEnt = (haEntities || []).find(e => e.entity_id === 'sun.sun')
   // 天气 + 温度（左上角信息）
   const WEATHER_ICON = { sunny: '☀️', 'clear-night': '🌙', partlycloudy: '⛅', cloudy: '☁️', rainy: '🌧️', pouring: '🌧️', snowy: '❄️', snowyrainy: '🌨️', lightning: '⛈️', fog: '🌫️', windy: '💨', hail: '🌨️' }
   const weatherEnt = (haEntities || []).find(e => e.entity_id.startsWith('weather.'))
