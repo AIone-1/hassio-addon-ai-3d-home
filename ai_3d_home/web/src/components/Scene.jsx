@@ -1499,8 +1499,8 @@ export default function Scene({ onSelect, floorIndex }) {
         {/* 门窗（showOpenings 关闭则去除） */}
         {showOpenings && (floor.openings || []).map((op) => <Opening key={op.id} op={op} floor={floor} level={level} onSelect={interactive ? onSelect : undefined} />)}
 
-        {/* 家具（纯户型图模式隐藏摆设，只看户型结构） */}
-        {mode !== '纯户型' && (floor.furniture || []).map((f) => (
+        {/* 家具（结构模式隐藏摆设，只看户型结构） */}
+        {mode !== '结构' && (floor.furniture || []).map((f) => (
           <Furniture key={f.id} item={f} level={level}
             selected={sel && sel.type === 'furniture' && sel.ref.id === f.id}
             interactive={interactive}
@@ -1509,8 +1509,8 @@ export default function Scene({ onSelect, floorIndex }) {
             onMove={handleMoveFurniture} />
         ))}
 
-        {/* 设备（纯户型图模式隐藏） */}
-        {mode !== '纯户型' && (floor.devices || []).map((dev) => (
+        {/* 设备（结构模式隐藏） */}
+        {mode !== '结构' && (floor.devices || []).map((dev) => (
           <DeviceMarker key={dev.id} dev={dev} level={level}
             selected={sel && sel.type === 'device' && sel.ref.id === dev.id}
             interactive={interactive}

@@ -2,7 +2,7 @@ import { useStore, setState, getState, toast } from '../store'
 import { api } from '../api'
 import { useState, useEffect } from 'react'
 
-const MODES = ['全屋', '照明', '遮阳', '环境', '安防', '纯户型']
+const MODES = ['全屋', '结构']
 
 export default function BottomBar() {
   const mode = useStore((s) => s.mode)

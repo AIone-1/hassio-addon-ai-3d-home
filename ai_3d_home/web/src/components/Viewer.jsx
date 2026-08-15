@@ -55,7 +55,7 @@ function DeviceLabels({ floorIndex, containerRef }) {
       const el = els.current.get(dev.id)
       if (!el) return
       el.classList.toggle('light-theme', !night)
-      const hide = mode === '纯户型'
+      const hide = mode === '结构'
       el.style.display = (showLabels && !hide) ? 'block' : 'none'
       if (!showLabels || hide) return
       v.set(dev.pos[0], (dev.pos[1] || 1.4), dev.pos[2]).project(camera)
