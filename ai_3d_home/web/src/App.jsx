@@ -200,9 +200,9 @@ export default function App() {
         setDeviceModal(sel.ref)
         return
       }
-      setState({ selected: sel })
+      setState({ selected: sel, wallSel: [] })
     } else {
-      setState({ selected: sel })
+      setState({ selected: sel, wallSel: [] })
     }
   }, [editing])
 
