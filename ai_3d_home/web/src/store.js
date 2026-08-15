@@ -78,6 +78,8 @@ let state = {
   settingsOpen: false,   // 设置面板
   sceneOpen: false,      // 场景同步面板
   notifOpen: false,      // 通知中心面板
+  sunAuto: true,         // 自动跟随 sun.sun 切日夜（手动切日夜则关掉）
+  sunElevation: null,    // 太阳高度角（度），用于日照/天空
 }
 
 let toastTimer = null

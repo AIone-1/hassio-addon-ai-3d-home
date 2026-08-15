@@ -492,8 +492,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     }
     if (dragRef.current) {
       const [x, y] = snap(w)
-      dragRef.current.pos[0] = Math.round(x * 10) / 10
-      dragRef.current.pos[2] = Math.round(y * 10) / 10
+      const d = dragRef.current
+      // 分组：同 group 的家具保持相对偏移一起移动
+      d.members.forEach((m, i) => {
+        m.pos[0] = Math.round((x - d.offsets[i][0]) * 10) / 10
+        m.pos[2] = Math.round((y - d.offsets[i][1]) * 10) / 10
+      })
       setState({ project: { ...getState().project }, saved: false })
       setCursor([x, y])
       return
@@ -527,7 +531,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     e.stopPropagation()
     if (obj.locked) { toast('已锁定，无法移动'); return }
     setState({ selected: { type, ref: obj } })
-    dragRef.current = obj
+    // 分组：同 group 的家具一起移动（记录成员和相对偏移）
+    if (type === 'furniture' && obj.group) {
+      const fl = getState().project.floors[floorIndex]
+      const members = (fl.furniture || []).filter((f) => f.group === obj.group)
+      dragRef.current = { obj, members, offsets: members.map((m) => [obj.pos[0] - m.pos[0], obj.pos[2] - m.pos[2]]) }
+    } else {
+      dragRef.current = { obj, members: [obj], offsets: [[0, 0]] }
+    }
     svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
   }
   // 双击 = 选中并切到移动工具（后续按住即可拖动）
@@ -1171,6 +1182,11 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <span className="plan-props-label">名字</span>
           <input type="text" value={selFurniture.name || ''} placeholder={selFurniture.type}
             onChange={(e) => patchFurniture(selFurniture, { name: e.target.value })} />
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">分组</span>
+          <input type="text" value={selFurniture.group || ''} placeholder="同组名一起移动"
+            onChange={(e) => patchFurniture(selFurniture, { group: e.target.value || undefined })} />
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">大小</span>

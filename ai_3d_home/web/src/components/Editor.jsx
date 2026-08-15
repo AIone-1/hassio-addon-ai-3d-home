@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useStore, setState, currentFloor, getState, toast, undo, redo, loadProject } from '../store'
+import { useStore, setState, currentFloor, getState, toast, undo, redo, loadProject, uid } from '../store'
 import { api, BASE } from '../api'
-import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, DEVICE_MODELS, DEVICE_KINDS, recomputeRooms } from '../three/geometry'
 import { thumbUrl } from '../catalog'
 import ModelPreview from './ModelPreview'
 
@@ -38,6 +38,17 @@ const LEFT_TOOLS = [
   { id: 'delete', label: '删除', k: 'Del' },
 ]
 
+// 房间模板（标准尺寸矩形，单位米）
+const ROOM_TEMPLATES = [
+  { name: '卧室', w: 3.5, d: 4.0 },
+  { name: '次卧', w: 3.0, d: 3.5 },
+  { name: '客厅', w: 5.0, d: 6.0 },
+  { name: '厨房', w: 3.0, d: 4.0 },
+  { name: '卫生间', w: 2.0, d: 3.0 },
+  { name: '书房', w: 3.0, d: 3.0 },
+  { name: '餐厅', w: 3.5, d: 3.5 },
+]
+
 export default function Editor() {
   const tool = useStore((s) => s.tool)
   const furnitureType = useStore((s) => s.furnitureType)
@@ -69,6 +80,7 @@ export default function Editor() {
   const [projectManagerOpen, setProjectManagerOpen] = useState(false)
   const [editorBgOpen, setEditorBgOpen] = useState(false)
   const [bgList, setBgList] = useState([])
+  const [roomTplOpen, setRoomTplOpen] = useState(false)
   const editorBgImage = useStore((s) => s.editorBgImage)
 
   // 下载模型按中文分类分组
@@ -104,6 +116,29 @@ export default function Editor() {
     fs.forEach((f) => { f.locked = locked })
     setState({ project: { ...st.project }, saved: false })
     toast(locked ? `已锁定 ${fs.length} 个家具` : `已解锁 ${fs.length} 个家具`)
+  }
+
+  // 插入房间模板：在现有户型右侧放一个标准尺寸矩形（4 面墙，自动识别成房间）
+  const insertRoomTemplate = (tpl) => {
+    const st = getState()
+    const fl = st.project.floors[st.currentFloor]
+    if (!fl) return
+    let maxX = 0, maxZ = 0
+    ;(fl.walls || []).forEach((w) => { maxX = Math.max(maxX, w.start[0], w.end[0]); maxZ = Math.max(maxZ, w.start[1], w.end[1]) })
+    const cx = maxX + tpl.w / 2 + 1
+    const cz = maxZ - tpl.d / 2
+    const hw = tpl.w / 2, hd = tpl.d / 2
+    const rect = [
+      [cx - hw, cz - hd, cx + hw, cz - hd],
+      [cx + hw, cz - hd, cx + hw, cz + hd],
+      [cx + hw, cz + hd, cx - hw, cz + hd],
+      [cx - hw, cz + hd, cx - hw, cz - hd],
+    ]
+    fl.walls = (fl.walls || []).concat(rect.map(([x1, z1, x2, z2]) => ({ id: uid(), start: [x1, z1], end: [x2, z2] })))
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...st.project }, saved: false, tool: 'select' })
+    setRoomTplOpen(false)
+    toast(`已插入「${tpl.name}」${tpl.w}×${tpl.d} 房间`)
   }
 
   const exportJson = () => {
@@ -467,6 +502,16 @@ export default function Editor() {
         <button className={`et-btn ${showLabels ? 'active' : ''}`} onClick={() => setState({ showLabels: !showLabels })}>标签</button>
         <button className={`et-btn ${showFurnitureLabels ? 'active' : ''}`} onClick={() => setState({ showFurnitureLabels: !showFurnitureLabels })}>名字</button>
         <button className={`et-btn ${showDimensions ? 'active' : ''}`} onClick={() => setState({ showDimensions: !showDimensions })} title="显示墙长度尺寸">尺寸</button>
+        <div style={{ position: 'relative' }}>
+          <button className="et-btn" onClick={() => setRoomTplOpen(!roomTplOpen)} title="插入标准尺寸房间">📐 房间模板</button>
+          {roomTplOpen && (
+            <div className="bb-menu" style={{ bottom: '100%', marginBottom: 4 }}>
+              {ROOM_TEMPLATES.map((t) => (
+                <button key={t.name} className="bb-menu-item" onClick={() => insertRoomTemplate(t)}>{t.name} {t.w}×{t.d}m</button>
+              ))}
+            </div>
+          )}
+        </div>
         <button className="et-btn" onClick={() => lockAllFurniture(true)} title="锁定当前楼层所有家具（防止移动）">🔒 全部锁定</button>
         <button className="et-btn" onClick={() => lockAllFurniture(false)} title="解锁当前楼层所有家具">🔓 全部解锁</button>
         <button className={`et-btn ${view2d ? 'active' : ''}`} onClick={() => setState({ view2d: !view2d })}>2D</button>

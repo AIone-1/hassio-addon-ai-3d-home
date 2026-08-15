@@ -931,15 +931,28 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
     return raycaster.ray.intersectPlane(plane, p) ? p : null
   }
 
+  // 移动家具（分组：同 group 的一起动，保持相对偏移）
+  const moveItem = (nx, nz) => {
+    const dx = nx - item.pos[0]
+    const dz = nz - item.pos[2]
+    item.pos[0] = nx; item.pos[2] = nz
+    if (item.group) {
+      const st = getState()
+      const fl = st.project.floors.find((f) => f.level === level)
+      ;(fl && fl.furniture || []).forEach((f) => {
+        if (f !== item && f.group === item.group) { f.pos[0] += dx; f.pos[2] += dz }
+      })
+    }
+    onMove(item)
+  }
+
   // 拾起状态下每帧跟随鼠标（不依赖 pointermove，鼠标快速移动也不丢目标）
   useFrame((state) => {
     if (!isPicked) return
     raycaster.setFromCamera(state.pointer, camera)
     const p = new THREE.Vector3()
     if (raycaster.ray.intersectPlane(plane, p)) {
-      item.pos[0] = Math.round(p.x * 10) / 10
-      item.pos[2] = Math.round(p.z * 10) / 10
-      onMove(item)
+      moveItem(Math.round(p.x * 10) / 10, Math.round(p.z * 10) / 10)
     }
   })
 
@@ -975,11 +988,7 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
         if (!dragRef.current && !isPicked) return
         e.stopPropagation()
         const p = toWorld(e)
-        if (p) {
-          item.pos[0] = Math.round(p.x * 10) / 10
-          item.pos[2] = Math.round(p.z * 10) / 10
-          onMove(item)
-        }
+        if (p) moveItem(Math.round(p.x * 10) / 10, Math.round(p.z * 10) / 10)
       } : undefined}
       onPointerUp={canDrag ? () => { dragRef.current = false } : undefined}
     >
@@ -1397,10 +1406,43 @@ function WallMaterial({ texture, color, opacity, selected }) {
   )
 }
 
+// 天空球（skybox）：按日夜/太阳高度角给一个垂直渐变的天空，罩住整个场景
+function SkyDome({ night, elevation }) {
+  const tex = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 8; c.height = 256
+    const ctx = c.getContext('2d')
+    const grad = ctx.createLinearGradient(0, 0, 0, 256)
+    if (night) {
+      grad.addColorStop(0, '#070b18')
+      grad.addColorStop(1, '#1b2944')
+    } else if (elevation != null && elevation < 10) {
+      // 日出/日落：暖色地平线
+      grad.addColorStop(0, '#3a5b8c')
+      grad.addColorStop(1, '#e8b070')
+    } else {
+      grad.addColorStop(0, '#3f6fb8')
+      grad.addColorStop(1, '#b8d4ec')
+    }
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, 8, 256)
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [night, elevation != null && elevation < 10])
+  return (
+    <mesh renderOrder={-10}>
+      <sphereGeometry args={[60, 32, 16]} />
+      <meshBasicMaterial map={tex} side={THREE.BackSide} depthWrite={false} fog={false} />
+    </mesh>
+  )
+}
+
 export default function Scene({ onSelect, floorIndex }) {
   const project = useStore((s) => s.project)
   const floor = useStore((s) => s.project.floors[floorIndex])
   const night = useStore((s) => s.night)
+  const sunElevation = useStore((s) => s.sunElevation)
   const shadows = useStore((s) => s.shadows)
   const selected = useStore((s) => s.selected)
   const tool = useStore((s) => s.tool)
@@ -1461,11 +1503,15 @@ export default function Scene({ onSelect, floorIndex }) {
 
   return (
     <>
+      {/* 天空球：日夜/太阳高度角渐变 */}
+      <SkyDome night={night} elevation={sunElevation} />
       {/* 环境光（随渲染模式变化，默认提亮便于看清） */}
       <ambientLight intensity={night ? 0.4 : Math.max(ml.ambient, 0.7)} />
       <hemisphereLight args={[ml.tint, '#6a7a9a', night ? 0.35 : Math.max(ml.hemi, 0.6)]} />
       <directionalLight
-        position={[8, 14, 9]} intensity={night ? 0.7 : Math.max(ml.sun, 1.6)} color={ml.sunColor}
+        position={[8, night ? 8 : (sunElevation != null ? Math.max(3, Math.sin((sunElevation * Math.PI) / 180) * 16) : 14), 9]}
+        intensity={night ? 0.7 : Math.max(ml.sun, 1.6)}
+        color={night ? ml.sunColor : (sunElevation != null && sunElevation < 10 ? '#ffb070' : ml.sunColor)}
         castShadow={shadows}
         shadow-mapSize-width={2048} shadow-mapSize-height={2048}
         shadow-camera-left={-16} shadow-camera-right={16}

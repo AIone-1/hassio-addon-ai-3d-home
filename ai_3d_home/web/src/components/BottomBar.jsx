@@ -125,7 +125,7 @@ export default function BottomBar() {
             </div>
           )}
         </div>
-        <button className={`bb-btn ${night ? 'active' : ''}`} onClick={() => setState({ night: !night })} title="日间/夜间">
+        <button className={`bb-btn ${night ? 'active' : ''}`} onClick={() => setState({ night: !night, sunAuto: false })} title="日间/夜间（点一次后改为手动，不再跟太阳）">
           {night ? '🌙 夜间' : '☀️ 日间'}
         </button>
       </div>

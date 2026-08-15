@@ -218,6 +218,16 @@ export default function App() {
         setDeviceModal(sel.ref)
         return
       }
+      // 缩放区域：查看态点房间 → 相机飞到房间中心（预设 iso 视角）
+      if (sel && sel.type === 'room' && sel.ref.points && sel.ref.points.length) {
+        const pts = sel.ref.points
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, cx = 0, cz = 0
+        pts.forEach((p) => { cx += p[0]; cz += p[1]; minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]) })
+        cx /= pts.length; cz /= pts.length
+        const dist = Math.max(5, (maxX - minX) * 1.6, (maxZ - minZ) * 1.8)
+        setState({ selected: sel, wallSel: [], camTarget: [cx, 0.55, cz], camDist: dist, camViewSignal: { type: 'default', n: st.camViewSignal.n + 1 } })
+        return
+      }
       setState({ selected: sel, wallSel: [] })
     } else {
       setState({ selected: sel, wallSel: [] })
@@ -294,6 +304,15 @@ export default function App() {
     if (notifOpen) loadNotifications()
   }, [notifOpen])
 
+  // 自动跟随太阳切日夜（sun.sun；手动切日夜时关掉 sunAuto）
+  useEffect(() => {
+    if (!sunEnt || !getState().sunAuto) return
+    const elev = sunEnt.attributes && sunEnt.attributes.elevation != null ? Number(sunEnt.attributes.elevation) : null
+    const below = sunEnt.state !== 'above_horizon'
+    if (getState().night !== below) setState({ night: below })
+    if (elev != null && getState().sunElevation !== elev) setState({ sunElevation: elev })
+  }, [sunEnt && sunEnt.state, sunEnt && sunEnt.attributes && sunEnt.attributes.elevation])
+
   // ---------- 3D 导出（分享 tab） ----------
   const export3DPng = (count = 1) => {
     const canvas = document.querySelector('.canvas-wrap canvas')
@@ -368,6 +387,8 @@ export default function App() {
   const scenes = (haEntities || []).filter(e => e.entity_id.startsWith('scene.'))
   const devAttrs = devState && devState.attributes ? devState.attributes : {}
   const devDomain = deviceModal ? deviceModal.entity_id.split('.')[0] : ''
+  // 太阳（sun.sun）：自动切日夜 + 日照高度角
+  const sunEnt = (haEntities || []).find(e => e.entity_id === 'sun.sun')
   // 天气 + 温度（左上角信息）
   const WEATHER_ICON = { sunny: '☀️', 'clear-night': '🌙', partlycloudy: '⛅', cloudy: '☁️', rainy: '🌧️', pouring: '🌧️', snowy: '❄️', snowyrainy: '🌨️', lightning: '⛈️', fog: '🌫️', windy: '💨', hail: '🌨️' }
   const weatherEnt = (haEntities || []).find(e => e.entity_id.startsWith('weather.'))

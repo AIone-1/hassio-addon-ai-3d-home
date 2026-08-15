@@ -293,6 +293,11 @@ export default function WallProps3D({ floorIndex }) {
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
+          <span className="plan-props-label">分组</span>
+          <input type="text" value={f.group || ''} placeholder="同组名一起移动"
+            onChange={(e) => commit(() => { f.group = e.target.value || undefined })} />
+        </div>
+        <div className="plan-props-row">
           <span className="plan-props-label">位置</span>
           <button className="plan-props-seg" onClick={() => commit(() => { f.pos[1] = 0; f.placement = 'floor' })}>地面</button>
           <button className="plan-props-seg" onClick={() => commit(() => { f.pos[1] = fl.height || 2.8; f.placement = 'ceiling' })}>屋顶</button>
