@@ -359,6 +359,18 @@ export default function App() {
     return () => document.removeEventListener('mousedown', onDown)
   }, [deviceModal])
 
+  // 设置面板：点空白处收回（点设置面板内或设置按钮本身不关）
+  useEffect(() => {
+    if (!settingsOpen) return
+    const onDown = (e) => {
+      const t = e.target
+      if (t && t.closest && (t.closest('.settings-panel') || t.closest('.settings-btn'))) return
+      setState({ settingsOpen: false })
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [settingsOpen])
+
   // 太阳（sun.sun）：自动切日夜 + 日照高度角（要放在 useEffect 之前，否则 TDZ 报错）
   const sunEnt = (haEntities || []).find(e => e.entity_id === 'sun.sun')
   // 自动跟随太阳切日夜（sun.sun；手动切日夜时关掉 sunAuto）
@@ -452,7 +464,7 @@ export default function App() {
   const tempSt = tempEnt ? haStates[tempEnt.entity_id] : null
 
   return (
-    <div className="app" onDoubleClick={() => immersive && setState({ immersive: false })}>
+    <div className={`app ${settingsOpen ? 'settings-open' : ''}`} onDoubleClick={() => immersive && setState({ immersive: false })}>
       {view2d ? <PlanEditor onSelect={handleSelect} floorIndex={currentFloor} /> : <Viewer onSelect={handleSelect} floorIndex={currentFloor} />}
 
       {/* 左上角状态（沉浸模式隐藏）：只留房间数 + 天气 + 温度，连接状态和帧率移进设置 */}
