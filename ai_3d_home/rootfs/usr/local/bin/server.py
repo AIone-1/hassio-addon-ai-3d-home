@@ -318,8 +318,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send_file(self, path):
         path = unquote(path)  # 解码中文文件名（如 %E8%BE%B9 -> 边）
-        fs = os.path.join(WEBUI_DIR, path.lstrip("/"))
-        if not os.path.abspath(fs).startswith(WEBUI_DIR):
+        # /models/ 固定从镜像内置目录读（模型 26MB 不随本地部署的 webui 走），其余从 WEBUI_DIR 读
+        base = "/usr/local/bin/webui" if path.startswith("/models/") else WEBUI_DIR
+        fs = os.path.join(base, path.lstrip("/"))
+        if not os.path.abspath(fs).startswith(base):
             return self._send(403, {"error": "forbidden"})
         if os.path.isdir(fs):
             fs = os.path.join(fs, "index.html")
