@@ -258,6 +258,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, CACHE.all_entities())
         if p == "/api/ha/states":
             return self._send(200, CACHE.snapshot())
+        if p == "/api/ha/persistent_notifications":
+            code, data = ha_request("GET", "/persistent_notification")
+            return self._send(200, {"code": code, "notifications": data if isinstance(data, list) else []})
         if p == "/api/project":
             return self._send(200, _read_json(PROJECT_FILE, {"floors": []}))
         if p == "/api/settings":
@@ -411,8 +414,21 @@ class Handler(BaseHTTPRequestHandler):
             entity_id = body.get("entity_id")
             if not (domain and service and entity_id):
                 return self._send(400, {"error": "need domain/service/entity_id"})
+            payload = {"entity_id": entity_id}
+            extra = body.get("data") or {}
+            if isinstance(extra, dict):
+                payload.update(extra)
             code, data = ha_request(
-                "POST", f"/services/{domain}/{service}", {"entity_id": entity_id})
+                "POST", f"/services/{domain}/{service}", payload)
+            return self._send(200, {"code": code, "result": data})
+
+        if p == "/api/ha/persistent_notification/dismiss":
+            body = self._json_body() or {}
+            nid = body.get("notification_id")
+            if not nid:
+                return self._send(400, {"error": "need notification_id"})
+            code, data = ha_request(
+                "POST", "/persistent_notification/dismiss", {"notification_id": nid})
             return self._send(200, {"code": code, "result": data})
 
         return self._send(404, {"error": "not found"})

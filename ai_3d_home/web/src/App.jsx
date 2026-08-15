@@ -11,6 +11,20 @@ import { api, TOGGLE_DOMAINS, BASE } from './api'
 import { roomsToWalls, recomputeRooms } from './three/geometry'
 import { loadCatalog } from './catalog'
 
+// 颜色换算：#rrggbb ↔ [r,g,b] 0-255
+function hexToRgb(hex) {
+  try {
+    const h = hex.replace('#', '')
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+  } catch { return [255, 209, 102] }
+}
+function rgbToHex(rgb) {
+  if (!Array.isArray(rgb)) return '#ffd166'
+  try {
+    return '#' + rgb.slice(0, 3).map((c) => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, '0')).join('')
+  } catch { return '#ffd166' }
+}
+
 export default function App() {
   const project = useStore((s) => s.project)
   const editing = useStore((s) => s.editing)
@@ -42,6 +56,9 @@ export default function App() {
   const [deviceModal, setDeviceModal] = useState(null)
   const [bgImages, setBgImages] = useState([])
   const [settingsTab, setSettingsTab] = useState('default')
+  const [notifications, setNotifications] = useState([])
+  const sceneOpen = useStore((s) => s.sceneOpen)
+  const notifOpen = useStore((s) => s.notifOpen)
   const saveTimer = useRef(null)
   const fpsRef = useRef(null)
 
@@ -208,13 +225,40 @@ export default function App() {
   }, [editing])
 
   // ---------- 设备控制 ----------
+  const refreshStates = () => setTimeout(async () => {
+    try { setState({ haStates: await api.states() }) } catch (e) {}
+  }, 800)
   const toggleDevice = async (dev) => {
     const domain = dev.entity_id.split('.')[0]
     await api.service(domain, 'toggle', dev.entity_id)
-    setTimeout(async () => {
-      try { setState({ haStates: await api.states() }) } catch (e) {}
-    }, 800)
+    refreshStates()
     toast(`已发送 ${dev.name} 切换指令`)
+  }
+  // 灯：调亮度 / 色温 / 颜色（data 直接透传给 light.turn_on）
+  const lightControl = async (dev, data) => {
+    await api.service('light', 'turn_on', dev.entity_id, data)
+    refreshStates()
+  }
+  // 窗帘：开 / 关 / 停
+  const coverControl = async (dev, action) => {
+    await api.service('cover', action, dev.entity_id)
+    refreshStates()
+  }
+  // 场景激活
+  const activateScene = async (entity_id) => {
+    await api.service('scene', 'turn_on', entity_id)
+    toast('已激活场景')
+  }
+  // 通知：拉取 / 关闭
+  const loadNotifications = async () => {
+    try {
+      const r = await api.notifications()
+      setNotifications(r.notifications || [])
+    } catch (e) { setNotifications([]) }
+  }
+  const dismissNotification = async (nid) => {
+    await api.notificationDismiss(nid)
+    loadNotifications()
   }
 
   // 保存默认选项到 settings（下次打开生效）
@@ -246,6 +290,9 @@ export default function App() {
   useEffect(() => {
     if (settingsOpen) loadBgImages()
   }, [settingsOpen])
+  useEffect(() => {
+    if (notifOpen) loadNotifications()
+  }, [notifOpen])
 
   // ---------- 3D 导出（分享 tab） ----------
   const export3DPng = (count = 1) => {
@@ -317,6 +364,10 @@ export default function App() {
   }, [editing])
 
   const devState = deviceModal ? haStates[deviceModal.entity_id] : null
+  // 场景列表（scene.* 实体）+ 当前选中设备属性
+  const scenes = (haEntities || []).filter(e => e.entity_id.startsWith('scene.'))
+  const devAttrs = devState && devState.attributes ? devState.attributes : {}
+  const devDomain = deviceModal ? deviceModal.entity_id.split('.')[0] : ''
   // 天气 + 温度（左上角信息）
   const WEATHER_ICON = { sunny: '☀️', 'clear-night': '🌙', partlycloudy: '⛅', cloudy: '☁️', rainy: '🌧️', pouring: '🌧️', snowy: '❄️', snowyrainy: '🌨️', lightning: '⛈️', fog: '🌫️', windy: '💨', hail: '🌨️' }
   const weatherEnt = (haEntities || []).find(e => e.entity_id.startsWith('weather.'))
@@ -352,19 +403,103 @@ export default function App() {
 
       {deviceListOpen && <DeviceList />}
 
-      {/* 设备控制弹窗 */}
+      {/* 设备控制弹窗（overlay 控制面板） */}
       {deviceModal && (
         <div className="modal-mask" onClick={() => setDeviceModal(null)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="dname">{deviceModal.name || deviceModal.entity_id}</div>
             <div className="dstate big">{devState ? devState.state : 'unknown'}</div>
             <div className="dentity">{deviceModal.entity_id}</div>
-            {TOGGLE_DOMAINS.has(deviceModal.entity_id.split('.')[0]) && (
+
+            {TOGGLE_DOMAINS.has(devDomain) && (
               <div className="dev-actions">
                 <button className="primary" onClick={() => toggleDevice(deviceModal)}>⏻ 切换</button>
               </div>
             )}
+
+            {/* 灯：亮度 / 色温 / 颜色 */}
+            {devDomain === 'light' && (
+              <div className="field" style={{ margin: '12px 0' }}>
+                <label>亮度</label>
+                <input type="range" min="0" max="255" step="1" style={{ width: '100%' }}
+                  value={devAttrs.brightness != null ? devAttrs.brightness : 255}
+                  onChange={(e) => lightControl(deviceModal, { brightness: Number(e.target.value) })} />
+                <label style={{ marginTop: 10 }}>色温（K）</label>
+                <input type="range" min="2000" max="6500" step="100" style={{ width: '100%' }}
+                  value={devAttrs.color_temp_kelvin || 4000}
+                  onChange={(e) => lightControl(deviceModal, { color_temp_kelvin: Number(e.target.value) })} />
+                <label style={{ marginTop: 10 }}>颜色</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  {[['#ffdd66', '暖黄'], ['#ffffff', '白'], ['#ff9b9b', '红'], ['#9bd4ff', '蓝'], ['#a8ffa8', '绿'], ['#e0a8ff', '紫']].map(([hex, name]) => (
+                    <button key={hex} title={name} style={{ width: 30, height: 30, borderRadius: 6, border: '2px solid var(--border)', background: hex, cursor: 'pointer' }}
+                      onClick={() => lightControl(deviceModal, { rgb_color: hexToRgb(hex) })} />
+                  ))}
+                  <label style={{ width: 30, height: 30, borderRadius: 6, border: '2px solid var(--border)', overflow: 'hidden', cursor: 'pointer', display: 'inline-block' }}>
+                    <input type="color" value={rgbToHex(devAttrs.rgb_color)} onChange={(e) => lightControl(deviceModal, { rgb_color: hexToRgb(e.target.value) })}
+                      style={{ width: '200%', height: '200%', margin: '-50%', cursor: 'pointer', border: 0, padding: 0 }} />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* 窗帘：开 / 停 / 关 */}
+            {devDomain === 'cover' && (
+              <div className="dev-actions" style={{ marginTop: 10 }}>
+                <button className="primary" onClick={() => coverControl(deviceModal, 'open_cover')}>开</button>
+                <button onClick={() => coverControl(deviceModal, 'stop_cover')}>停</button>
+                <button onClick={() => coverControl(deviceModal, 'close_cover')}>关</button>
+              </div>
+            )}
+
             <button className="close-btn" onClick={() => setDeviceModal(null)}>关闭</button>
+          </div>
+        </div>
+      )}
+
+      {/* 场景同步面板 */}
+      {sceneOpen && (
+        <div className="modal-mask" onClick={() => setState({ sceneOpen: false })}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 360 }}>
+            <div className="dname">🎬 场景</div>
+            {scenes.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--muted)' }}>没有 scene 实体</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxHeight: '60vh', overflowY: 'auto' }}>
+                {scenes.map((s) => (
+                  <button key={s.entity_id} onClick={() => { activateScene(s.entity_id); setState({ sceneOpen: false }) }}
+                    style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
+                    {(s.attributes && s.attributes.friendly_name) || s.entity_id.split('.').pop()}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button className="close-btn" onClick={() => setState({ sceneOpen: false })}>关闭</button>
+          </div>
+        </div>
+      )}
+
+      {/* 通知中心面板 */}
+      {notifOpen && (
+        <div className="modal-mask" onClick={() => setState({ notifOpen: false })}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="dname">🔔 通知</div>
+            {notifications.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--muted)' }}>没有通知</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, maxHeight: '60vh', overflowY: 'auto' }}>
+                {notifications.map((n) => (
+                  <div key={n.notification_id} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{n.created_at || ''}</span>
+                      <button onClick={() => dismissNotification(n.notification_id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 4 }}>{n.message || ''}</div>
+                    {n.title && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.title}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="close-btn" onClick={() => setState({ notifOpen: false })}>关闭</button>
           </div>
         </div>
       )}

@@ -76,6 +76,8 @@ let state = {
   editorBgImage: '',     // 3D 编辑视图独立背景图（和主界面背景互不影响）
   editorBgMode: 'color', // 3D 编辑视图背景模式
   settingsOpen: false,   // 设置面板
+  sceneOpen: false,      // 场景同步面板
+  notifOpen: false,      // 通知中心面板
 }
 
 let toastTimer = null

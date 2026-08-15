@@ -130,6 +130,8 @@ export default function BottomBar() {
         </button>
       </div>
       <div className="bb-group">
+        <button className="bb-btn" onClick={() => setState({ sceneOpen: true })} title="场景同步">🎬 场景</button>
+        <button className="bb-btn" onClick={() => setState({ notifOpen: true })} title="通知中心">🔔 通知</button>
         <button className="bb-btn" onClick={() => setState({ deviceListOpen: true })} title="查看已绑定设备">设备{deviceCount}</button>
         <button className={`bb-btn ${editing ? 'active' : ''}`} onClick={() => {
           if (editing) setState({ editing: false, view2d: false, tool: 'select' })

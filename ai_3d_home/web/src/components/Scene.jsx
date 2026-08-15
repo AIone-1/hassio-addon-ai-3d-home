@@ -638,34 +638,66 @@ function Airflow({ color, scale = 1 }) {
 }
 
 // ---------- 设备模型（对齐 JMGLink 原版 49 个设备模型，程序化几何） ----------
+// rgb_color [r,g,b] 0-255 → '#rrggbb'
+function rgbToHex(rgb) {
+  try {
+    return '#' + rgb.slice(0, 3).map((c) => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, '0')).join('')
+  } catch { return '#ffd166' }
+}
+// 色温 kelvin → 近似 RGB（1000-40000K 的常用近似，2700 暖白 → 6500 冷白）
+function kelvinToHex(k) {
+  const t = Math.max(1000, Math.min(40000, Number(k) || 4000)) / 100
+  let r, g, b
+  if (t <= 66) {
+    r = 255
+    g = 99.47 * Math.log(t) - 161.12
+    b = t <= 19 ? 0 : 138.52 * Math.log(t - 10) - 305.04
+  } else {
+    r = 329.7 * Math.pow(t - 60, -0.1332)
+    g = 288.12 * Math.pow(t - 60, -0.0755)
+    b = 255
+  }
+  const c = (v) => Math.max(0, Math.min(255, Math.round(v)))
+  return '#' + [c(r), c(g), c(b)].map((v) => v.toString(16).padStart(2, '0')).join('')
+}
 // id 形如 "light.ceiling" / "switch.wall" / "fan.ceiling"，kind 是第一段，variant 是第二段
-export function DeviceModel({ id, w, d, h, isOn }) {
+export function DeviceModel({ id, w, d, h, isOn, state }) {
   const kind = (id || '').split('.')[0]
   const variant = (id || '').split('.')[1] || ''
-  const light = isOn ? '#ffd166' : '#e8edf2'
+  // 灯颜色：优先 rgb_color，其次 color_temp_kelvin（转暖白/冷白），最后默认黄
+  const attrs = (state && state.attributes) || {}
+  const lightColor = kind === 'light' && isOn
+    ? (Array.isArray(attrs.rgb_color) ? rgbToHex(attrs.rgb_color) : (attrs.color_temp_kelvin != null ? kelvinToHex(attrs.color_temp_kelvin) : '#ffd166'))
+    : '#ffd166'
+  const light = isOn ? lightColor : '#e8edf2'
+  // 窗帘开合比例：优先 current_position(0=关,100=开)，否则按 state 判断（closed=关）
+  const coverPos = kind === 'cover' ? (attrs.current_position != null ? Number(attrs.current_position) : (state && state.state === 'closed' ? 0 : 100)) : 100
+  const openRatio = Math.max(0, Math.min(100, coverPos)) / 100
+  // 门(binary_sensor.door)开合：state 'on' = 开
+  const doorOpen = kind === 'binary_sensor' && variant === 'door' ? isOn : false
 
   if (kind === 'light') {
     if (variant === 'chandelier') {
       return <group>
         <mesh position={[0, h * 0.35, 0]}><cylinderGeometry args={[0.015, 0.015, h * 0.6, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
-        <mesh position={[0, 0, 0]}><sphereGeometry args={[w * 0.28, 16, 12]} /><meshStandardMaterial color={light} emissive="#ffd166" emissiveIntensity={isOn ? 0.8 : 0.1} /></mesh>
+        <mesh position={[0, 0, 0]}><sphereGeometry args={[w * 0.28, 16, 12]} /><meshStandardMaterial color={light} emissive={light} emissiveIntensity={isOn ? 0.8 : 0.1} /></mesh>
       </group>
     }
     if (variant === 'floor_lamp') {
       return <group>
         <mesh position={[0, h * 0.45, 0]}><cylinderGeometry args={[0.015, 0.015, h * 0.9, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
-        <mesh position={[0, 0, 0]}><coneGeometry args={[w * 0.5, h * 0.18, 16]} /><meshStandardMaterial color={light} emissive="#ffd166" emissiveIntensity={isOn ? 0.8 : 0.1} /></mesh>
+        <mesh position={[0, 0, 0]}><coneGeometry args={[w * 0.5, h * 0.18, 16]} /><meshStandardMaterial color={light} emissive={light} emissiveIntensity={isOn ? 0.8 : 0.1} /></mesh>
       </group>
     }
     if (variant === 'strip') {
       return <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#ffe9a8" emissive="#ffd166" emissiveIntensity={0.8} /></mesh>
     }
     if (variant === 'downlight') {
-      return <mesh><cylinderGeometry args={[w * 0.5, w * 0.55, h, 16]} /><meshStandardMaterial color={light} emissive="#ffd166" emissiveIntensity={isOn ? 0.9 : 0.15} /></mesh>
+      return <mesh><cylinderGeometry args={[w * 0.5, w * 0.55, h, 16]} /><meshStandardMaterial color={light} emissive={light} emissiveIntensity={isOn ? 0.9 : 0.15} /></mesh>
     }
     // ceiling 吸顶灯
     return <group>
-      <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color={light} emissive="#ffd166" emissiveIntensity={isOn ? 0.7 : 0.1} /></mesh>
+      <mesh><boxGeometry args={[w, h, d]} /><meshStandardMaterial color={light} emissive={light} emissiveIntensity={isOn ? 0.7 : 0.1} /></mesh>
     </group>
   }
 
@@ -683,15 +715,18 @@ export function DeviceModel({ id, w, d, h, isOn }) {
   }
 
   if (kind === 'cover') {
+    const closed = 1 - openRatio
     return <group>
       <mesh position={[0, h * 0.48, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.02, 0.02, w, 8]} /><meshStandardMaterial color="#8a9aa8" /></mesh>
       {variant === 'blind' ? (
+        // 百叶帘：关=叶片铺开下垂，开=叶片收起顶部
         Array.from({ length: 8 }).map((_, i) => (
-          <mesh key={i} position={[0, h * 0.42 - i * (h * 0.1), 0]}><boxGeometry args={[w * 0.92, 0.012, d * 0.4]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
+          <mesh key={i} position={[0, h * 0.42 - i * (h * 0.1) * closed, 0]}><boxGeometry args={[w * 0.92, 0.012, d * 0.4]} /><meshStandardMaterial color="#cfd8e2" /></mesh>
         ))
       ) : (
+        // 单向窗帘：关=面板铺满，开=面板收到右侧
         [-0.3, -0.1, 0.1, 0.3].map((V) => (
-          <mesh key={V} position={[V * w, -h * 0.26, 0]}><boxGeometry args={[w * 0.18, h * 0.5, d * 0.5]} /><meshStandardMaterial color="#9fb8c8" roughness={0.7} /></mesh>
+          <mesh key={V} position={[V * w * closed + 0.4 * w * openRatio, -h * 0.26, 0]}><boxGeometry args={[w * 0.18, h * 0.5, d * 0.5]} /><meshStandardMaterial color="#9fb8c8" roughness={0.7} /></mesh>
         ))
       )}
     </group>
@@ -733,9 +768,14 @@ export function DeviceModel({ id, w, d, h, isOn }) {
 
   if (kind === 'binary_sensor') {
     if (variant === 'door') {
+      // 门磁：门框 + 可转动的门扇（state on=开，门扇绕左侧铰链转开）
       return <group>
-        <FBox position={[0, h * 0.4, 0]} size={[w, h * 0.5, d]} color="#eef2f5" />
-        <FBox position={[0, -h * 0.4, 0]} size={[w, h * 0.5, d]} color="#eef2f5" />
+        <FBox position={[-w * 0.42, 0, 0]} size={[w * 0.14, h * 0.9, d * 0.5]} color="#8a9aa8" />
+        <FBox position={[w * 0.42, 0, 0]} size={[w * 0.14, h * 0.9, d * 0.5]} color="#8a9aa8" />
+        <FBox position={[0, h * 0.42, 0]} size={[w, h * 0.12, d * 0.5]} color="#8a9aa8" />
+        <group position={[-w * 0.42, 0, 0]} rotation={[0, -doorOpen * 1.9, 0]}>
+          <FBox position={[w * 0.42, 0, 0]} size={[w * 0.84, h * 0.82, d * 0.36]} color={doorOpen ? '#cfe3ee' : '#eef2f5'} />
+        </group>
       </group>
     }
     if (variant === 'smoke') {
@@ -1272,7 +1312,7 @@ function DeviceMarker({ dev, level, selected, onSelect, interactive, canDrag, on
         <GltfModel name={cat.glb} w={cat.w} d={cat.d} h={cat.h} />
       ) : devModel ? (
         // 设备模型目录里的程序化模型（灯光/开关/空调/摄像机/风扇…）
-        <DeviceModel id={devModel.id} w={devModel.w} d={devModel.d} h={devModel.h} isOn={isOn} />
+        <DeviceModel id={devModel.id} w={devModel.w} d={devModel.d} h={devModel.h} isOn={isOn} state={state} />
       ) : (
         // 无模型：小球兜底
         <mesh>

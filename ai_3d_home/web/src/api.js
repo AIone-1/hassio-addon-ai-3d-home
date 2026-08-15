@@ -36,8 +36,11 @@ export const api = {
   backgroundDelete: (name) => req('/api/background/delete', { method: 'POST', body: { name } }),
   entities: () => req('/api/ha/entities'),
   states: () => req('/api/ha/states'),
-  service: (domain, service, entity_id) =>
-    req('/api/ha/service', { method: 'POST', body: { domain, service, entity_id } }),
+  service: (domain, service, entity_id, data) =>
+    req('/api/ha/service', { method: 'POST', body: { domain, service, entity_id, data } }),
+  notifications: () => req('/api/ha/persistent_notifications'),
+  notificationDismiss: (notification_id) =>
+    req('/api/ha/persistent_notification/dismiss', { method: 'POST', body: { notification_id } }),
 }
 
 // 实体友好名 / 图标
