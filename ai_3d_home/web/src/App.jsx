@@ -179,6 +179,24 @@ export default function App() {
       }
       pollStates()
       setInterval(pollStates, 5000)
+      // WebSocket 实时推送（SSE）：后端连 HA WebSocket 订阅 state_changed，状态变化即时推下来；
+      // EventSource 断了会自动重连，pollStates 每 5s 兜底。
+      try {
+        const es = new EventSource((BASE + 'api/ha/stream').replace(/\/{2,}/g, '/'))
+        es.onmessage = (ev) => {
+          try {
+            const msg = JSON.parse(ev.data)
+            if (msg.type === 'snapshot' && msg.states) {
+              setState({ haStates: msg.states, haConnected: true })
+            } else if (msg.type === 'state' && msg.entity_id) {
+              const next = { ...getState().haStates }
+              if (msg.new_state) next[msg.entity_id] = msg.new_state
+              else delete next[msg.entity_id]
+              setState({ haStates: next, haConnected: true })
+            }
+          } catch (e) { /* 忽略坏消息 */ }
+        }
+      } catch (e) { /* EventSource 不支持则只靠轮询 */ }
     })()
   }, [])
 

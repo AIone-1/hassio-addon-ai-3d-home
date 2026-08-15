@@ -2,8 +2,8 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/aarch64-base:latest
 FROM $BUILD_FROM
 
-# 后端只用 Python 标准库，零第三方依赖
-RUN apk add --no-cache python3 ca-certificates tzdata
+# 后端 Python 标准库 + websockets（HA WebSocket 实时订阅用；不可用则退化为轮询）
+RUN apk add --no-cache python3 py3-websockets ca-certificates tzdata
 
 COPY run.sh /run.sh
 COPY rootfs/usr/local/bin/server.py /usr/local/bin/server.py

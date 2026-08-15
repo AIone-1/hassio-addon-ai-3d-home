@@ -146,6 +146,17 @@ class StateCache:
         with self._lock:
             self._states = snapshot
 
+    def update(self, eid, new_state):
+        # WebSocket 实时更新单个实体（只更新绑定的实体）
+        with self._lock:
+            if eid not in self._bound:
+                return False
+            if new_state is None:
+                self._states.pop(eid, None)
+            else:
+                self._states[eid] = new_state
+            return True
+
     def run_loop(self, interval):
         while not self._stop:
             try:
@@ -156,6 +167,70 @@ class StateCache:
 
 
 CACHE = StateCache()
+
+# ---------------------------------------------------------------- 实时推送 (SSE)
+# 前端 EventSource 连 /api/ha/stream，后端把 WebSocket 收到的状态变化推下去。
+_STREAM_CLIENTS = []
+_STREAM_LOCK = threading.Lock()
+
+
+def notify_stream(payload):
+    data = ("data: " + json.dumps(payload, ensure_ascii=False) + "\n\n").encode("utf-8")
+    dead = []
+    with _STREAM_LOCK:
+        clients = list(_STREAM_CLIENTS)
+    for w in clients:
+        try:
+            w.write(data)
+            w.flush()
+        except Exception:
+            dead.append(w)
+    if dead:
+        with _STREAM_LOCK:
+            for w in dead:
+                if w in _STREAM_CLIENTS:
+                    _STREAM_CLIENTS.remove(w)
+
+
+# ---------------------------------------------------------------- HA WebSocket 实时订阅
+# 连 HA WebSocket 订阅 state_changed，实时更新 CACHE 并推给前端。
+# websockets 库不可用时自动退化为轮询（run_loop 仍在跑）。
+def ws_loop():
+    import asyncio
+    try:
+        import websockets
+    except ImportError:
+        print("[ai_3d_home] websockets 库不可用，状态退化为轮询", flush=True)
+        return
+
+    base, token = ha_endpoints()
+    ws_url = base.replace("http://", "ws://", 1) + "/websocket"
+
+    async def run():
+        while not CACHE._stop:
+            try:
+                async with websockets.connect(ws_url, max_size=2 ** 26) as ws:
+                    await ws.send(json.dumps({"type": "auth", "access_token": token}))
+                    auth = json.loads(await ws.recv())
+                    if auth.get("type") != "auth_ok":
+                        await asyncio.sleep(5)
+                        continue
+                    await ws.send(json.dumps({"id": 1, "type": "subscribe_events", "event_type": "state_changed"}))
+                    # 订阅成功后先补一次全量
+                    CACHE.refresh()
+                    notify_stream({"type": "snapshot", "states": CACHE.snapshot()})
+                    while True:
+                        msg = json.loads(await ws.recv())
+                        if msg.get("type") == "event" and msg.get("event", {}).get("event_type") == "state_changed":
+                            d = msg["event"].get("data", {})
+                            eid = d.get("entity_id")
+                            ns = d.get("new_state")
+                            if eid and CACHE.update(eid, ns):
+                                notify_stream({"type": "state", "entity_id": eid, "new_state": ns})
+            except Exception:
+                await asyncio.sleep(5)
+
+    threading.Thread(target=lambda: asyncio.run(run()), daemon=True).start()
 
 
 # ---------------------------------------------------------------- data io
@@ -196,6 +271,35 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(raw)
+
+    def _send_stream(self):
+        # SSE：把 WebSocket 收到的状态变化实时推给前端（EventSource）
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+        w = self.wfile
+        try:
+            w.write(("data: " + json.dumps({"type": "snapshot", "states": CACHE.snapshot()}, ensure_ascii=False) + "\n\n").encode("utf-8"))
+            w.flush()
+            with _STREAM_LOCK:
+                _STREAM_CLIENTS.append(w)
+            # 阻塞直到连接被断开（notify_stream 写失败会清理）
+            while True:
+                time.sleep(30)
+                try:
+                    w.write(b": ping\n\n")
+                    w.flush()
+                except Exception:
+                    break
+        except Exception:
+            pass
+        finally:
+            with _STREAM_LOCK:
+                if w in _STREAM_CLIENTS:
+                    _STREAM_CLIENTS.remove(w)
 
     def _send_file(self, path):
         path = unquote(path)  # 解码中文文件名（如 %E8%BE%B9 -> 边）
@@ -258,6 +362,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, CACHE.all_entities())
         if p == "/api/ha/states":
             return self._send(200, CACHE.snapshot())
+        if p == "/api/ha/stream":
+            return self._send_stream()
         if p == "/api/ha/persistent_notifications":
             code, data = ha_request("GET", "/persistent_notification")
             return self._send(200, {"code": code, "notifications": data if isinstance(data, list) else []})
@@ -451,6 +557,9 @@ def main():
 
     t = threading.Thread(target=CACHE.run_loop, args=(interval,), daemon=True)
     t.start()
+
+    # WebSocket 实时订阅（不可用则退化为轮询）
+    ws_loop()
 
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     print(f"[ai_3d_home] listening on {PORT}", flush=True)
