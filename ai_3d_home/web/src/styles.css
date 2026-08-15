@@ -49,6 +49,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .status-tl { position: absolute; top: 12px; left: 14px; display: flex; gap: 8px; align-items: center;
   font-size: 11px; color: var(--muted); z-index: 20; }
 .status-tl .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.status-tl .dot.blink { animation: status-blink 1.6s ease-in-out infinite; }
+@keyframes status-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
 /* ---------- 编辑器 ---------- */
 .editor-top { position: absolute; top: 0; left: 0; right: 0; display: flex; gap: 6px; align-items: center;
@@ -149,6 +151,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   paint-order: stroke; stroke: #fff; stroke-width: 0.07; stroke-linejoin: round; font-weight: 600; }
 .plan-align-hint { font-size: 0.18px; fill: #1e9e6a; text-anchor: middle; dominant-baseline: middle; pointer-events: none;
   paint-order: stroke; stroke: #fff; stroke-width: 0.08; stroke-linejoin: round; font-weight: 700; }
+.plan-issue-label { font-size: 0.18px; fill: #ff5a5a; text-anchor: middle; dominant-baseline: middle; pointer-events: none;
+  paint-order: stroke; stroke: #fff; stroke-width: 0.08; stroke-linejoin: round; font-weight: 700; }
 .plan-wall-draft { stroke: #343a3f; stroke-linecap: butt; }
 /* 门窗（对齐原版） */
 .plan-opening { cursor: grab; }
@@ -159,6 +163,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .door-swing { fill: none; stroke: #89929a; stroke-width: 0.035; pointer-events: none; }
 .door-leaf { stroke: #68737c; stroke-width: 0.055; stroke-linecap: round; pointer-events: none; }
 .plan-preview { stroke: #2f7fe0; stroke-width: 0.05; fill: none; }
+.plan-intersection-dot { fill: #ff2d55; stroke: #fff; stroke-width: 0.04; pointer-events: none; }
 .plan-furniture { fill: #e8ece8; stroke-width: 0.04; cursor: pointer; }
 .plan-furniture.selected { fill: #d4e6ff; stroke: #2f7fe0; stroke-width: 0.06; }
 .plan-furniture-label { font-size: 0.16px; fill: #53615a; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
@@ -216,11 +221,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .plan-props-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .plan-props-row:last-child { margin-bottom: 0; }
 .plan-props-label { font-size: 11px; color: var(--muted); min-width: 32px; }
-.plan-props-row button { padding: 5px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel2);
+.plan-props-row button { padding: 5px 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.28); background: rgba(255,255,255,0.14);
   color: var(--text); font-size: 12px; cursor: pointer; }
-.plan-props-row button:hover { background: rgba(255,255,255,0.06); }
-.plan-props-row input[type="number"] { width: 62px; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--border);
-  background: var(--panel2); color: var(--text); font-size: 12px; }
+.plan-props-row button:hover { background: rgba(255,255,255,0.24); }
+.plan-props-row input[type="number"] { width: 62px; padding: 5px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.08); color: var(--text); font-size: 12px; }
 .plan-props-unit { font-size: 11px; color: var(--muted); }
 .plan-props-seg { flex: 1; text-align: center; }
 .plan-props-seg.active { background: var(--accent) !important; color: #081018 !important; font-weight: 600; border-color: var(--accent) !important; }
@@ -229,6 +234,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .opening-line.selected { stroke: #2f7fe0; stroke-width: 0.22; }
 .plan-props-row input[type="text"] { flex: 1; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
   background: var(--panel2); color: var(--text); font-size: 12px; }
+/* 隐藏数字输入框自带的上下微调箭头（用 −/+ 按钮代替，避免和面板颜色重叠） */
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
 
 /* 右侧完全透明侧边面板（场景 / 通知 / 设备等，与背景融为一体） */
 .side-panel { position: fixed; right: 14px; top: 64px; width: 250px; max-height: 62vh; overflow-y: auto;

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore, setState, currentFloor, getState, toast, undo, redo, loadProject, uid } from '../store'
 import { api, BASE } from '../api'
-import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, DEVICE_MODELS, DEVICE_KINDS, recomputeRooms } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, DEVICE_MODELS, DEVICE_KINDS, recomputeRooms, segmentIntersect, pointToSeg } from '../three/geometry'
 import { thumbUrl } from '../catalog'
 import ModelPreview from './ModelPreview'
 
@@ -81,6 +81,7 @@ export default function Editor() {
   const [editorBgOpen, setEditorBgOpen] = useState(false)
   const [bgList, setBgList] = useState([])
   const [roomTplOpen, setRoomTplOpen] = useState(false)
+  const [wallIssues, setWallIssues] = useState(null)
   const editorBgImage = useStore((s) => s.editorBgImage)
 
   // 下载模型按中文分类分组
@@ -116,6 +117,151 @@ export default function Editor() {
     fs.forEach((f) => { f.locked = locked })
     setState({ project: { ...st.project }, saved: false })
     toast(locked ? `已锁定 ${fs.length} 个家具` : `已解锁 ${fs.length} 个家具`)
+  }
+
+  // 全选当前楼层所有墙
+  const selectAllWalls = () => {
+    const st = getState()
+    const fl = st.project.floors[st.currentFloor]
+    const ids = (fl.walls || []).map((w) => w.id)
+    setState({ wallSel: ids, selected: null, roomSel: [], tool: 'select' })
+    toast(`已选中 ${ids.length} 面墙`)
+  }
+
+  // 全选房间（房间=地板，选中后可批量改颜色/透明度/贴图）
+  const selectAllRooms = () => {
+    const st = getState()
+    const fl = st.project.floors[st.currentFloor]
+    const ids = (fl.rooms || []).map((r) => r.id)
+    setState({ roomSel: ids, wallSel: [], selected: null, tool: 'select' })
+    toast(`已选中 ${ids.length} 个房间`)
+  }
+
+  // 按类型选墙（户型信息里点「墙/水平/竖直/斜线」用）
+  const selectWallsByType = (type) => {
+    const st = getState()
+    const fl = st.project.floors[st.currentFloor]
+    const walls = fl.walls || []
+    const horiz = (w) => Math.abs(w.end[1] - w.start[1]) < 0.01
+    const vert = (w) => Math.abs(w.end[0] - w.start[0]) < 0.01
+    let ids
+    if (type === 'horiz') ids = walls.filter(horiz).map((w) => w.id)
+    else if (type === 'vert') ids = walls.filter(vert).map((w) => w.id)
+    else if (type === 'diag') ids = walls.filter((w) => !horiz(w) && !vert(w)).map((w) => w.id)
+    else ids = walls.map((w) => w.id)
+    setState({ wallSel: ids, selected: null, tool: 'select' })
+    toast(`已选中 ${ids.length} 面墙`)
+  }
+
+  // 检测墙体问题：零长度 / 重复 / 重叠
+  const detectWallIssues = () => {
+    const st = getState()
+    const fl = st.project.floors[st.currentFloor]
+    const walls = fl.walls || []
+    const eps = 0.05
+    const d = (p1, p2) => Math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+    const len = (w) => Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
+    const zeroLen = walls.filter((w) => len(w) < 0.01).map((w) => w.id)
+    const dupIds = new Set()
+    const overlapIds = new Set()
+    const collinearOverlap = (a, b) => {
+      const ax = a.end[0] - a.start[0], ay = a.end[1] - a.start[1]
+      const alen = len(a)
+      if (alen < 0.01) return false
+      const cross = (p) => Math.abs(ax * (p[1] - a.start[1]) - ay * (p[0] - a.start[0])) / alen
+      if (cross(b.start) > eps || cross(b.end) > eps) return false
+      const proj = (p) => ((p[0] - a.start[0]) * ax + (p[1] - a.start[1]) * ay) / (alen * alen)
+      const lo = Math.max(0, Math.min(proj(b.start), proj(b.end)))
+      const hi = Math.min(1, Math.max(proj(b.start), proj(b.end)))
+      return hi - lo > 0.01
+    }
+    for (let i = 0; i < walls.length; i++) {
+      const a = walls[i]
+      for (let j = i + 1; j < walls.length; j++) {
+        const b = walls[j]
+        if (dupIds.has(b.id) || overlapIds.has(b.id) || overlapIds.has(a.id)) continue
+        const same = (d(a.start, b.start) < eps && d(a.end, b.end) < eps) || (d(a.start, b.end) < eps && d(a.end, b.start) < eps)
+        if (same) { dupIds.add(b.id); continue }
+        if (collinearOverlap(a, b)) {
+          if (len(a) >= len(b)) overlapIds.add(b.id); else overlapIds.add(a.id)
+        }
+      }
+    }
+    // 悬挂/孤立墙：端点不接别的墙（伸出去了/孤零零的），属于「没用的墙」
+    // 注意：判断端点是否「接」在别的墙的任意位置（含中点，T形/共用墙），否则会把正常的墙误判成伸出
+    const pointToSegDist = (p, a, b) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1]
+      const len2 = dx * dx + dy * dy
+      if (len2 < 1e-9) return Math.hypot(p[0] - a[0], p[1] - a[1])
+      let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2
+      t = Math.max(0, Math.min(1, t))
+      return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
+    }
+    const touchesAny = (p, excludeW) => walls.some((other) => {
+      if (other.id === excludeW.id) return false
+      return pointToSegDist(p, other.start, other.end) < eps
+    })
+    const danglingIds = new Set()
+    walls.forEach((w) => {
+      if (zeroLen.includes(w.id) || dupIds.has(w.id) || overlapIds.has(w.id)) return
+      const sTouch = touchesAny(w.start, w)
+      const eTouch = touchesAny(w.end, w)
+      if (!sTouch || !eTouch) danglingIds.add(w.id)
+    })
+    const issues = { zeroLen, dupIds: [...dupIds], overlapIds: [...overlapIds], danglingIds: [...danglingIds], total: zeroLen.length + dupIds.size + overlapIds.size + danglingIds.size }
+    setWallIssues(issues)
+    setState({ wallIssues: issues })  // 写 store，让 2D 户型图标注问题墙
+    if (issues.total === 0) toast('检测完成，没有发现问题墙')
+    else toast(`发现 ${issues.total} 面问题墙：重复 ${dupIds.size}、重叠 ${overlapIds.size}、零长度 ${zeroLen.length}、伸出/孤立 ${danglingIds.size}，点「修复」处理`)
+  }
+
+  // 自动修复墙体问题
+  const fixWallIssues = () => {
+    const st = getState()
+    const fl = st.project.floors[st.currentFloor]
+    if (!wallIssues || wallIssues.total === 0) return
+    const walls = fl.walls || []
+    const removeIds = new Set([...wallIssues.zeroLen, ...wallIssues.dupIds, ...wallIssues.overlapIds])
+    let trimmed = 0
+    // 伸出墙：把「自由端」缩回到它与别的墙的交点（只切掉伸出去那段，保留有用的那段）
+    const danglingIds = wallIssues.danglingIds || []
+    danglingIds.forEach((id) => {
+      const w = walls.find((x) => x.id === id)
+      if (!w) return
+      const touchesAny = (p) => walls.some((other) => {
+        if (other.id === w.id) return false
+        return pointToSeg(p, other.start, other.end).dist < 0.08
+      })
+      const freeStart = !touchesAny(w.start)
+      const freeEnd = !touchesAny(w.end)
+      // 找修剪点：与别的墙的交点，排除「连接端本身」，取离连接端最近的那个
+      const findTrim = (connectedP) => {
+        let best = null, bestD = Infinity
+        walls.forEach((other) => {
+          if (other.id === w.id) return
+          const ip = segmentIntersect(w.start, w.end, other.start, other.end)
+          if (!ip) return
+          const d = Math.hypot(ip[0] - connectedP[0], ip[1] - connectedP[1])
+          if (d < 0.05) return  // 交点就是连接点本身，跳过（避免缩成零长度墙）
+          if (d < bestD) { bestD = d; best = ip }
+        })
+        return best
+      }
+      if (freeStart && !freeEnd) {
+        const ip = findTrim(w.end)  // w.end 是连接端，w.start 是自由端
+        if (ip) { w.start = ip; trimmed++ } else removeIds.add(w.id)
+      } else if (freeEnd && !freeStart) {
+        const ip = findTrim(w.start)  // w.start 是连接端，w.end 是自由端
+        if (ip) { w.end = ip; trimmed++ } else removeIds.add(w.id)
+      } else {
+        removeIds.add(w.id)  // 两端都自由 = 孤立墙，整条删
+      }
+    })
+    fl.walls = walls.filter((w) => !removeIds.has(w.id))
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...st.project }, saved: false, wallSel: [], wallIssues: null })
+    toast(`已修复：删除 ${removeIds.size} 面、修剪 ${trimmed} 面伸出墙`)
+    setWallIssues(null)
   }
 
   // 插入房间模板：在现有户型右侧放一个标准尺寸矩形（4 面墙，自动识别成房间）
@@ -514,10 +660,15 @@ export default function Editor() {
         </div>
         <button className="et-btn" onClick={() => lockAllFurniture(true)} title="锁定当前楼层所有家具（防止移动）">🔒 全部锁定</button>
         <button className="et-btn" onClick={() => lockAllFurniture(false)} title="解锁当前楼层所有家具">🔓 全部解锁</button>
+        <button className="et-btn" onClick={selectAllWalls} title="全选当前楼层所有墙">全选墙</button>
+        <button className="et-btn" onClick={selectAllRooms} title="全选当前楼层所有房间(地板)">全选地板</button>
+        <button className="et-btn" onClick={detectWallIssues} title="检测零长度/重复/重叠的问题墙">🔍 检测</button>
+        {wallIssues && wallIssues.total > 0 && (
+          <button className="et-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={fixWallIssues} title="删除检测到的问题墙">🔧 修复({wallIssues.total})</button>
+        )}
         <button className={`et-btn ${view2d ? 'active' : ''}`} onClick={() => setState({ view2d: !view2d })}>2D</button>
         <button className={`et-btn ${!view2d ? 'active' : ''}`} onClick={() => setState({ view2d: false, tool: 'select', pickItem: null, wallSel: [] })}>3D</button>
         <div style={{ flex: 1 }} />
-        <span className="et-label">HA 已连接</span>
       </div>
 
       {/* 左侧竖排工具 */}
@@ -544,11 +695,11 @@ export default function Editor() {
           <div className="editor-info-title">户型信息</div>
           <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
           <div className="editor-info-row"><span>面积</span><b>{infoArea.toFixed(1)} ㎡</b></div>
-          <div className="editor-info-row"><span>房间</span><b>{infoRoomCount} 个</b></div>
-          <div className="editor-info-row"><span>墙</span><b>{infoWallCount} 条</b></div>
-          <div className="editor-info-row"><span>水平</span><b>{infoHorizCount} 条</b></div>
-          <div className="editor-info-row"><span>竖直</span><b>{infoVertCount} 条</b></div>
-          <div className="editor-info-row"><span>斜线</span><b>{infoDiagCount} 条</b></div>
+          <div className="editor-info-row" style={{ cursor: 'pointer' }} title="选中所有墙" onClick={() => selectWallsByType('all')}><span>墙</span><b>{infoWallCount} 条</b></div>
+          <div className="editor-info-row" style={{ cursor: 'pointer' }} title="选中所有水平墙" onClick={() => selectWallsByType('horiz')}><span>水平</span><b>{infoHorizCount} 条</b></div>
+          <div className="editor-info-row" style={{ cursor: 'pointer' }} title="选中所有竖直墙" onClick={() => selectWallsByType('vert')}><span>竖直</span><b>{infoVertCount} 条</b></div>
+          <div className="editor-info-row" style={{ cursor: 'pointer' }} title="选中所有斜线墙" onClick={() => selectWallsByType('diag')}><span>斜线</span><b>{infoDiagCount} 条</b></div>
+          <div className="editor-info-row" style={{ cursor: 'pointer' }} title="选中所有房间(地板)" onClick={selectAllRooms}><span>房间</span><b>{infoRoomCount} 个</b></div>
           <div className="editor-info-row"><span>家具</span><b>{infoFurnCount} 个</b></div>
           <div className="editor-info-row"><span>设备</span><b>{infoDevCount} 个</b></div>
         </div>

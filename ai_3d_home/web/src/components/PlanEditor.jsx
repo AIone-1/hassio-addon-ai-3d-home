@@ -2,9 +2,10 @@
 // 墙是线段（floor.walls 持久化），房间由墙段的封闭环自动检测（recomputeRooms）——这就是"共用墙/相交也封闭"的机制
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
-import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg, segmentIntersect, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg, pointOnSeg, segmentIntersect, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
 import { getCatalogItem, thumbUrl } from '../catalog'
 import HexColorPicker from './HexColorPicker'
+import NumInput from './NumInput'
 import { api, BASE } from '../api'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
@@ -115,6 +116,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const planImageScale = useStore(s => s.planImageScale)
   const selected = useStore(s => s.selected)
   const wallSelIds = useStore(s => s.wallSel)
+  const roomSelIds = useStore(s => s.roomSel)
+  const wallIssues = useStore(s => s.wallIssues)
   const multiSelect = useStore(s => s.multiSelect)
   const furnitureType = useStore(s => s.furnitureType)
   const pendingEntity = useStore(s => s.pendingEntity)
@@ -244,7 +247,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     }
     fl.rooms = recomputeRooms(fl)
     setDraft(null)
-    setState({ project: { ...getState().project }, saved: false })
+    setState({ project: { ...getState().project }, saved: false, __noUndo: true })
     toast(fl.rooms.length ? `已识别 ${fl.rooms.length} 个房间` : '墙体尚未形成封闭房间')
   }
 
@@ -264,6 +267,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     }
     const last = draft.pts[draft.pts.length - 1]
     if (Math.hypot(x - last[0], y - last[1]) < 0.01) return  // 点重复，忽略
+    const isFirst = draft.walls.length === 0  // 第一段墙才占一步撤销，后续段归到同一步
     const w = { id: uid(), start: [...last], end: [x, y], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor, ...(getState().wallOpacity !== 100 ? { opacity: getState().wallOpacity } : {}) }
     fl.walls.push(w)
     // 每加一面墙就增量识别一次：墙一闭合（含和已有墙重合/共用墙）就立刻出房间，不用非得点回起点或按 Enter
@@ -276,7 +280,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     } else {
       setDraft({ pts: [...draft.pts, [x, y]], walls: [...draft.walls, w] })
     }
-    setState({ project: { ...getState().project }, saved: false })
+    setState({ project: { ...getState().project }, saved: false, ...(isFirst ? {} : { __noUndo: true }) })
   }
 
   const cancelDraft = () => {
@@ -285,7 +289,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     // 右键取消：结束画墙，但保留已画的墙（哪怕没封闭成房间也不删）
     fl.rooms = recomputeRooms(fl)
     setDraft(null)
-    setState({ project: { ...getState().project }, saved: false })
+    setState({ project: { ...getState().project }, saved: false, __noUndo: true })
     toast('已取消画墙（保留已画的墙）')
   }
 
@@ -653,14 +657,62 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     setState({ project: { ...st.project }, saved: false, selected: null })
     toast('已删除设备')
   }
-  // 房间属性（改名/颜色）
-  const selRoom = selected && selected.type === 'room' ? selected.ref : null
+  // 房间属性（改名/颜色）；recomputeRooms 会重建房间对象，这里按 id 取最新的，避免拿到旧引用
+  const selRoom = selected && selected.type === 'room'
+    ? ((getState().project.floors[floorIndex]?.rooms || []).find(x => x.id === selected.ref.id) || selected.ref)
+    : null
+  // 房间包围盒尺寸（长=横向 X，宽=纵向 Z）
+  const roomDims = (() => {
+    const pts = selRoom && selRoom.points || []
+    if (!pts.length) return { w: 0, d: 0 }
+    const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1])
+    return { w: Math.max(...xs) - Math.min(...xs), d: Math.max(...zs) - Math.min(...zs) }
+  })()
   const patchRoom = (r, patch) => {
     const fl = getState().project.floors[floorIndex]
     const target = (fl.rooms || []).find(x => x.id === r.id)
     if (!target) return
     Object.assign(target, patch)
     setState({ project: { ...getState().project }, saved: false })
+  }
+  // 批量改所有选中的房间（全选地板/屋顶后改颜色/透明度/贴图）
+  const patchRooms = (patch) => {
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
+    const ids = st.roomSel || []
+    ;(fl.rooms || []).forEach((r) => { if (ids.includes(r.id)) Object.assign(r, patch) })
+    setState({ project: { ...st.project }, saved: false })
+  }
+  // 改房间长/宽：按房间包围盒，围绕中心缩放「属于这个房间的墙」（端点都在房间边界上的墙）
+  const resizeRoom = (r, newW, newD) => {
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
+    const room = (fl.rooms || []).find(x => x.id === r.id) || r
+    const pts = room.points || []
+    if (pts.length < 3) return
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+    pts.forEach(p => { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]) })
+    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2
+    const curW = maxX - minX, curD = maxZ - minZ
+    const sx = curW > 0.05 ? newW / curW : 1
+    const sz = curD > 0.05 ? newD / curD : 1
+    const eps = 0.08
+    const onBoundary = (p) => {
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length]
+        if (pointToSeg(p, a, b).dist < eps) return true
+      }
+      return false
+    }
+    const scale = (p) => [cx + (p[0] - cx) * sx, cz + (p[1] - cz) * sz]
+    ;(fl.walls || []).forEach((w) => {
+      if (onBoundary(w.start) && onBoundary(w.end)) {
+        w.start = scale(w.start)
+        w.end = scale(w.end)
+      }
+    })
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...st.project }, saved: false })
   }
   // 墙属性（高度）
   // 单选墙（用于属性面板）；墙改成用 wallSel 多选（最多 2 条），这里取唯一选中的那条
@@ -671,6 +723,24 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     if (!target) return
     Object.assign(target, patch)
     setState({ project: { ...getState().project }, saved: false })
+  }
+  // 批量改所有选中的墙（全选后也能改颜色/高度/厚度/不透明度）
+  const patchWalls = (patch) => {
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
+    const ids = st.wallSel || []
+    ;(fl.walls || []).forEach((w) => { if (ids.includes(w.id)) Object.assign(w, patch) })
+    setState({ project: { ...st.project }, saved: false })
+  }
+  // 批量删除所有选中的墙
+  const deleteWalls = () => {
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
+    const ids = st.wallSel || []
+    fl.walls = (fl.walls || []).filter((w) => !ids.includes(w.id))
+    fl.rooms = recomputeRooms(fl)
+    setState({ project: { ...st.project }, saved: false, wallSel: [] })
+    toast(`已删除 ${ids.length} 面墙`)
   }
   // 改墙长度：起点固定，终点沿墙方向移动。加长=向终点方向延伸，缩短=向起点方向收
   const setWallLength = (w, len) => {
@@ -939,13 +1009,22 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         const wlen = Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
         const wmx = (w.start[0] + w.end[0]) / 2
         const wmy = (w.start[1] + w.end[1]) / 2
+        // 检测标注：问题墙显示红色/橙色 + 问题类型标签
+        let issue = null
+        if (wallIssues) {
+          if (wallIssues.zeroLen.includes(w.id)) issue = { label: '零长度', color: '#ff6b6b' }
+          else if (wallIssues.dupIds.includes(w.id)) issue = { label: '重复', color: '#ff9b54' }
+          else if (wallIssues.overlapIds.includes(w.id)) issue = { label: '重叠', color: '#ffd166' }
+          else if (wallIssues.danglingIds.includes(w.id)) issue = { label: '伸出', color: '#ff6b9d' }
+        }
         return (
           <g key={w.id || `w${i}`}>
             <line
               x1={w.start[0]} y1={w.start[1]} x2={w.end[0]} y2={w.end[1]}
               className={`plan-wall ${selW ? 'selected' : ''}`}
-              strokeWidth={WALL_T}
-              strokeOpacity={((w.opacity != null ? w.opacity : wallOpacity) / 100)}
+              stroke={issue ? issue.color : undefined}
+              strokeWidth={issue ? WALL_T * 1.6 : WALL_T}
+              strokeOpacity={(w.opacity != null ? w.opacity : wallOpacity) / 100}
               onPointerDown={(e) => {
                 if (tool === 'delete') { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
                 else if (tool === 'select') {
@@ -957,6 +1036,24 @@ export default function PlanEditor({ onSelect, floorIndex }) {
                 }
               }}
             />
+            {issue && (
+              <>
+                <text x={wmx} y={wmy - 0.18} className="plan-issue-label" textAnchor="middle">{issue.label}</text>
+                {issue.label === '伸出' && (() => {
+                  // 标出自由端（伸出去的那一头）：红色圆圈，让人看清在哪里伸出
+                  const touchesAny = (p) => walls.some((other) => {
+                    if (other.id === w.id) return false
+                    return pointToSeg(p, other.start, other.end).dist < 0.08
+                  })
+                  return (
+                    <>
+                      {!touchesAny(w.start) && <circle cx={w.start[0]} cy={w.start[1]} r={0.22} fill="none" stroke="#ff2d55" strokeWidth={0.07} />}
+                      {!touchesAny(w.end) && <circle cx={w.end[0]} cy={w.end[1]} r={0.22} fill="none" stroke="#ff2d55" strokeWidth={0.07} />}
+                    </>
+                  )
+                })()}
+              </>
+            )}
             {selW && tool === 'select' && (
               <>
                 <circle cx={w.start[0]} cy={w.start[1]} r={0.16} className="plan-wall-handle start" onPointerDown={(e) => startWallDrag(e, w, 'start')} />
@@ -969,6 +1066,32 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           </g>
         )
       })}
+
+      {/* 墙体交点：红点标记（判断线是否闭合/连接） */}
+      {(() => {
+        const pts = []
+        const seen = new Set()
+        const add = (p) => {
+          const k = `${Math.round(p[0] * 100)},${Math.round(p[1] * 100)}`
+          if (seen.has(k)) return
+          seen.add(k)
+          pts.push(p)
+        }
+        for (let i = 0; i < walls.length; i++) {
+          for (let j = i + 1; j < walls.length; j++) {
+            const a = walls[i], b = walls[j]
+            const ip = segmentIntersect(a.start, a.end, b.start, b.end)
+            if (ip) add(ip)
+            if (pointOnSeg(b.start, a.start, a.end)) add(b.start)
+            if (pointOnSeg(b.end, a.start, a.end)) add(b.end)
+            if (pointOnSeg(a.start, b.start, b.end)) add(a.start)
+            if (pointOnSeg(a.end, b.start, b.end)) add(a.end)
+          }
+        }
+        return pts.map((p, i) => (
+          <circle key={i} cx={p[0]} cy={p[1]} r={0.12} className="plan-intersection-dot" />
+        ))
+      })()}
 
       {/* 门窗（对齐原版：墙洞白线 + 门扇 + 开启弧） */}
       {openings.map(op => {
@@ -1070,6 +1193,15 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           strokeDasharray="0.3 0.28"
         />
       )}
+
+      {/* 画墙实时长度（上一个点 → 光标，移动鼠标实时变） */}
+      {draft && draft.pts.length > 0 && cursor && tool === 'wall' && (() => {
+        const last = draft.pts[draft.pts.length - 1]
+        const len = Math.hypot(cursor[0] - last[0], cursor[1] - last[1])
+        if (len < 0.01) return null
+        const mx = (last[0] + cursor[0]) / 2, my = (last[1] + cursor[1]) / 2
+        return <text x={mx} y={my + 0.32} className="plan-dim" textAnchor="middle">{len.toFixed(2)}m</text>
+      })()}
 
       {/* 画墙时水平/垂直提示（当前段被轴向吸附成水平或垂直时显示） */}
       {draft && draft.pts.length > 0 && cursor && tool === 'wall' && (() => {
@@ -1373,14 +1505,39 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <span style={{ fontSize: 12, color: 'var(--text)' }}>{polygonArea(selRoom.points || []).toFixed(1)} ㎡</span>
         </div>
         <div className="plan-props-row">
+          <span className="plan-props-label">长</span>
+          <button onClick={() => resizeRoom(selRoom, Math.max(0.5, roomDims.w - 0.1), roomDims.d)}>−</button>
+          <NumInput value={Math.round(roomDims.w * 100) / 100} step={0.1} min={0.5} onChange={(v) => resizeRoom(selRoom, v, roomDims.d)} />
+          <button onClick={() => resizeRoom(selRoom, roomDims.w + 0.1, roomDims.d)}>＋</button>
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">宽</span>
+          <button onClick={() => resizeRoom(selRoom, roomDims.w, Math.max(0.5, roomDims.d - 0.1))}>−</button>
+          <NumInput value={Math.round(roomDims.d * 100) / 100} step={0.1} min={0.5} onChange={(v) => resizeRoom(selRoom, roomDims.w, v)} />
+          <button onClick={() => resizeRoom(selRoom, roomDims.w, roomDims.d + 0.1)}>＋</button>
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">高度</span>
+          <NumInput value={selRoom.height || floor?.height || 2.8} step={0.1} min={0.5} max={8} onChange={(v) => patchRoom(selRoom, { height: v })} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
           <span className="plan-props-label">厚度</span>
-          <input type="number" step="0.01" min="0.02" max="1" value={selRoom.thickness || 0.05}
-            onChange={(e) => patchRoom(selRoom, { thickness: Number(e.target.value) || 0.05 })} />
+          <NumInput value={selRoom.thickness || 0.05} step={0.01} min={0.02} max={1} onChange={(v) => patchRoom(selRoom, { thickness: v })} />
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">颜色</span>
           <HexColorPicker value={selRoom.color || '#7789ad'} onChange={(c) => patchRoom(selRoom, { color: c })} />
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">透明度</span>
+          <input type="range" min="10" max="100" step="5" style={{ flex: 1 }}
+            value={selRoom.opacity != null ? selRoom.opacity : 100}
+            onChange={(e) => patchRoom(selRoom, { opacity: Number(e.target.value) })} />
+          <span className="plan-props-unit">{selRoom.opacity != null ? selRoom.opacity : 100}%</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">壁纸</span>
@@ -1407,6 +1564,52 @@ export default function PlanEditor({ onSelect, floorIndex }) {
               <img key={img.name} src={BASE + 'api/background/' + img.name} alt=""
                 style={{ width: 48, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: selRoom.texture === img.name ? '2px solid var(--accent)' : '1px solid var(--border)' }}
                 onClick={() => patchRoom(selRoom, { texture: img.name })} />
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+    {roomSelIds.length > 0 && (
+      <div className="plan-props">
+        <div className="plan-props-head"><span>批量房间（{roomSelIds.length} 个）</span></div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          {FLOOR_COLORS.map((c) => (
+            <button key={c} title={c} onClick={() => patchRooms({ color: c })}
+              className="plan-props-swatch" style={{ background: c }} />
+          ))}
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">透明度</span>
+          <input type="range" min="10" max="100" step="5" style={{ flex: 1 }} defaultValue={100}
+            onChange={(e) => patchRooms({ opacity: Number(e.target.value) })} />
+          <span className="plan-props-unit">%</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">贴图</span>
+          <input type="file" accept="image/*" id="room-batch-texture-file" style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = async () => {
+                try {
+                  const r = await fetch(BASE + 'api/background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: reader.result }) })
+                  const res = await r.json()
+                  if (res.ok && res.name) { patchRooms({ texture: res.name }); setBgList([{ name: res.name }, ...bgList]); toast('地板贴图已上传') }
+                } catch (err) { toast('上传失败') }
+              }
+              reader.readAsDataURL(file)
+            }} />
+          <button onClick={() => document.getElementById('room-batch-texture-file').click()}>上传贴图</button>
+          <button style={{ color: 'var(--danger)' }} onClick={() => patchRooms({ texture: '' })}>清除</button>
+        </div>
+        {bgList.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+            {bgList.map((img) => (
+              <img key={img.name} src={BASE + 'api/background/' + img.name} alt=""
+                style={{ width: 48, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: '1px solid var(--border)' }}
+                onClick={() => patchRooms({ texture: img.name })} />
             ))}
           </div>
         )}
@@ -1500,6 +1703,37 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <button className="plan-props-seg" onClick={() => applyWallConstraint('collinear')}>共线</button>
           <button className="plan-props-seg" onClick={() => applyWallConstraint('horizontal')}>水平</button>
           <button className="plan-props-seg" onClick={() => applyWallConstraint('samepoint')}>同点</button>
+        </div>
+      </div>
+    )}
+    {wallSelIds.length > 2 && (
+      <div className="plan-props">
+        <div className="plan-props-head">
+          <span>批量墙（{wallSelIds.length} 面）</span>
+          <button className="plan-props-del" onClick={deleteWalls}>删除</button>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">高度</span>
+          <input type="number" step="0.1" min="1" max="6" placeholder="统一" onChange={(e) => { if (e.target.value) patchWalls({ height: Number(e.target.value) || 2.8 }) }} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">厚度</span>
+          <input type="number" step="0.02" min="0.05" max="0.5" placeholder="统一" onChange={(e) => { if (e.target.value) patchWalls({ thickness: Number(e.target.value) || 0.12 }) }} />
+          <span className="plan-props-unit">m</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          {WALL_COLORS.map((c) => (
+            <button key={c} title={c} onClick={() => patchWalls({ color: c })}
+              className="plan-props-swatch" style={{ background: c }} />
+          ))}
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">不透明度</span>
+          <input type="range" min="10" max="100" step="5" style={{ flex: 1 }} defaultValue={wallOpacity}
+            onChange={(e) => patchWalls({ opacity: Number(e.target.value) })} />
+          <span className="plan-props-unit">%</span>
         </div>
       </div>
     )}

@@ -80,6 +80,11 @@ let state = {
   notifOpen: false,      // 通知中心面板
   sunAuto: true,         // 自动跟随 sun.sun 切日夜（手动切日夜则关掉）
   sunElevation: null,    // 太阳高度角（度），用于日照/天空
+  roomSel: [],           // 多选房间（全选地板/屋顶）的 id 列表
+  wallIssues: null,      // 检测出的问题墙 { zeroLen, dupIds, overlapIds, danglingIds }
+  showToolbar: true,     // 显示底部工具栏（默认选项里可设默认）
+  haEntitiesFp: '',      // 全量实体指纹（entity_id 排序拼接），变了才更新 haEntities，避免闪屏
+  showFps: true,         // 显示帧率/卡顿（主界面左上角，默认选项里可关）
 }
 
 let toastTimer = null
@@ -101,11 +106,15 @@ export function getState() { return state }
 export function setState(partial) {
   const next = typeof partial === 'function' ? partial(state) : partial
   // 修改 project 时保存快照（撤销用），限 50 步；新改动清空重做历史
+  // __noUndo：连续改动（如画墙的每个点）不单独占一步撤销，只在第一步存一次快照
   if (next.project && next.project !== state.project) {
-    undoStack.push(lastClean)
-    if (undoStack.length > 50) undoStack.shift()
-    redoStack = []
+    if (!next.__noUndo) {
+      undoStack.push(lastClean)
+      if (undoStack.length > 50) undoStack.shift()
+      redoStack = []
+    }
     lastClean = JSON.parse(JSON.stringify(next.project))
+    delete next.__noUndo
   }
   state = { ...state, ...next }
   listeners.forEach((l) => l(state))

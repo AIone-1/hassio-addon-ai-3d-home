@@ -1000,7 +1000,7 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
 
 // ---------- 房间（地板 + 2D 描边；墙在 Scene 层统一去重渲染） ----------
 // 地板材质：有壁纸贴图用贴图，没贴图用纯色（2D 用 basic，3D 用 physical）
-function FloorMaterial({ texture, color, view2d }) {
+function FloorMaterial({ texture, color, view2d, opacity }) {
   const [map, setMap] = useState(null)
   useEffect(() => {
     if (!texture) { setMap(null); return }
@@ -1017,12 +1017,14 @@ function FloorMaterial({ texture, color, view2d }) {
     return () => { cancelled = true }
   }, [texture])
   const matColor = map ? '#ffffff' : color
+  const trans = opacity != null && opacity < 100
+  const op = trans ? opacity / 100 : 1
   if (view2d) {
-    return <meshBasicMaterial key={map ? map.uuid : 'no-tex'} map={map || undefined} color={matColor} side={THREE.DoubleSide} />
+    return <meshBasicMaterial key={map ? map.uuid : 'no-tex'} map={map || undefined} color={matColor} side={THREE.DoubleSide} transparent={trans} opacity={op} />
   }
   return (
     <meshPhysicalMaterial key={map ? map.uuid : 'no-tex'} map={map || undefined} color={matColor}
-      roughness={0.46} metalness={0.02} clearcoat={map ? 0 : 0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} />
+      roughness={0.46} metalness={0.02} clearcoat={map ? 0 : 0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} transparent={trans} opacity={op} />
   )
 }
 
@@ -1045,11 +1047,11 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
       {/* 地板：多边形形状，法线朝上，renderOrder 强制绘制在前 */}
       <mesh geometry={floorGeo} position={[0, floorY, 0]} renderOrder={1} receiveShadow>
-        <FloorMaterial texture={room.texture} color={room.color || floor.color || (view2d ? '#d5c6a8' : '#7789ad')} view2d={view2d} />
+        <FloorMaterial texture={room.texture} color={room.color || floor.color || (view2d ? '#d5c6a8' : '#7789ad')} view2d={view2d} opacity={room.opacity} />
       </mesh>
       {/* 主界面屋顶：封闭房间顶上加半透明顶面（和地板同一多边形，只在不同高度，不翻转） */}
       {showCeiling && !editing && !view2d && (
-        <mesh geometry={floorGeo} position={[0, level + (floor.height || 2.8), 0]} renderOrder={2}>
+        <mesh geometry={floorGeo} position={[0, level + (room.height || floor.height || 2.8), 0]} renderOrder={2}>
           <meshPhysicalMaterial color={roofColor || room.color || floor.color || '#7789ad'} roughness={0.5} metalness={0.02} transparent opacity={(roofOpacity != null ? roofOpacity : 80) / 100} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
       )}

@@ -100,7 +100,8 @@ export function Controls({ enabled = true }) {
   useFrame((_, delta) => {
     const c = ref.current
     if (!c) return
-    c.update(delta)
+    // 限制单帧 delta：卡顿一帧时阻尼不会「跳」导致视角突变（突然放大/乱转）
+    c.update(Math.min(delta, 0.05))
     // 暴露当前相机位置/目标，供「保存视角」读取（不触发 React 重渲染）
     if (!window.__cam3d) window.__cam3d = {}
     window.__cam3d.pos = c.object.position.toArray()

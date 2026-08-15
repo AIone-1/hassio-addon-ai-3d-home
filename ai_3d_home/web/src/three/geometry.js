@@ -219,13 +219,16 @@ export function robustFloorGeometry(points, THREE) {
     }
   }
   const positions = []
+  const uvs = []
   for (const f of faces) {
     for (const idx of f) {
       positions.push(points[idx][0], 0, points[idx][1])  // 直接水平：x, 0, z
+      uvs.push(points[idx][0], points[idx][1])  // UV 用世界 XZ 坐标，1 米 = 1 个贴图重复（否则贴图显示不出来）
     }
   }
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   geo.computeVertexNormals()
   return geo
 }
@@ -443,6 +446,9 @@ export function recomputeRooms(floor) {
       points: poly,
       height: (match ? match.room.height : undefined) || floor.height || 2.8,
       color: (match && match.room.color) || FLOOR_PALETTE[0],
+      texture: match ? match.room.texture : undefined,   // 地板壁纸
+      thickness: match ? match.room.thickness : undefined,  // 地板厚度
+      opacity: match ? match.room.opacity : undefined,   // 地板透明度
     }
   })
 }

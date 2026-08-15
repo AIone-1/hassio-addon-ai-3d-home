@@ -12,7 +12,7 @@ const Ic = ({ children }) => (
 )
 
 // 可编辑按钮的默认顺序（id 列表）
-const DEFAULT_ORDER = ['rotate', 'center', 'fullscreen', 'immersive', 'wall', 'openings', 'ceiling', 'view', 'night', 'scene', 'notif', 'device', 'edit', 'settings']
+const DEFAULT_ORDER = ['rotate', 'center', 'fullscreen', 'immersive', 'wall', 'openings', 'ceiling', 'view', 'night', 'scene', 'notif', 'device', 'edit', 'settings', 'baredit']
 
 export default function BottomBar() {
   const mode = useStore((s) => s.mode)
@@ -286,7 +286,7 @@ export default function BottomBar() {
       {barEditOpen && (
         <div className="bb-edit-panel">
           <div className="bb-edit-head">工具栏按钮（↑↓排序 · 眼睛=显示/隐藏）</div>
-          {order.map((id) => {
+          {order.filter((id) => id !== 'baredit').map((id) => {
             const b = BTNS[id]
             if (!b) return null
             const isHidden = hidden.includes(id)

@@ -46,6 +46,8 @@ export default function App() {
   const roofColor = useStore((s) => s.roofColor)
   const view2d = useStore((s) => s.view2d)
   const immersive = useStore((s) => s.immersive)
+  const showToolbar = useStore((s) => s.showToolbar)
+  const showFps = useStore((s) => s.showFps)
   const settings = useStore((s) => s.settings)
   const quality = useStore((s) => s.quality)
   const shadows = useStore((s) => s.shadows)
@@ -104,11 +106,18 @@ export default function App() {
           customViews: settings.customViews || [],
           quality: settings.quality || 'high',
           shadows: settings.shadows !== undefined ? settings.shadows : true,
+          bloom: settings.bloom !== undefined ? settings.bloom : true,
           autoRotate: !!settings.autoRotate,
           rotateDir: settings.rotateDir || 1,
           rotateSpeed: settings.rotateSpeed || 1,
           immersive: !!settings.immersive,
           night: !!settings.night,
+          showWalls: settings.showWalls !== undefined ? settings.showWalls : true,
+          showOpenings: settings.showOpenings !== undefined ? settings.showOpenings : true,
+          showCeiling: settings.showCeiling !== undefined ? settings.showCeiling : true,
+          showToolbar: settings.showToolbar !== undefined ? settings.showToolbar : true,
+          showFps: settings.showFps !== undefined ? settings.showFps : true,
+          sceneOpen: !!settings.defaultScene,
           bgImage: settings.bgImage || '',
           bgMode: settings.bgMode || 'color',
           bgColor: settings.bgColor || '#5278ae',
@@ -152,11 +161,16 @@ export default function App() {
           setState({ currentFloor: 0 })
         }
       } catch (e) {}
-      // 拉全量实体（绑定用）
+      // 拉全量实体（绑定用）；只比较 entity_id 做指纹，变了才 setState（避免每 30s 无谓重渲染导致闪屏）
       const pollEntities = async () => {
         try {
           const ents = await api.entities()
-          if (Array.isArray(ents)) setState({ haEntities: ents, haConnected: true })
+          if (Array.isArray(ents)) {
+            const fp = ents.map((e) => e.entity_id).sort().join(',')
+            const prev = getState().haEntitiesFp
+            if (prev !== fp) setState({ haEntities: ents, haEntitiesFp: fp, haConnected: true })
+            else setState({ haConnected: true })
+          }
         } catch (e) { setState({ haConnected: false }) }
       }
       pollEntities()
@@ -376,7 +390,7 @@ export default function App() {
   // 自动跟随太阳切日夜（sun.sun；手动切日夜时关掉 sunAuto）
   useEffect(() => {
     if (!sunEnt || !getState().sunAuto) return
-    const elev = sunEnt.attributes && sunEnt.attributes.elevation != null ? Number(sunEnt.attributes.elevation) : null
+    const elev = sunEnt.attributes && sunEnt.attributes.elevation != null ? Math.round(Number(sunEnt.attributes.elevation)) : null
     const below = sunEnt.state !== 'above_horizon'
     if (getState().night !== below) setState({ night: below })
     if (elev != null && getState().sunElevation !== elev) setState({ sunElevation: elev })
@@ -467,8 +481,10 @@ export default function App() {
     <div className={`app ${settingsOpen ? 'settings-open' : ''}`} onDoubleClick={() => immersive && setState({ immersive: false })}>
       {view2d ? <PlanEditor onSelect={handleSelect} floorIndex={currentFloor} /> : <Viewer onSelect={handleSelect} floorIndex={currentFloor} />}
 
-      {/* 左上角状态（沉浸模式隐藏）：只留房间数 + 天气 + 温度，连接状态和帧率移进设置 */}
+      {/* 左上角状态（沉浸模式隐藏）：HA 连接状态（闪烁绿点）+ 房间数 + 天气 + 温度 + 帧率 */}
       {!immersive && <div className="status-tl">
+        <span className="dot blink" style={{ background: haConnected ? 'var(--ok)' : 'var(--danger)' }} />
+        <span>{haConnected ? 'Home Assistant 已连接' : 'Home Assistant 未连接'}</span>
         <span style={{ color: 'var(--accent2)' }}>
           {editing ? `房间 ${project.floors.reduce((n, f) => n + (f.rooms || []).length, 0)} 个` : ''}
         </span>
@@ -478,9 +494,10 @@ export default function App() {
         {tempSt && (
           <span>🌡️ {tempSt.state}{tempSt.attributes?.unit_of_measurement || '°C'}</span>
         )}
+        {showFps && <span ref={fpsRef} style={{ fontSize: '14px', fontWeight: 700 }} />}
       </div>}
 
-      {!immersive && <BottomBar />}
+      {!immersive && showToolbar && <BottomBar />}
 
       {editing && <Editor />}
 
@@ -541,7 +558,7 @@ export default function App() {
       )}
 
       {/* 场景同步面板（右侧半透明，常驻；其它面板打开时自动隐藏，关掉后再显示） */}
-      {sceneOpen && !notifOpen && !deviceModal && !settingsOpen && !deviceListOpen && !bindOpen && (
+      {sceneOpen && !editing && !notifOpen && !deviceModal && !settingsOpen && !deviceListOpen && !bindOpen && (
         <div className="side-panel scene-panel">
           <div className="ha-scene-list">
             {scenes.map((s) => {
@@ -596,57 +613,63 @@ export default function App() {
       {settingsOpen && (
         <div className="settings-panel">
           <div className="dname">设置</div>
-            {/* 连接状态 + 帧率（从主页移到这里） */}
-            <div className="field" style={{ margin: '10px 0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                <span className="dot" style={{ background: haConnected ? 'var(--ok)' : 'var(--danger)' }} />
-                <span style={{ color: 'var(--text)' }}>{haConnected ? 'Home Assistant 已连接' : 'Home Assistant 未连接'}</span>
-                <span ref={fpsRef} style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: 'var(--muted)' }} />
-              </div>
-            </div>
             {/* 三个 tab 切换 */}
             <div style={{ display: 'flex', gap: 6, margin: '10px 0' }}>
-              {[['default', '默认选项'], ['background', '背景配置'], ['quality', '画质'], ['share', '分享']].map(([k, l]) => (
+              {[['default', '默认选项'], ['background', '背景配置'], ['share', '分享']].map(([k, l]) => (
                 <button key={k} style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: '1px solid var(--border)', background: settingsTab === k ? 'var(--accent)' : 'var(--panel2)', color: settingsTab === k ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={() => setSettingsTab(k)}>{l}</button>
               ))}
             </div>
-            {settingsTab === 'default' && (
-            <div className="field" style={{ margin: '12px 0' }}>
-              <label>默认选项（下次打开生效）</label>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>旋转</span>
-                {[['none', '停止', !settings.autoRotate], ['cw', '顺时针', !!settings.autoRotate && settings.rotateDir === 1], ['ccw', '逆时针', !!settings.autoRotate && settings.rotateDir === -1]].map(([v, l, active]) => (
-                  <button key={v} onClick={() => saveDefault(v === 'none' ? { autoRotate: false } : { autoRotate: true, rotateDir: v === 'cw' ? 1 : -1 })}
-                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: active ? 'var(--accent)' : 'var(--panel2)', color: active ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>{l}</button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>速度</span>
-                <input type="number" step="0.1" min="0.5" max="5" value={settings.rotateSpeed || 1}
-                  onChange={(e) => saveDefault({ rotateSpeed: parseFloat(e.target.value) || 1 })}
-                  style={{ width: 64, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12 }} />
-                <span style={{ fontSize: 11, color: 'var(--muted)' }}>×</span>
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>画质</span>
-                {[['eco', '流畅'], ['smooth', '均衡'], ['balanced', '高清'], ['high', '极致']].map(([v, l]) => (
-                  <button key={v} onClick={() => saveDefault({ quality: v })}
-                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: (settings.quality || 'high') === v ? 'var(--accent)' : 'var(--panel2)', color: (settings.quality || 'high') === v ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>{l}</button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>投影</span>
-                <button onClick={() => saveDefault({ shadows: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.shadows !== false ? 'var(--accent)' : 'var(--panel2)', color: settings.shadows !== false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
-                <button onClick={() => saveDefault({ shadows: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.shadows === false ? 'var(--accent)' : 'var(--panel2)', color: settings.shadows === false ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
-                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>全屏</span>
-                <button onClick={() => saveDefault({ fullscreen: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.fullscreen ? 'var(--accent)' : 'var(--panel2)', color: settings.fullscreen ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
-                <button onClick={() => saveDefault({ fullscreen: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !settings.fullscreen ? 'var(--accent)' : 'var(--panel2)', color: !settings.fullscreen ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
-                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>沉浸</span>
-                <button onClick={() => saveDefault({ immersive: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: settings.immersive ? 'var(--accent)' : 'var(--panel2)', color: settings.immersive ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
-                <button onClick={() => saveDefault({ immersive: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !settings.immersive ? 'var(--accent)' : 'var(--panel2)', color: !settings.immersive ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
-              </div>
-            </div>
-            )}
+            {settingsTab === 'default' && (() => {
+              const seg = (active) => ({ padding: '5px 14px', borderRadius: 6, border: '1px solid var(--border)', background: active ? 'var(--accent)' : 'var(--panel2)', color: active ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 })
+              const labelStyle = { fontSize: 12, color: 'var(--muted)', minWidth: 88, flexShrink: 0 }
+              const row = { display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }
+              const toggle = (label, cur, key) => (
+                <div key={key} style={row}>
+                  <span style={labelStyle}>{label}</span>
+                  <button onClick={() => saveDefault({ [key]: true })} style={seg(cur !== false)}>开</button>
+                  <button onClick={() => saveDefault({ [key]: false })} style={seg(cur === false)}>关</button>
+                </div>
+              )
+              return (
+                <div className="field" style={{ margin: '12px 0' }}>
+                  <label>默认选项（下次打开生效，每条一行）</label>
+                  <div style={row}>
+                    <span style={labelStyle}>旋转</span>
+                    {[['none', '停止', !settings.autoRotate], ['cw', '顺时针', !!settings.autoRotate && settings.rotateDir === 1], ['ccw', '逆时针', !!settings.autoRotate && settings.rotateDir === -1]].map(([v, l, active]) => (
+                      <button key={v} onClick={() => saveDefault(v === 'none' ? { autoRotate: false } : { autoRotate: true, rotateDir: v === 'cw' ? 1 : -1 })} style={seg(active)}>{l}</button>
+                    ))}
+                  </div>
+                  <div style={row}>
+                    <span style={labelStyle}>速度</span>
+                    <input type="number" step="0.1" min="0.5" max="5" value={settings.rotateSpeed || 1}
+                      onChange={(e) => saveDefault({ rotateSpeed: parseFloat(e.target.value) || 1 })}
+                      style={{ width: 64, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 12 }} />
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>×</span>
+                  </div>
+                  <div style={row}>
+                    <span style={labelStyle}>画质</span>
+                    {[['eco', '流畅'], ['smooth', '均衡'], ['balanced', '高清'], ['high', '极致']].map(([v, l]) => (
+                      <button key={v} onClick={() => saveDefault({ quality: v })} style={seg((settings.quality || 'high') === v)}>{l}</button>
+                    ))}
+                  </div>
+                  <div style={row}>
+                    <span style={labelStyle}>日间/夜间</span>
+                    <button onClick={() => saveDefault({ night: false })} style={seg(settings.night !== true)}>日间</button>
+                    <button onClick={() => saveDefault({ night: true })} style={seg(settings.night === true)}>夜间</button>
+                  </div>
+                  {toggle('显示墙', settings.showWalls !== undefined ? settings.showWalls : true, 'showWalls')}
+                  {toggle('显示门窗', settings.showOpenings !== undefined ? settings.showOpenings : true, 'showOpenings')}
+                  {toggle('显示屋顶', settings.showCeiling !== undefined ? settings.showCeiling : true, 'showCeiling')}
+                  {toggle('显示工具栏', settings.showToolbar !== undefined ? settings.showToolbar : true, 'showToolbar')}
+                  {toggle('显示场景', !!settings.defaultScene, 'defaultScene')}
+                  {toggle('投影', settings.shadows !== false, 'shadows')}
+                  {toggle('泛光', settings.bloom !== false, 'bloom')}
+                  {toggle('帧率/卡顿', settings.showFps !== false, 'showFps')}
+                  {toggle('全屏', !!settings.fullscreen, 'fullscreen')}
+                  {toggle('沉浸', !!settings.immersive, 'immersive')}
+                </div>
+              )
+            })()}
             {settingsTab === 'background' && (<>
             <div className="field" style={{ margin: '12px 0' }}>
               <label>背景颜色（六边形色盘）</label>
@@ -745,25 +768,6 @@ export default function App() {
               </div>
             </div>
             </>)}
-            {settingsTab === 'quality' && (
-            <div className="field" style={{ margin: '12px 0' }}>
-              <label>画质</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                {[['eco', '流畅'], ['smooth', '均衡'], ['balanced', '高清'], ['high', '极致']].map(([v, l]) => (
-                  <button key={v} onClick={() => setState({ quality: v })}
-                    style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: quality === v ? 'var(--accent)' : 'var(--panel2)', color: quality === v ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>{l}</button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
-                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>投影</span>
-                <button onClick={() => setState({ shadows: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: shadows ? 'var(--accent)' : 'var(--panel2)', color: shadows ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
-                <button onClick={() => setState({ shadows: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !shadows ? 'var(--accent)' : 'var(--panel2)', color: !shadows ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
-                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>泛光</span>
-                <button onClick={() => setState({ bloom: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: bloom ? 'var(--accent)' : 'var(--panel2)', color: bloom ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
-                <button onClick={() => setState({ bloom: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !bloom ? 'var(--accent)' : 'var(--panel2)', color: !bloom ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
-              </div>
-            </div>
-            )}
             {settingsTab === 'share' && (
             <div className="field" style={{ margin: '12px 0' }}>
               <label>分享 / 导出</label>
