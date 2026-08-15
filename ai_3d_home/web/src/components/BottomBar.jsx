@@ -126,7 +126,7 @@ export default function BottomBar() {
           </button>
           {viewOpen && (
             <div className="bb-menu">
-              <button className="bb-menu-item" onClick={() => setView('default')}><Ic><path d="M3 10l9-7 9 7" /><path d="M5 9v11h14V9" /></Ic>默认视图</button>
+              <button className="bb-menu-item" onClick={() => setView('default')}><Ic><path d="M3 10l9-7 9 7" /><path d="M5 9v11h14V9" /></Ic>主视图</button>
               <button className="bb-menu-item" onClick={() => setView('top')}><Ic><path d="M12 3v18M6 15l6 6 6-6" /></Ic>上视图</button>
               <button className="bb-menu-item" onClick={() => setView('front')}><Ic><path d="M12 21V3M6 9l6-6 6 6" /></Ic>前视图</button>
               <div className="bb-menu-sep" />
@@ -151,7 +151,7 @@ export default function BottomBar() {
         <button className={`bb-btn ${sceneOpen ? 'active' : ''}`} onClick={() => setState((s) => ({ sceneOpen: !s.sceneOpen }))} title="场景同步">
           <Ic><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></Ic>场景
         </button>
-        <button className={`bb-btn ${notifOpen ? 'active' : ''}`} onClick={() => setState((s) => ({ notifOpen: !s.notifOpen }))} title="通知中心">
+        <button className={`bb-btn notif-btn ${notifOpen ? 'active' : ''}`} onClick={() => setState((s) => ({ notifOpen: !s.notifOpen }))} title="通知中心">
           <Ic><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></Ic>通知
         </button>
         <button className="bb-btn" onClick={() => setState({ deviceListOpen: true })} title="查看已绑定设备">

@@ -324,6 +324,17 @@ export default function App() {
   useEffect(() => {
     if (notifOpen) loadNotifications()
   }, [notifOpen])
+  // 通知面板：点空白处 / 切换其它按钮时自动收起（点通知面板内或通知按钮本身不关）
+  useEffect(() => {
+    if (!notifOpen) return
+    const onDown = (e) => {
+      const t = e.target
+      if (t && t.closest && (t.closest('.notif-panel') || t.closest('.notif-btn'))) return
+      setState({ notifOpen: false })
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [notifOpen])
 
   // 太阳（sun.sun）：自动切日夜 + 日照高度角（要放在 useEffect 之前，否则 TDZ 报错）
   const sunEnt = (haEntities || []).find(e => e.entity_id === 'sun.sun')
@@ -498,9 +509,9 @@ export default function App() {
         </div>
       )}
 
-      {/* 场景同步面板（右侧半透明） */}
-      {sceneOpen && (
-        <div className="side-panel">
+      {/* 场景同步面板（右侧半透明，常驻；其它面板打开时自动隐藏，关掉后再显示） */}
+      {sceneOpen && !notifOpen && !deviceModal && !settingsOpen && !deviceListOpen && !bindOpen && (
+        <div className="side-panel scene-panel">
           <div className="side-panel-head">🎬 场景</div>
           {scenes.length === 0 ? (
             <p className="side-panel-empty">没有 scene 实体</p>
@@ -514,9 +525,9 @@ export default function App() {
         </div>
       )}
 
-      {/* 通知中心面板（右侧半透明） */}
+      {/* 通知中心面板（右侧半透明，临时弹窗） */}
       {notifOpen && (
-        <div className="side-panel">
+        <div className="side-panel notif-panel">
           <div className="side-panel-head">🔔 通知</div>
           {notifications.length === 0 ? (
             <p className="side-panel-empty">没有通知</p>
