@@ -24,6 +24,7 @@ const backupLabel = (name) => {
 }
 
 const LEFT_TOOLS = [
+  { id: 'browse', label: '浏览', k: 'H' },
   { id: 'select', label: '选择', k: 'V' },
   { id: 'move', label: '移动', k: 'M' },
   { id: 'movePlan', label: '移动户型', k: 'G' },
@@ -82,7 +83,8 @@ export default function Editor() {
 
   const setTool = (t) => {
     setState({ tool: t })
-    if (t === 'furniture') setFurnOpen(true)
+    if (t === 'browse') { setFurnOpen(false); setCatOpen(false); setState({ selected: null, wallSel: [], pickItem: null }) }
+    else if (t === 'furniture') setFurnOpen(true)
     else if (t === 'device') { setState({ bindOpen: true }); setFurnOpen(false) }
     else if (t === 'wall') {
       setFurnOpen(false); setCatOpen(false)
@@ -92,6 +94,16 @@ export default function Editor() {
       setState({ wallSel: [] })
       toast('裁剪：点一面墙，在与其它墙的交点处切成两段')
     } else { setFurnOpen(false); setCatOpen(false) }
+  }
+
+  // 全部锁定 / 解锁当前楼层家具
+  const lockAllFurniture = (locked) => {
+    const st = getState()
+    const fl = st.project.floors[st.currentFloor]
+    const fs = (fl && fl.furniture) || []
+    fs.forEach((f) => { f.locked = locked })
+    setState({ project: { ...st.project }, saved: false })
+    toast(locked ? `已锁定 ${fs.length} 个家具` : `已解锁 ${fs.length} 个家具`)
   }
 
   const exportJson = () => {
@@ -455,6 +467,8 @@ export default function Editor() {
         <button className={`et-btn ${showLabels ? 'active' : ''}`} onClick={() => setState({ showLabels: !showLabels })}>标签</button>
         <button className={`et-btn ${showFurnitureLabels ? 'active' : ''}`} onClick={() => setState({ showFurnitureLabels: !showFurnitureLabels })}>名字</button>
         <button className={`et-btn ${showDimensions ? 'active' : ''}`} onClick={() => setState({ showDimensions: !showDimensions })} title="显示墙长度尺寸">尺寸</button>
+        <button className="et-btn" onClick={() => lockAllFurniture(true)} title="锁定当前楼层所有家具（防止移动）">🔒 全部锁定</button>
+        <button className="et-btn" onClick={() => lockAllFurniture(false)} title="解锁当前楼层所有家具">🔓 全部解锁</button>
         <button className={`et-btn ${view2d ? 'active' : ''}`} onClick={() => setState({ view2d: !view2d })}>2D</button>
         <button className={`et-btn ${!view2d ? 'active' : ''}`} onClick={() => setState({ view2d: false, tool: 'select', pickItem: null, wallSel: [] })}>3D</button>
         <div style={{ flex: 1 }} />

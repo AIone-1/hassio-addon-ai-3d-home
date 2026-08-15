@@ -35,6 +35,7 @@ export default function App() {
   const settings = useStore((s) => s.settings)
   const quality = useStore((s) => s.quality)
   const shadows = useStore((s) => s.shadows)
+  const bloom = useStore((s) => s.bloom)
   const autoRotate = useStore((s) => s.autoRotate)
   const rotateDir = useStore((s) => s.rotateDir)
   const rotateSpeed = useStore((s) => s.rotateSpeed)
@@ -306,7 +307,7 @@ export default function App() {
         setState({ editing: false, bindOpen: false, pendingEntity: null, selected: null, view2d: false, settingsOpen: false, tool: 'select' })
       }
       // 工具快捷键 V/M/G/H/W/D/N/F/E/B
-      const map = { v: 'select', m: 'move', g: 'movePlan', h: 'pan', w: 'wall', d: 'door', n: 'window', x: 'cut', f: 'furniture', e: 'device', b: 'texture' }
+      const map = { v: 'select', m: 'move', g: 'movePlan', h: 'browse', w: 'wall', d: 'door', n: 'window', x: 'cut', f: 'furniture', e: 'device', b: 'texture' }
       if (map[e.key.toLowerCase()] && editing) {
         setState({ tool: map[e.key.toLowerCase()] })
       }
@@ -377,7 +378,7 @@ export default function App() {
             <div className="dname">设置</div>
             {/* 三个 tab 切换 */}
             <div style={{ display: 'flex', gap: 6, margin: '10px 0' }}>
-              {[['default', '默认选项'], ['background', '背景配置'], ['share', '分享']].map(([k, l]) => (
+              {[['default', '默认选项'], ['background', '背景配置'], ['quality', '画质'], ['share', '分享']].map(([k, l]) => (
                 <button key={k} style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: '1px solid var(--border)', background: settingsTab === k ? 'var(--accent)' : 'var(--panel2)', color: settingsTab === k ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={() => setSettingsTab(k)}>{l}</button>
               ))}
             </div>
@@ -516,6 +517,25 @@ export default function App() {
               </div>
             </div>
             </>)}
+            {settingsTab === 'quality' && (
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>画质</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                {[['eco', '流畅'], ['smooth', '均衡'], ['balanced', '高清'], ['high', '极致']].map(([v, l]) => (
+                  <button key={v} onClick={() => setState({ quality: v })}
+                    style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: quality === v ? 'var(--accent)' : 'var(--panel2)', color: quality === v ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>{l}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52 }}>投影</span>
+                <button onClick={() => setState({ shadows: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: shadows ? 'var(--accent)' : 'var(--panel2)', color: shadows ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                <button onClick={() => setState({ shadows: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !shadows ? 'var(--accent)' : 'var(--panel2)', color: !shadows ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+                <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 52, marginLeft: 10 }}>泛光</span>
+                <button onClick={() => setState({ bloom: true })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: bloom ? 'var(--accent)' : 'var(--panel2)', color: bloom ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>开</button>
+                <button onClick={() => setState({ bloom: false })} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: !bloom ? 'var(--accent)' : 'var(--panel2)', color: !bloom ? '#081018' : '#fff', cursor: 'pointer', fontSize: 12 }}>关</button>
+              </div>
+            </div>
+            )}
             {settingsTab === 'share' && (
             <div className="field" style={{ margin: '12px 0' }}>
               <label>分享 / 导出</label>

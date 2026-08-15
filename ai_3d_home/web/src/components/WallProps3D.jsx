@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import * as THREE from 'three'
 import { useStore, setState, getState, toast } from '../store'
-import { recomputeRooms } from '../three/geometry'
+import { recomputeRooms, polygonArea } from '../three/geometry'
 import { api, BASE } from '../api'
+import HexColorPicker from './HexColorPicker'
 
 const WALL_COLORS = ['#ffffff', '#d5e0f1', '#f5f7fa', '#e8e4dc', '#c9c9c9', '#d8e8f0', '#e0d8e8', '#d0e8d8', '#f0e0d0']
 
@@ -214,6 +215,61 @@ export default function WallProps3D({ floorIndex }) {
     )
   }
 
+  // ---------- 房间 ----------
+  if (selected.type === 'room') {
+    const r = selected.ref
+    const room = (fl.rooms || []).find((x) => x.id === r.id) || r
+    const patchRoom3D = (patch) => {
+      Object.assign(room, patch)
+      setState({ project: { ...getState().project }, saved: false })
+    }
+    return (
+      <div className="plan-props">
+        <div className="plan-props-head"><span>房间</span></div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">名字</span>
+          <input type="text" value={room.name || ''} onChange={(e) => patchRoom3D({ name: e.target.value })} />
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">面积</span>
+          <span style={{ fontSize: 12, color: 'var(--text)' }}>{polygonArea(room.points || []).toFixed(1)} ㎡</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">颜色</span>
+          <HexColorPicker value={room.color || '#7789ad'} onChange={(c) => patchRoom3D({ color: c })} />
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">壁纸</span>
+          <input type="file" accept="image/*" id="floor-texture-file-3d" style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = async () => {
+                try {
+                  const rr = await fetch(BASE + 'api/background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: reader.result }) })
+                  const res = await rr.json()
+                  if (res.ok && res.name) { patchRoom3D({ texture: res.name }); setBgList([{ name: res.name }, ...bgList]); toast('地板壁纸已上传') }
+                } catch (err) { toast('上传失败') }
+              }
+              reader.readAsDataURL(file)
+            }} />
+          <button onClick={() => document.getElementById('floor-texture-file-3d').click()}>{room.texture ? '更换壁纸' : '上传壁纸'}</button>
+          {room.texture && <button style={{ color: 'var(--danger)' }} onClick={() => patchRoom3D({ texture: '' })}>清除</button>}
+        </div>
+        {bgList.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+            {bgList.map((img) => (
+              <img key={img.name} src={BASE + 'api/background/' + img.name} alt=""
+                style={{ width: 48, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: room.texture === img.name ? '2px solid var(--accent)' : '1px solid var(--border)' }}
+                onClick={() => patchRoom3D({ texture: img.name })} />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ---------- 家具 ----------
   if (selected.type === 'furniture') {
     const f = selected.ref
@@ -256,6 +312,11 @@ export default function WallProps3D({ floorIndex }) {
             onChange={(e) => { const v = Math.max(0.1, (Number(e.target.value) || 100) / 100); commit(() => { f.scale = [v, v, v] }) }} />
           <button onClick={() => { const v = s + 0.1; commit(() => { f.scale = [v, v, v] }) }}>＋</button>
           <span className="plan-props-unit">%</span>
+        </div>
+        <div className="plan-props-row">
+          <button className="plan-props-seg" onClick={() => commit(() => { f.locked = !f.locked })}>
+            {f.locked ? '🔒 已锁定（点击解锁）' : '🔓 锁定（防止移动）'}
+          </button>
         </div>
       </div>
     )

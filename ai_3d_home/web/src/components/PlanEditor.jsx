@@ -376,7 +376,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       }
       return
     }
-    if (e.button === 1 || tool === 'pan') {
+    if (e.button === 1 || tool === 'pan' || tool === 'browse') {
       e.preventDefault()
       panRef.current = { w: toWorld(e), p: [pan[0], pan[1]] }
       svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
@@ -525,6 +525,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const startDrag = (e, type, obj) => {
     if (tool !== 'move') return
     e.stopPropagation()
+    if (obj.locked) { toast('已锁定，无法移动'); return }
     setState({ selected: { type, ref: obj } })
     dragRef.current = obj
     svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
@@ -863,6 +864,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <rect width="1" height="1" fill="url(#plan-minor-grid)" />
           <path d="M 1 0 L 0 0 0 1" className="plan-grid-major" fill="none" />
         </pattern>
+        {/* 房间地板壁纸贴图（每 1 米平铺一次） */}
+        {rooms.filter(r => r.texture).map(r => (
+          <pattern key={r.id} id={`room-tex-${r.id}`} patternUnits="userSpaceOnUse" width="1" height="1">
+            <image href={BASE + 'api/background/' + r.texture} x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice" />
+          </pattern>
+        ))}
       </defs>
 
       {/* 网格背景（覆盖可视区 + 留白） */}
@@ -907,6 +914,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             <polygon
               points={room.points.map(p => p.join(',')).join(' ')}
               className={`plan-room ${selRoom ? 'selected' : ''}`}
+              style={selRoom ? undefined : (room.texture ? { fill: `url(#room-tex-${room.id})` } : room.color ? { fill: room.color } : undefined)}
             />
             <text x={cx} y={cy - 0.06} className={`plan-room-name ${selRoom ? 'selected' : ''}`}>{room.name}</text>
             <text x={cx} y={cy + 0.22} className="plan-room-area">{polygonArea(room.points).toFixed(1)} m²</text>
@@ -1213,6 +1221,9 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           </div>
         )}
         <div className="plan-props-row">
+          <button className="plan-props-seg" onClick={() => patchFurniture(selFurniture, { locked: !selFurniture.locked })}>
+            {selFurniture.locked ? '🔒 已锁定（点击解锁）' : '🔓 锁定（防止移动）'}
+          </button>
           <button className="plan-props-seg" onClick={() => duplicateFurniture(selFurniture)}>⧉ 复制</button>
         </div>
       </div>

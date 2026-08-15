@@ -926,6 +926,7 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
       }}
       onPointerDown={canDrag ? (e) => {
         e.stopPropagation()
+        if (item.locked) { toast('已锁定，无法移动'); return }
         onSelect(item)
         dragRef.current = true
         e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId)
@@ -949,6 +950,33 @@ function Furniture({ item, level, selected, onSelect, onMove, interactive, canDr
 }
 
 // ---------- 房间（地板 + 2D 描边；墙在 Scene 层统一去重渲染） ----------
+// 地板材质：有壁纸贴图用贴图，没贴图用纯色（2D 用 basic，3D 用 physical）
+function FloorMaterial({ texture, color, view2d }) {
+  const [map, setMap] = useState(null)
+  useEffect(() => {
+    if (!texture) { setMap(null); return }
+    let cancelled = false
+    const loader = new THREE.TextureLoader()
+    loader.crossOrigin = 'anonymous'
+    loader.load(MODEL_BASE + 'api/background/' + texture + '?t=' + Date.now(), (t) => {
+      if (cancelled) return
+      t.colorSpace = THREE.SRGBColorSpace
+      t.wrapS = t.wrapT = THREE.RepeatWrapping
+      t.needsUpdate = true
+      setMap(t)
+    }, undefined, () => { if (!cancelled) setMap(null) })
+    return () => { cancelled = true }
+  }, [texture])
+  const matColor = map ? '#ffffff' : color
+  if (view2d) {
+    return <meshBasicMaterial key={map ? map.uuid : 'no-tex'} map={map || undefined} color={matColor} side={THREE.DoubleSide} />
+  }
+  return (
+    <meshPhysicalMaterial key={map ? map.uuid : 'no-tex'} map={map || undefined} color={matColor}
+      roughness={0.46} metalness={0.02} clearcoat={map ? 0 : 0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} />
+  )
+}
+
 function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
   const pts = room.points || []
   const view2d = useStore((s) => s.view2d)
@@ -968,9 +996,7 @@ function Room({ room, roomIdx, floor, level, onSelect, interactive }) {
     <group onClick={interactive ? (e) => { e.stopPropagation(); onSelect(room) } : undefined}>
       {/* 地板：多边形形状，法线朝上，renderOrder 强制绘制在前 */}
       <mesh geometry={floorGeo} position={[0, floorY, 0]} renderOrder={1} receiveShadow>
-        {view2d
-          ? <meshBasicMaterial color={room.color || floor.color || '#d5c6a8'} side={THREE.DoubleSide} />
-          : <meshPhysicalMaterial color={room.color || floor.color || '#7789ad'} roughness={0.46} metalness={0.02} clearcoat={0.2} clearcoatRoughness={0.82} side={THREE.DoubleSide} />}
+        <FloorMaterial texture={room.texture} color={room.color || floor.color || (view2d ? '#d5c6a8' : '#7789ad')} view2d={view2d} />
       </mesh>
       {/* 主界面屋顶：封闭房间顶上加半透明顶面（和地板同一多边形，只在不同高度，不翻转） */}
       {showCeiling && !editing && !view2d && (
