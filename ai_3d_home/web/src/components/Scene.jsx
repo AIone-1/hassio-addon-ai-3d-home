@@ -1486,7 +1486,7 @@ export default function Scene({ onSelect, floorIndex }) {
               <mesh
                 position={[mx, h / 2 + level, mz]}
                 rotation={[0, -ang, 0]}
-                onClick={tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
+                onClick={!editing ? undefined : tool === 'delete' ? (e) => { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
                   : tool === 'select' ? (e) => {
                     e.stopPropagation()
                     if (e.ctrlKey || e.metaKey || multiSelect) {
