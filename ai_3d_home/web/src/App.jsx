@@ -347,6 +347,18 @@ export default function App() {
     return () => document.removeEventListener('mousedown', onDown)
   }, [notifOpen])
 
+  // 设备控制面板：点空白处收起（点面板内不关）
+  useEffect(() => {
+    if (!deviceModal) return
+    const onDown = (e) => {
+      const t = e.target
+      if (t && t.closest && t.closest('.device-panel')) return
+      setDeviceModal(null)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [deviceModal])
+
   // 太阳（sun.sun）：自动切日夜 + 日照高度角（要放在 useEffect 之前，否则 TDZ 报错）
   const sunEnt = (haEntities || []).find(e => e.entity_id === 'sun.sun')
   // 自动跟随太阳切日夜（sun.sun；手动切日夜时关掉 sunAuto）
@@ -464,56 +476,55 @@ export default function App() {
 
       {deviceListOpen && <DeviceList />}
 
-      {/* 设备控制弹窗（overlay 控制面板） */}
+      {/* 设备控制面板（右侧完全透明，与场景/通知一致） */}
       {deviceModal && (
-        <div className="modal-mask" onClick={() => setDeviceModal(null)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="dname">{deviceModal.name || deviceModal.entity_id}</div>
-            <div className="dstate big">{devState ? devState.state : 'unknown'}</div>
-            <div className="dentity">{deviceModal.entity_id}</div>
-
-            {TOGGLE_DOMAINS.has(devDomain) && (
-              <div className="dev-actions">
-                <button className="primary" onClick={() => toggleDevice(deviceModal)}>⏻ 切换</button>
-              </div>
-            )}
-
-            {/* 灯：亮度 / 色温 / 颜色 */}
-            {devDomain === 'light' && (
-              <div className="field" style={{ margin: '12px 0' }}>
-                <label>亮度</label>
-                <input type="range" min="0" max="255" step="1" style={{ width: '100%' }}
-                  value={devAttrs.brightness != null ? devAttrs.brightness : 255}
-                  onChange={(e) => lightControl(deviceModal, { brightness: Number(e.target.value) })} />
-                <label style={{ marginTop: 10 }}>色温（K）</label>
-                <input type="range" min="2000" max="6500" step="100" style={{ width: '100%' }}
-                  value={devAttrs.color_temp_kelvin || 4000}
-                  onChange={(e) => lightControl(deviceModal, { color_temp_kelvin: Number(e.target.value) })} />
-                <label style={{ marginTop: 10 }}>颜色</label>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                  {[['#ffdd66', '暖黄'], ['#ffffff', '白'], ['#ff9b9b', '红'], ['#9bd4ff', '蓝'], ['#a8ffa8', '绿'], ['#e0a8ff', '紫']].map(([hex, name]) => (
-                    <button key={hex} title={name} style={{ width: 30, height: 30, borderRadius: 6, border: '2px solid var(--border)', background: hex, cursor: 'pointer' }}
-                      onClick={() => lightControl(deviceModal, { rgb_color: hexToRgb(hex) })} />
-                  ))}
-                  <label style={{ width: 30, height: 30, borderRadius: 6, border: '2px solid var(--border)', overflow: 'hidden', cursor: 'pointer', display: 'inline-block' }}>
-                    <input type="color" value={rgbToHex(devAttrs.rgb_color)} onChange={(e) => lightControl(deviceModal, { rgb_color: hexToRgb(e.target.value) })}
-                      style={{ width: '200%', height: '200%', margin: '-50%', cursor: 'pointer', border: 0, padding: 0 }} />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* 窗帘：开 / 停 / 关 */}
-            {devDomain === 'cover' && (
-              <div className="dev-actions" style={{ marginTop: 10 }}>
-                <button className="primary" onClick={() => coverControl(deviceModal, 'open_cover')}>开</button>
-                <button onClick={() => coverControl(deviceModal, 'stop_cover')}>停</button>
-                <button onClick={() => coverControl(deviceModal, 'close_cover')}>关</button>
-              </div>
-            )}
-
-            <button className="close-btn" onClick={() => setDeviceModal(null)}>关闭</button>
+        <div className="side-panel device-panel">
+          <div className="side-panel-head">{deviceModal.name || deviceModal.entity_id}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+            {devState ? devState.state : 'unknown'} · {deviceModal.entity_id}
           </div>
+
+          {TOGGLE_DOMAINS.has(devDomain) && (
+            <div className="dev-actions">
+              <button className="primary" onClick={() => toggleDevice(deviceModal)}>⏻ 切换</button>
+            </div>
+          )}
+
+          {/* 灯：亮度 / 色温 / 颜色 */}
+          {devDomain === 'light' && (
+            <div className="field" style={{ margin: '12px 0' }}>
+              <label>亮度</label>
+              <input type="range" min="0" max="255" step="1" style={{ width: '100%' }}
+                value={devAttrs.brightness != null ? devAttrs.brightness : 255}
+                onChange={(e) => lightControl(deviceModal, { brightness: Number(e.target.value) })} />
+              <label style={{ marginTop: 10 }}>色温（K）</label>
+              <input type="range" min="2000" max="6500" step="100" style={{ width: '100%' }}
+                value={devAttrs.color_temp_kelvin || 4000}
+                onChange={(e) => lightControl(deviceModal, { color_temp_kelvin: Number(e.target.value) })} />
+              <label style={{ marginTop: 10 }}>颜色</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                {[['#ffdd66', '暖黄'], ['#ffffff', '白'], ['#ff9b9b', '红'], ['#9bd4ff', '蓝'], ['#a8ffa8', '绿'], ['#e0a8ff', '紫']].map(([hex, name]) => (
+                  <button key={hex} title={name} style={{ width: 30, height: 30, borderRadius: 6, border: '2px solid var(--border)', background: hex, cursor: 'pointer' }}
+                    onClick={() => lightControl(deviceModal, { rgb_color: hexToRgb(hex) })} />
+                ))}
+                <label style={{ width: 30, height: 30, borderRadius: 6, border: '2px solid var(--border)', overflow: 'hidden', cursor: 'pointer', display: 'inline-block' }}>
+                  <input type="color" value={rgbToHex(devAttrs.rgb_color)} onChange={(e) => lightControl(deviceModal, { rgb_color: hexToRgb(e.target.value) })}
+                    style={{ width: '200%', height: '200%', margin: '-50%', cursor: 'pointer', border: 0, padding: 0 }} />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* 窗帘：开 / 停 / 关 */}
+          {devDomain === 'cover' && (
+            <div className="dev-actions" style={{ marginTop: 10 }}>
+              <button className="primary" onClick={() => coverControl(deviceModal, 'open_cover')}>开</button>
+              <button onClick={() => coverControl(deviceModal, 'stop_cover')}>停</button>
+              <button onClick={() => coverControl(deviceModal, 'close_cover')}>关</button>
+            </div>
+          )}
+
+          <button className="close-btn" onClick={() => setDeviceModal(null)}>关闭</button>
         </div>
       )}
 
