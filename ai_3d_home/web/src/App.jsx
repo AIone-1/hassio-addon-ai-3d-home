@@ -57,6 +57,8 @@ export default function App() {
   const [bgImages, setBgImages] = useState([])
   const [settingsTab, setSettingsTab] = useState('default')
   const [notifications, setNotifications] = useState([])
+  const [runningSceneId, setRunningSceneId] = useState(null)
+  const [lastSceneId, setLastSceneId] = useState(null)
   const sceneOpen = useStore((s) => s.sceneOpen)
   const notifOpen = useStore((s) => s.notifOpen)
   const saveTimer = useRef(null)
@@ -275,10 +277,19 @@ export default function App() {
     await api.service('cover', action, dev.entity_id)
     refreshStates()
   }
-  // 场景激活
+  // 场景激活（对标 JMGLink：执行中 + 刚刚执行状态）
   const activateScene = async (entity_id) => {
-    await api.service('scene', 'turn_on', entity_id)
-    toast('已激活场景')
+    setRunningSceneId(entity_id)
+    try {
+      await api.service('scene', 'turn_on', entity_id)
+    } catch (e) {
+      toast('场景执行失败')
+    } finally {
+      setTimeout(() => {
+        setRunningSceneId(null)
+        setLastSceneId(entity_id)
+      }, 800)
+    }
   }
   // 通知：拉取 / 关闭
   const loadNotifications = async () => {
@@ -512,16 +523,29 @@ export default function App() {
       {/* 场景同步面板（右侧半透明，常驻；其它面板打开时自动隐藏，关掉后再显示） */}
       {sceneOpen && !notifOpen && !deviceModal && !settingsOpen && !deviceListOpen && !bindOpen && (
         <div className="side-panel scene-panel">
-          <div className="side-panel-head">🎬 场景</div>
-          {scenes.length === 0 ? (
-            <p className="side-panel-empty">没有 scene 实体</p>
-          ) : (
-            scenes.map((s) => (
-              <button key={s.entity_id} className="side-panel-item" onClick={() => activateScene(s.entity_id)}>
-                {(s.attributes && s.attributes.friendly_name) || s.entity_id.split('.').pop()}
-              </button>
-            ))
-          )}
+          <div className="ha-scene-list">
+            {scenes.map((s) => {
+              const name = (s.attributes && s.attributes.friendly_name) || s.entity_id.split('.').pop()
+              const running = runningSceneId === s.entity_id
+              const recent = lastSceneId === s.entity_id
+              return (
+                <button key={s.entity_id} type="button" className={`ha-scene-item ${running ? 'running' : ''} ${recent ? 'recent' : ''}`.trim()}
+                  disabled={!!runningSceneId} onClick={() => activateScene(s.entity_id)} title={`执行 ${name}`}>
+                  <span className="ha-scene-icon">✦</span>
+                  <span className="ha-scene-copy">
+                    <strong>{name}</strong>
+                    {(running || recent) && <small>{running ? '执行中' : '刚刚执行'}</small>}
+                  </span>
+                  <span className="ha-scene-run">
+                    {running
+                      ? <span className="scene-spinner" />
+                      : <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 21 12 7 20 7 4" /></svg>}
+                  </span>
+                </button>
+              )
+            })}
+            {scenes.length === 0 && <div className="ha-scene-empty">在 Home Assistant 中创建 scene.* 后会显示在这里。</div>}
+          </div>
         </div>
       )}
 
