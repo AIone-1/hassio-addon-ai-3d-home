@@ -36,6 +36,7 @@ MIME = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
+    ".wasm": "application/wasm",
     ".ico": "image/x-icon",
     ".map": "application/json",
     ".woff": "font/woff",
@@ -318,8 +319,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send_file(self, path):
         path = unquote(path)  # 解码中文文件名（如 %E8%BE%B9 -> 边）
-        # /models/ 固定从镜像内置目录读（模型 26MB 不随本地部署的 webui 走），其余从 WEBUI_DIR 读
-        base = "/usr/local/bin/webui" if path.startswith("/models/") else WEBUI_DIR
+        # /models/ 优先从 WEBUI_DIR 读（本地部署可新增自定义模型），文件不存在再回退镜像内置（26MB 老模型不随部署走）
+        if path.startswith("/models/"):
+            base = WEBUI_DIR if os.path.isfile(os.path.join(WEBUI_DIR, path.lstrip("/"))) else "/usr/local/bin/webui"
+        else:
+            base = WEBUI_DIR
         fs = os.path.join(base, path.lstrip("/"))
         if not os.path.abspath(fs).startswith(base):
             return self._send(403, {"error": "forbidden"})
@@ -361,6 +365,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_file(p)
         if p.startswith("/models/"):
             return self._send_file(p)
+        if p.startswith("/videos/"):
+            return self._send_file(p)
+        if p.startswith("/draco/"):
+            return self._send_file(p)
         if p == "/api/health":
             code, data = ha_request("GET", "/")
             return self._send(200, {"ok": True, "ha": code == 200, "code": code})
@@ -389,13 +397,11 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/settings":
             return self._send(200, _read_json(SETTINGS_FILE, {}))
         if p == "/api/backups":
-            # 列出所有存档（文件名 + 修改时间）
+            # 列出所有存档（文件名 + 修改时间），按修改时间降序 = 最后保存的靠在最上面
             try:
-                items = []
-                for f in sorted(os.listdir(BACKUP_DIR), reverse=True):
-                    if f.endswith(".json"):
-                        fp = os.path.join(BACKUP_DIR, f)
-                        items.append({"name": f, "time": os.path.getmtime(fp)})
+                files = [f for f in os.listdir(BACKUP_DIR) if f.endswith(".json")]
+                files.sort(key=lambda f: os.path.getmtime(os.path.join(BACKUP_DIR, f)), reverse=True)
+                items = [{"name": f, "time": os.path.getmtime(os.path.join(BACKUP_DIR, f))} for f in files]
                 return self._send(200, {"backups": items})
             except Exception:
                 return self._send(200, {"backups": []})
@@ -587,6 +593,10 @@ def main():
         for dev in fl.get("devices", []):
             if dev.get("entity_id"):
                 eids.add(dev["entity_id"])
+        # 家具绑定的实体（窗帘/电视等 cover/light 实体）也要纳入状态缓存，否则前端收不到状态（窗帘无法外部控制联动）
+        for furn in fl.get("furniture", []):
+            if furn.get("entity_id"):
+                eids.add(furn["entity_id"])
     CACHE.set_bound(eids)
 
     t = threading.Thread(target=CACHE.run_loop, args=(interval,), daemon=True)

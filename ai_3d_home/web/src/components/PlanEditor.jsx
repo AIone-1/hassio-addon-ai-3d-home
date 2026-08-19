@@ -2,10 +2,12 @@
 // 墙是线段（floor.walls 持久化），房间由墙段的封闭环自动检测（recomputeRooms）——这就是"共用墙/相交也封闭"的机制
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useStore, setState, getState, uid, toast } from '../store'
-import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg, pointOnSeg, segmentIntersect, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, FURNITURE_WALL_HEIGHT, FURNITURE_COLOR_PALETTE, DOOR_COLORS, DOOR_STYLES, WINDOW_STYLES, polygonArea, recomputeRooms, pointToSeg, pointOnSeg, segmentIntersect, SNAP_TOL, autoTrimWalls, pointInPolygon, wallOnEdge, mergeCollinearWalls, snapWallEndpoints, straightenWalls, DEVICE_MODELS, DEVICE_KINDS } from '../three/geometry'
 import { getCatalogItem, thumbUrl } from '../catalog'
 import HexColorPicker from './HexColorPicker'
 import NumInput from './NumInput'
+import EntityPicker from './EntityPicker'
+import MoveControls from './MoveControls'
 import { api, BASE } from '../api'
 
 const GRID = 0.5       // 小网格 0.5m（大格 1m）
@@ -103,6 +105,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const snapStep = useStore(s => s.snapStep)
   const showFurnitureLabels = useStore(s => s.showFurnitureLabels)
   const showDimensions = useStore(s => s.showDimensions)
+  const showIntersections = useStore(s => s.showIntersections)
   const wallH = useStore(s => s.wallH)
   const wallThick = useStore(s => s.wallThick)
   const wallColor = useStore(s => s.wallColor)
@@ -125,32 +128,63 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const haStates = useStore(s => s.haStates)
   const recenterKey = useStore(s => s.planRecenterKey)
   const zoomDelta = useStore(s => s.planZoomDelta)
+  const roomEditId = useStore(s => s.roomEditId)   // 点房间「编辑」进 2D 后要聚焦的房间 id（null=显示整个户型）
 
   const svgRef = useRef(null)
   const [size, setSize] = useState({ w: 1, h: 1 })
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState([0, 0])
   const [draft, setDraft] = useState(null)     // { pts: [[x,y],...], walls: [墙对象] } 画墙草稿
+  const [frozenRooms, setFrozenRooms] = useState(null)  // 画墙前冻结的 rooms 快照（画墙期间取景不随新房间变）
+  const [frozenWalls, setFrozenWalls] = useState(null)  // 画墙前冻结的 walls 快照
   const [cursor, setCursor] = useState(null)    // [x,y] 世界坐标（已吸附）
   const [cursorWall, setCursorWall] = useState(null)  // 光标吸附到已有墙时的墙点（蓝色提示）
   const [cutPoint, setCutPoint] = useState(null)      // 裁剪时的交点提示（橙色）
   const [bgList, setBgList] = useState([])            // 已上传背景图（地板壁纸缩略图用）
+  const [deviceBindOpen, setDeviceBindOpen] = useState(false)  // 设备属性面板里的绑定设备选择器
   const dragRef = useRef(null)                  // 拖动的家具/设备对象
   const openingDragRef = useRef(null)           // 拖动的门窗对象（沿墙移动）
-  const wallDragRef = useRef(null)              // 拖动的墙端点 { wall, which: 'start'|'end' }
+  const openingResizeRef = useRef(null)         // 拖动调整宽度的门窗 { op, center:[x,y], dir:[x,y] }
+  const wallDragRef = useRef(null)              // 拖动的墙端点（旋转，绕另一端保持长度） { wall, which: 'start'|'end' }
+  const wallMoveRef = useRef(null)              // 拖动的整面墙（整体平移） { wall, last: [x,y] }
   const panRef = useRef(null)                   // { w:[x,y], p:[x,y] } 平移起点
   const planMoveRef = useRef(null)              // 移动户型的起点世界坐标
   const rightClickRef = useRef(0)               // 最近一次右键时间戳，用于区分单击取消 / 双击切移动
 
   useEffect(() => { api.backgrounds().then((r) => setBgList(r.images || [])).catch(() => {}) }, [])
 
-  // 房间由 recomputeRooms 返回新数组，引用变化会触发重算（画墙过程中视口保持稳定）
+  // 单房间聚焦：点房间「编辑」进 2D 后只显示这个房间的平面图（roomEditId 非空），不是整个户型
+  const editingRoom = roomEditId ? (floor?.rooms || []).find(r => r.id === roomEditId) : null
+  // 墙是否属于这个房间的边界：两个端点都落在房间边界上即可。
+  // 注意房间的一条边可能由多面墙拼接（如右边墙 = 上下两段），不能要求「单面墙完整覆盖整条边」，
+  // 否则拼接墙会被误判成「不属于房间」，导致 2D 里缺墙、全选墙选不中。
+  const wallCoversRoomEdge = (w) => {
+    if (!editingRoom) return true
+    const pts = editingRoom.points || []
+    // 墙属于房间边界：和房间某条边共线且有交叠（覆盖单面墙/拼接墙/共用墙三种情况）
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length]
+      if (wallOnEdge(w, a, b)) return true
+    }
+    return false
+  }
+  // 家具/设备位置是否在聚焦房间内
+  const posInEditingRoom = (x, z) => !editingRoom || pointInPolygon([x, z], editingRoom.points || [])
+
+  // 取景范围：画墙前冻结 rooms/walls 快照，画墙期间（含画完闭合）取景完全不变、视口不跳；
+  // 只有「居中」或「切出画墙工具」才解冻，重新按当前户型取景
   const bounds = useMemo(() => {
-    // 墙也纳入取景（这样只画墙没房间时户型也在画布中央），但排除正在画的草稿墙
-    const draftIds = new Set((draft?.walls || []).map((w) => w.id))
-    const committed = (floor?.walls || []).filter((w) => !draftIds.has(w.id))
-    return floorBounds(floor, committed)
-  }, [floor?.rooms, floor?.furniture, floor?.devices, floor?.walls, draft?.walls])
+    if (editingRoom && editingRoom.points) {
+      // 单房间聚焦：只按这个房间的包围盒取景（房间居中、紧凑放大，不铺满整个户型）
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      editingRoom.points.forEach(p => { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]) })
+      const pad = 1.5
+      return { minX: minX - pad, minY: minY - pad, width: (maxX - minX) + pad * 2, height: (maxY - minY) + pad * 2 }
+    }
+    const rooms = frozenRooms !== null ? frozenRooms : floor?.rooms
+    const walls = frozenWalls !== null ? frozenWalls : (floor?.walls || [])
+    return floorBounds({ ...floor, rooms }, walls)
+  }, [floor, frozenRooms, frozenWalls, editingRoom])
   const aspect = size.w / size.h
   const fitted = useMemo(() => fitBounds(bounds, aspect), [bounds, aspect])
   const vbW = fitted.width / zoom
@@ -170,8 +204,19 @@ export default function PlanEditor({ onSelect, floorIndex }) {
 
   // 吸附到已有墙（含中点，不只端点），排除本次草稿已画的墙（避免光标吸回刚画的墙）
   const wallSnapPoint = (pt) => {
-    let best = null, bd = 0.3
     const exclude = new Set((draft?.walls || []).map((w) => w.id))
+    // 优先吸附端点：光标靠近墙端点（<0.15m）直接吸到端点——保证相邻墙共享角点精确重合，不留错位缝隙
+    let bestEp = null, bestEpD = 0.15
+    for (const w of (floor?.walls || [])) {
+      if (exclude.has(w.id)) continue
+      for (const ep of [w.start, w.end]) {
+        const d = Math.hypot(pt[0] - ep[0], pt[1] - ep[1])
+        if (d < bestEpD) { bestEpD = d; bestEp = ep }
+      }
+    }
+    if (bestEp) return [...bestEp]
+    // 否则墙段吸附（含中点，用于共用墙/分割墙精准连接）
+    let best = null, bd = 0.3
     for (const w of (floor?.walls || [])) {
       if (exclude.has(w.id)) continue
       const r = pointToSeg(pt, w.start, w.end)
@@ -243,8 +288,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     fl.walls = fl.walls || []
     const first = draft.pts[0], last = draft.pts[draft.pts.length - 1]
     if (Math.hypot(last[0] - first[0], last[1] - first[1]) > 0.01) {
-      fl.walls.push({ id: uid(), start: [...last], end: [...first], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor, ...(getState().wallOpacity !== 100 ? { opacity: getState().wallOpacity } : {}) })
+      const cw = { id: uid(), start: [...last], end: [...first], height: getState().wallH, thickness: getState().wallThick, color: getState().wallColor, ...(getState().wallOpacity !== 100 ? { opacity: getState().wallOpacity } : {}) }
+      fl.walls.push(cw)
     }
+    fl.walls = straightenWalls(fl.walls)   // 拉直斜墙（消除方向误差）
+    fl.walls = snapWallEndpoints(fl.walls)   // 吸附错位端点（相邻墙共享角点精确重合）
+    fl.walls = mergeCollinearWalls(fl.walls)   // 合并共线相连的墙（从源头杜绝拼接墙）
+    fl.walls = straightenWalls(fl.walls)   // 再拉直一次（合并两条独立墙后消除残留斜）
+    fl.walls = autoTrimWalls(fl.walls)   // 自动修剪伸出墙，避免悬空墙干扰房间
     fl.rooms = recomputeRooms(fl)
     setDraft(null)
     setState({ project: { ...getState().project }, saved: false, __noUndo: true })
@@ -255,6 +306,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     const fl = getState().project.floors[floorIndex]
     fl.walls = fl.walls || []
     if (!draft || !draft.pts.length) {
+      // 只在「未冻结」时冻结一次：连续画多个房间时保持第一次的冻结快照，
+      // 否则每画一个新房间的第一面墙，快照又被更新成「含上一个房间」，取景突变、视口跳
+      if (frozenRooms === null) {
+        setFrozenRooms(floor.rooms)
+        setFrozenWalls(floor.walls)
+      }
       setDraft({ pts: [snap(raw)], walls: [] })
       return
     }
@@ -275,6 +332,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     fl.rooms = recomputeRooms(fl)
     if (fl.rooms.length > prevCount) {
       // 已靠已有墙闭合出新房间 → 自动结束本次画墙（不加闭合墙，避免和共用墙重复）
+      fl.walls = straightenWalls(fl.walls)   // 拉直斜墙
+      fl.walls = snapWallEndpoints(fl.walls)   // 吸附错位端点
+      fl.walls = mergeCollinearWalls(fl.walls)   // 合并共线相连的墙（从源头杜绝拼接墙）
+      fl.walls = straightenWalls(fl.walls)   // 再拉直一次（消除合并残留斜）
+      fl.walls = autoTrimWalls(fl.walls)   // 自动修剪伸出墙
+      fl.rooms = recomputeRooms(fl)
       setDraft(null)
       toast(fl.rooms.length ? `已识别 ${fl.rooms.length} 个房间` : '墙体尚未形成封闭房间')
     } else {
@@ -316,7 +379,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     return () => ro.disconnect()
   }, [])
 
-  useEffect(() => { setZoom(1); setPan([0, 0]); setDraft(null); dragRef.current = null }, [recenterKey])
+  useEffect(() => { setZoom(1); setPan([0, 0]); setDraft(null); setFrozenRooms(null); setFrozenWalls(null); dragRef.current = null }, [recenterKey])
+  // 切换楼层时解冻取景（冻结的是旧楼层的 rooms/walls，换楼层必须重新取景）。
+  // 注意：切工具不解冻——用户要求「不点居中就不自动居中」，切工具也要保持视口不动
+  useEffect(() => { setFrozenRooms(null); setFrozenWalls(null) }, [floorIndex])
 
   useEffect(() => {
     if (!zoomDelta) return
@@ -452,7 +518,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setState({ project: { ...getState().project }, pendingEntity: null, bindOpen: false, saved: false })
       return
     }
-    if (tool === 'select' || tool === 'move') setState({ selected: null, wallSel: [] })
+    if (tool === 'select' || tool === 'move') setState({ selected: null, wallSel: [], roomSel: [] })
   }
 
   const handleMove = (e) => {
@@ -469,12 +535,29 @@ export default function PlanEditor({ onSelect, floorIndex }) {
       setState({ project: { ...getState().project }, saved: false })
       return
     }
+    if (wallMoveRef.current) {
+      // 移动整面墙：整体平移，保持长度和方向（用初始墙位置 + 鼠标位移，避免累积误差）
+      const { wall, startPos, startMouse } = wallMoveRef.current
+      const [x, y] = snap(w)
+      const dx = x - startMouse[0], dy = y - startMouse[1]
+      wall.start = [startPos[0] + dx, startPos[1] + dy]
+      wall.end = [startPos[2] + dx, startPos[3] + dy]
+      const fl = getState().project.floors[floorIndex]
+      fl.rooms = recomputeRooms(fl)
+      setState({ project: { ...getState().project }, saved: false })
+      return
+    }
     if (wallDragRef.current) {
+      // 旋转：拖动端点绕另一端旋转，保持墙的长度不变
       const { wall, which } = wallDragRef.current
       const anchor = which === 'start' ? wall.end : wall.start
-      let [x, y] = snap(w)
-      ;[x, y] = snapAxis([x, y], anchor)
-      wall[which] = [x, y]
+      const [x, y] = snap(w)
+      const len = Math.hypot(wall.end[0] - wall.start[0], wall.end[1] - wall.start[1])
+      const d = [x - anchor[0], y - anchor[1]]
+      const dl = Math.hypot(d[0], d[1])
+      if (dl > 0.01) {
+        wall[which] = [anchor[0] + (d[0] / dl) * len, anchor[1] + (d[1] / dl) * len]
+      }
       const fl = getState().project.floors[floorIndex]
       fl.rooms = recomputeRooms(fl)
       setState({ project: { ...getState().project }, saved: false })
@@ -492,6 +575,17 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         openingDragRef.current.offset = best.t
         setState({ project: { ...getState().project }, saved: false })
       }
+      return
+    }
+    if (openingResizeRef.current) {
+      // 门窗宽度拖动：指针沿墙方向投影相对中心 = 半宽，新宽 = 2×|投影|（限制 0.3 ~ 墙长）
+      const { op, center, dir } = openingResizeRef.current
+      const wall = (floor?.walls || []).find(x => x.id === op.wallId)
+      const wallLen = wall ? Math.hypot(wall.end[0] - wall.start[0], wall.end[1] - wall.start[1]) : 10
+      const proj = (w[0] - center[0]) * dir[0] + (w[1] - center[1]) * dir[1]
+      const newWidth = Math.max(0.3, Math.min(wallLen, Math.abs(proj) * 2))
+      op.width = Math.round(newWidth * 100) / 100
+      setState({ project: { ...getState().project }, saved: false })
       return
     }
     if (dragRef.current) {
@@ -526,8 +620,25 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     panRef.current = null
     dragRef.current = null
     openingDragRef.current = null
+    openingResizeRef.current = null
     wallDragRef.current = null
+    wallMoveRef.current = null
     planMoveRef.current = null
+  }
+
+  // 开始拖动门窗宽度（两端手柄）
+  const startResizeOpening = (e, op) => {
+    if (tool !== 'move') return
+    e.stopPropagation()
+    const wall = (floor?.walls || []).find(x => x.id === op.wallId)
+    if (!wall) return
+    const t = Math.max(0, Math.min(1, op.offset || 0.5))
+    const cx = wall.start[0] + (wall.end[0] - wall.start[0]) * t
+    const cy = wall.start[1] + (wall.end[1] - wall.start[1]) * t
+    const len = Math.hypot(wall.end[0] - wall.start[0], wall.end[1] - wall.start[1]) || 1
+    openingResizeRef.current = { op, center: [cx, cy], dir: [(wall.end[0] - wall.start[0]) / len, (wall.end[1] - wall.start[1]) / len] }
+    setState({ selected: { type: 'opening', ref: op } })
+    svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
   }
 
   const startDrag = (e, type, obj) => {
@@ -547,9 +658,10 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   }
   // 双击 = 选中并切到移动工具（后续按住即可拖动）
   const doubleClickDrag = (e, type, obj) => {
-    if (type !== 'furniture' && type !== 'device' && type !== 'opening') return
+    if (type !== 'furniture' && type !== 'device' && type !== 'opening' && type !== 'wall') return
     e.stopPropagation()
-    setState({ selected: { type, ref: obj }, tool: 'move' })
+    if (type === 'wall') setState({ wallSel: [obj.id], selected: null, tool: 'move' })
+    else setState({ selected: { type, ref: obj }, tool: 'move' })
   }
   // 拖动墙端点拉伸墙段
   const startWallDrag = (e, wall, which) => {
@@ -566,7 +678,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   // 多选墙（最多 2 条），用于共线/垂直/水平约束；点已选中的墙则取消选中
   const toggleWallSel = (id) => {
     const cur = getState().wallSel || []
-    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].slice(-2)
+    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
     setState({ wallSel: next, selected: null })
   }
 
@@ -668,49 +780,181 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1])
     return { w: Math.max(...xs) - Math.min(...xs), d: Math.max(...zs) - Math.min(...zs) }
   })()
+  // 房间作用域下，把 patch 里的「颜色类」字段（color/opacity）路由到房间独立配色（solo），
+  // 其余几何字段（height/thickness/texture 等）返回照旧改对象。户型作用域不用这个。
+  const applyRoomPatch = (room, patch, isWall) => {
+    const geom = {}
+    for (const [k, v] of Object.entries(patch)) {
+      if (k === 'color') { if (isWall) room.soloWallColor = v; else room.soloFloorColor = v }
+      else if (k === 'opacity') { if (isWall) room.soloWallOpacity = v; else room.soloFloorOpacity = v }
+      else geom[k] = v
+    }
+    return geom
+  }
   const patchRoom = (r, patch) => {
-    const fl = getState().project.floors[floorIndex]
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
     const target = (fl.rooms || []).find(x => x.id === r.id)
     if (!target) return
-    Object.assign(target, patch)
-    setState({ project: { ...getState().project }, saved: false })
+    const editingRoom = st.roomEditId ? (fl.rooms || []).find(x => x.id === st.roomEditId) : null
+    if (editingRoom && editingRoom.id === target.id) {
+      // 房间作用域：颜色/透明度存到房间独立配色（solo），不影响户型图整体；几何字段照旧改房间
+      const geom = applyRoomPatch(target, patch, false)
+      if (Object.keys(geom).length) Object.assign(target, geom)
+    } else {
+      Object.assign(target, patch)
+    }
+    setState({ project: { ...st.project }, saved: false })
   }
   // 批量改所有选中的房间（全选地板/屋顶后改颜色/透明度/贴图）
   const patchRooms = (patch) => {
     const st = getState()
     const fl = st.project.floors[floorIndex]
     const ids = st.roomSel || []
-    ;(fl.rooms || []).forEach((r) => { if (ids.includes(r.id)) Object.assign(r, patch) })
+    const editingRoom = st.roomEditId ? (fl.rooms || []).find(x => x.id === st.roomEditId) : null
+    ;(fl.rooms || []).forEach((r) => {
+      if (!ids.includes(r.id)) return
+      if (editingRoom && r.id === editingRoom.id) {
+        const geom = applyRoomPatch(r, patch, false)
+        if (Object.keys(geom).length) Object.assign(r, geom)
+      } else {
+        Object.assign(r, patch)
+      }
+    })
     setState({ project: { ...st.project }, saved: false })
   }
-  // 改房间长/宽：按房间包围盒，围绕中心缩放「属于这个房间的墙」（端点都在房间边界上的墙）
+  // 改房间长/宽：对每个墙端点做「分段坐标变换」——本房间左侧的墙整体左移、右侧右移、
+  // 上方上移、下方下移，落在本房间边界上的端点随四角外扩/内收。这样缩放后所有共享角的
+  // 墙端点始终重合，户型永远封闭、不会分家；左右邻居整体让位、大小不变。
+  // 锁定的房间（locked）不做分段变换，而是整体平移（沿缩放方向），保持自身长宽不变。
   const resizeRoom = (r, newW, newD) => {
     const st = getState()
     const fl = st.project.floors[floorIndex]
     const room = (fl.rooms || []).find(x => x.id === r.id) || r
+    // 尺寸锁定：这个房间的长宽不能改，先解锁才能编辑
+    if (room.locked) { toast('该房间已锁定尺寸，先解锁再改长宽'); return }
     const pts = room.points || []
     if (pts.length < 3) return
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
     pts.forEach(p => { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]) })
-    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2
     const curW = maxX - minX, curD = maxZ - minZ
-    const sx = curW > 0.05 ? newW / curW : 1
-    const sz = curD > 0.05 ? newD / curD : 1
+    const dx = (newW - curW) / 2   // 每侧外扩量（正=放大向外，负=缩小向内）
+    const dz = (newD - curD) / 2
     const eps = 0.08
-    const onBoundary = (p) => {
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i], b = pts[(i + 1) % pts.length]
+    const boundary = (rpts) => (p) => {
+      for (let i = 0; i < rpts.length; i++) {
+        const a = rpts[i], b = rpts[(i + 1) % rpts.length]
         if (pointToSeg(p, a, b).dist < eps) return true
       }
       return false
     }
-    const scale = (p) => [cx + (p[0] - cx) * sx, cz + (p[1] - cz) * sz]
-    ;(fl.walls || []).forEach((w) => {
-      if (onBoundary(w.start) && onBoundary(w.end)) {
-        w.start = scale(w.start)
-        w.end = scale(w.end)
+    const bboxOf = (rpts) => {
+      let bx = Infinity, bX = -Infinity, bz = Infinity, bZ = -Infinity
+      rpts.forEach(p => { bx = Math.min(bx, p[0]); bX = Math.max(bX, p[0]); bz = Math.min(bz, p[1]); bZ = Math.max(bZ, p[1]) })
+      return { minX: bx, maxX: bX, minZ: bz, maxZ: bZ }
+    }
+    const transform = (p) => {
+      let x = p[0], z = p[1]
+      if (x <= minX + eps) x -= dx
+      else if (x >= maxX - eps) x += dx
+      if (z <= minZ + eps) z -= dz
+      else if (z >= maxZ - eps) z += dz
+      return [x, z]
+    }
+
+    // 切分贯穿本房间边框的墙（一条墙跨多个房间时先切开，锁定房间的边界段才能独立识别/整体平移）
+    const boxSegs = [
+      { a: [minX, minZ], b: [minX, maxZ] },
+      { a: [maxX, minZ], b: [maxX, maxZ] },
+      { a: [minX, minZ], b: [maxX, minZ] },
+      { a: [minX, maxZ], b: [maxX, maxZ] },
+    ]
+    const ownOn = boundary(pts)
+    const split = []
+    for (const w of (fl.walls || [])) {
+      // 整条就是本房间边界墙 → 不切分（否则共线误差会被误切出假交点）
+      if (ownOn(w.start) && ownOn(w.end)) { split.push(w); continue }
+      const cuts = []
+      for (const s of boxSegs) {
+        const ip = segmentIntersect(w.start, w.end, s.a, s.b)
+        if (!ip) continue
+        if (Math.hypot(ip[0] - w.start[0], ip[1] - w.start[1]) > eps && Math.hypot(ip[0] - w.end[0], ip[1] - w.end[1]) > eps) {
+          if (!cuts.some(c => Math.hypot(c[0] - ip[0], c[1] - ip[1]) < eps)) cuts.push(ip)
+        }
       }
+      if (!cuts.length) { split.push(w); continue }
+      const dir = [w.end[0] - w.start[0], w.end[1] - w.start[1]]
+      const len2 = dir[0] * dir[0] + dir[1] * dir[1] || 1
+      cuts.sort((p, q) => (((p[0] - w.start[0]) * dir[0] + (p[1] - w.start[1]) * dir[1]) - ((q[0] - w.start[0]) * dir[0] + (q[1] - w.start[1]) * dir[1])) / len2)
+      const pieces = [w.start, ...cuts, w.end]
+      for (let k = 0; k < pieces.length - 1; k++) {
+        split.push({ ...w, id: k === 0 ? w.id : `${w.id}-s${k}`, start: [...pieces[k]], end: [...pieces[k + 1]] })
+      }
+    }
+    fl.walls = split
+
+    // 锁定房间：锁定墙完全不动（保持尺寸）；同方向（改长推左右、改宽推上下）整体平移；
+    // 跨方向（改长影响上下、改宽影响左右）锁定房间不动，房2 扩出的部分用新墙段补上（补段）
+    const lockedRooms = (fl.rooms || []).filter(rr => rr.locked && rr.id !== room.id)
+    const lockedWallSet = new Set()
+    lockedRooms.forEach(rr => {
+      const onRr = boundary(rr.points || [])
+      ;(fl.walls || []).forEach(w => { if (onRr(w.start) && onRr(w.end)) lockedWallSet.add(w) })
     })
+
+    // 记录未锁定墙端点（缩放前），补段要用缩放前的位置判断「原本重合」——分段变换后端点已移动
+    const preEndpoints = []
+    ;(fl.walls || []).forEach(w => {
+      if (lockedWallSet.has(w)) return
+      preEndpoints.push([...w.start], [...w.end])
+    })
+
+    // 非锁定墙：分段变换（锁定墙跳过，保持不动）
+    ;(fl.walls || []).forEach((w) => {
+      if (lockedWallSet.has(w)) return
+      w.start = transform(w.start)
+      w.end = transform(w.end)
+    })
+
+    // 同方向锁定房间：整体平移（保持尺寸、被推开）
+    lockedRooms.forEach(rr => {
+      const bb = bboxOf(rr.points || [])
+      let mx = 0, mz = 0
+      if (dx !== 0 && bb.maxX <= minX + eps) mx = -dx
+      else if (dx !== 0 && bb.minX >= maxX - eps) mx = dx
+      if (dz !== 0 && bb.maxZ <= minZ + eps) mz = -dz
+      else if (dz !== 0 && bb.minZ >= maxZ - eps) mz = dz
+      if (mx === 0 && mz === 0) return
+      const onRr = boundary(rr.points || [])
+      ;(fl.walls || []).forEach(w => {
+        if (onRr(w.start) && onRr(w.end)) {
+          w.start = [w.start[0] + mx, w.start[1] + mz]
+          w.end = [w.end[0] + mx, w.end[1] + mz]
+        }
+      })
+    })
+
+    // 通用补段：锁定墙端点不动，缩放前与它重合的未锁定墙端点移动后错位，在错位处补新墙段。
+    // 用缩放前记录的 preEndpoints 判断「原本重合」
+    const newWalls = []
+    lockedWallSet.forEach(w => {
+      ;[w.start, w.end].forEach(p => {
+        preEndpoints.forEach(p2 => {
+          if (Math.hypot(p2[0] - p[0], p2[1] - p[1]) < eps) {
+            const q = transform(p2)
+            if (Math.hypot(q[0] - p[0], q[1] - p[1]) > 0.01) {
+              const dup = newWalls.some(nw =>
+                (Math.hypot(nw.start[0] - p[0], nw.start[1] - p[1]) < 0.01 && Math.hypot(nw.end[0] - q[0], nw.end[1] - q[1]) < 0.01) ||
+                (Math.hypot(nw.start[0] - q[0], nw.start[1] - q[1]) < 0.01 && Math.hypot(nw.end[0] - p[0], nw.end[1] - p[1]) < 0.01)
+              )
+              if (!dup) newWalls.push({ ...w, id: uid(), start: [...p], end: [...q] })
+            }
+          }
+        })
+      })
+    })
+    ;(fl.walls || []).push(...newWalls)
+
     fl.rooms = recomputeRooms(fl)
     setState({ project: { ...st.project }, saved: false })
   }
@@ -718,18 +962,38 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   // 单选墙（用于属性面板）；墙改成用 wallSel 多选（最多 2 条），这里取唯一选中的那条
   const selWall = wallSelIds.length === 1 ? (floor?.walls || []).find(w => w.id === wallSelIds[0]) || null : null
   const patchWall = (w, patch) => {
-    const fl = getState().project.floors[floorIndex]
-    const target = (fl.walls || []).find(x => x.id === w.id)
-    if (!target) return
-    Object.assign(target, patch)
-    setState({ project: { ...getState().project }, saved: false })
+    const st = getState()
+    const fl = st.project.floors[floorIndex]
+    const editingRoom = st.roomEditId ? (fl.rooms || []).find(x => x.id === st.roomEditId) : null
+    if (editingRoom) {
+      // 房间作用域：颜色/透明度存到房间独立配色（solo），不影响户型图整体；几何字段照旧改墙
+      const geom = applyRoomPatch(editingRoom, patch, true)
+      if (Object.keys(geom).length) {
+        const target = (fl.walls || []).find(x => x.id === w.id)
+        if (target) Object.assign(target, geom)
+      }
+    } else {
+      const target = (fl.walls || []).find(x => x.id === w.id)
+      if (!target) return
+      Object.assign(target, patch)
+    }
+    setState({ project: { ...st.project }, saved: false })
   }
   // 批量改所有选中的墙（全选后也能改颜色/高度/厚度/不透明度）
   const patchWalls = (patch) => {
     const st = getState()
     const fl = st.project.floors[floorIndex]
     const ids = st.wallSel || []
-    ;(fl.walls || []).forEach((w) => { if (ids.includes(w.id)) Object.assign(w, patch) })
+    const editingRoom = st.roomEditId ? (fl.rooms || []).find(x => x.id === st.roomEditId) : null
+    ;(fl.walls || []).forEach((w) => {
+      if (!ids.includes(w.id)) return
+      if (editingRoom) {
+        const geom = applyRoomPatch(editingRoom, patch, true)
+        if (Object.keys(geom).length) Object.assign(w, geom)
+      } else {
+        Object.assign(w, patch)
+      }
+    })
     setState({ project: { ...st.project }, saved: false })
   }
   // 批量删除所有选中的墙
@@ -759,39 +1023,46 @@ export default function PlanEditor({ onSelect, floorIndex }) {
   const applyWallConstraint = (type) => {
     const fl = getState().project.floors[floorIndex]
     const ids = getState().wallSel || []
-    if (ids.length !== 2) return
-    const a = (fl.walls || []).find(w => w.id === ids[0])
-    const b = (fl.walls || []).find(w => w.id === ids[1])
-    if (!a || !b) return
+    if (ids.length < 2) return
+    const a = (fl.walls || []).find(w => w.id === ids[0])  // 第 1 条是基准，保持不动
+    if (!a) return
     const la = Math.hypot(a.end[0] - a.start[0], a.end[1] - a.start[1])
     if (la < 1e-6) return
     const da = [(a.end[0] - a.start[0]) / la, (a.end[1] - a.start[1]) / la]  // a 方向单位向量
-    const lb = Math.hypot(b.end[0] - b.start[0], b.end[1] - b.start[1]) || 1
-    if (type === 'horizontal') {
-      // 水平：b 变成水平（保持 b 起点、长度）
-      b.end = [b.start[0] + (b.end[0] - b.start[0] >= 0 ? 1 : -1) * lb, b.start[1]]
-    } else if (type === 'perp') {
-      // 垂直：b 变成垂直于 a（a 的法向），保持 b 起点、长度
-      const n = [-da[1], da[0]]
-      b.end = [b.start[0] + n[0] * lb, b.start[1] + n[1] * lb]
-    } else if (type === 'collinear') {
-      // 共线：第2条线接到第1条线终点，沿第1条线方向延长（不是两条线重合）
-      b.start = [...a.end]
-      b.end = [a.end[0] + da[0] * lb, a.end[1] + da[1] * lb]
-    } else if (type === 'samepoint') {
-      // 同点：找两墙最近的端点对，把第2条线平移到端点重合
-      const p1 = [a.start, a.end], p2 = [b.start, b.end]
-      let bi = 0, bj = 0, bd = Infinity
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
-        const d = Math.hypot(p1[i][0] - p2[j][0], p1[i][1] - p2[j][1])
-        if (d < bd) { bd = d; bi = i; bj = j }
+    // 对后面所有选中的墙应用约束（支持多条，不再只限 2 条）
+    for (const id of ids.slice(1)) {
+      const b = (fl.walls || []).find(w => w.id === id)
+      if (!b) continue
+      const lb = Math.hypot(b.end[0] - b.start[0], b.end[1] - b.start[1]) || 1
+      if (type === 'horizontal') {
+        // 水平：b 变成水平（保持 b 起点、长度）
+        b.end = [b.start[0] + (b.end[0] - b.start[0] >= 0 ? 1 : -1) * lb, b.start[1]]
+      } else if (type === 'perp') {
+        // 垂直：b 变成垂直于 a（a 的法向），保持 b 起点、长度
+        const n = [-da[1], da[0]]
+        b.end = [b.start[0] + n[0] * lb, b.start[1] + n[1] * lb]
+      } else if (type === 'collinear') {
+        // 共线：b 的方向对齐 a 的方向，且 b 的起点投影到 a 的直线上（同一条直线，不要求线段首尾相接/重合）
+        const t = (b.start[0] - a.start[0]) * da[0] + (b.start[1] - a.start[1]) * da[1]
+        const proj = [a.start[0] + da[0] * t, a.start[1] + da[1] * t]
+        const dir = ((b.end[0] - b.start[0]) * da[0] + (b.end[1] - b.start[1]) * da[1]) >= 0 ? 1 : -1
+        b.start = proj
+        b.end = [proj[0] + dir * da[0] * lb, proj[1] + dir * da[1] * lb]
+      } else if (type === 'samepoint') {
+        // 同点：找两墙最近的端点对，把 b 平移到和 a 端点重合
+        const p1 = [a.start, a.end], p2 = [b.start, b.end]
+        let bi = 0, bj = 0, bd = Infinity
+        for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+          const d = Math.hypot(p1[i][0] - p2[j][0], p1[i][1] - p2[j][1])
+          if (d < bd) { bd = d; bi = i; bj = j }
+        }
+        const dx = p1[bi][0] - p2[bj][0], dy = p1[bi][1] - p2[bj][1]
+        b.start = [b.start[0] + dx, b.start[1] + dy]
+        b.end = [b.end[0] + dx, b.end[1] + dy]
       }
-      const dx = p1[bi][0] - p2[bj][0], dy = p1[bi][1] - p2[bj][1]
-      b.start = [b.start[0] + dx, b.start[1] + dy]
-      b.end = [b.end[0] + dx, b.end[1] + dy]
     }
     fl.rooms = recomputeRooms(fl)
-    setState({ project: { ...getState().project }, saved: false, wallSel: [a.id, b.id] })
+    setState({ project: { ...getState().project }, saved: false, wallSel: ids })
   }
   // 绕起点旋转 ±90°
   const rotateWall90 = (w, dir) => {
@@ -985,8 +1256,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         <circle r={0.12} />
       </g>
 
-      {/* 房间：多边形 + 名字 + 面积 */}
-      {rooms.map(room => {
+      {/* 房间：多边形 + 名字 + 面积（单房间聚焦时只显示这一个房间） */}
+      {rooms.filter(r => !editingRoom || r.id === roomEditId).map(room => {
         const cx = room.points.reduce((s, p) => s + p[0], 0) / room.points.length
         const cy = room.points.reduce((s, p) => s + p[1], 0) / room.points.length
         const selRoom = isSel('room', room.id)
@@ -995,7 +1266,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             <polygon
               points={room.points.map(p => p.join(',')).join(' ')}
               className={`plan-room ${selRoom ? 'selected' : ''}`}
-              style={selRoom ? undefined : (room.texture ? { fill: `url(#room-tex-${room.id})` } : room.color ? { fill: room.color } : undefined)}
+              style={selRoom ? undefined : (room.texture ? { fill: `url(#room-tex-${room.id})` } : ((editingRoom && editingRoom.id === room.id && editingRoom.soloFloorColor) || room.color) ? { fill: (editingRoom && editingRoom.id === room.id && editingRoom.soloFloorColor) || room.color } : undefined)}
             />
             <text x={cx} y={cy - 0.06} className={`plan-room-name ${selRoom ? 'selected' : ''}`}>{room.name}</text>
             <text x={cx} y={cy + 0.22} className="plan-room-area">{polygonArea(room.points).toFixed(1)} m²</text>
@@ -1003,8 +1274,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         )
       })}
 
-      {/* 墙（持久化线段：select 多选（最多2条），delete 删除） */}
-      {walls.map((w, i) => {
+      {/* 墙（持久化线段：select 多选（最多2条），delete 删除；单房间聚焦时只显示该房间边界墙） */}
+      {walls.filter(w => wallCoversRoomEdge(w)).map((w, i) => {
         const selW = wallSelIds.includes(w.id)
         const wlen = Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
         const wmx = (w.start[0] + w.end[0]) / 2
@@ -1013,18 +1284,20 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         let issue = null
         if (wallIssues) {
           if (wallIssues.zeroLen.includes(w.id)) issue = { label: '零长度', color: '#ff6b6b' }
+          else if ((wallIssues.shortWalls || []).includes(w.id)) issue = { label: '短墙', color: '#ff6b6b' }
           else if (wallIssues.dupIds.includes(w.id)) issue = { label: '重复', color: '#ff9b54' }
           else if (wallIssues.overlapIds.includes(w.id)) issue = { label: '重叠', color: '#ffd166' }
           else if (wallIssues.danglingIds.includes(w.id)) issue = { label: '伸出', color: '#ff6b9d' }
+          else if ((wallIssues.isolatedIds || []).includes(w.id)) issue = { label: '孤立', color: '#ff6b9d' }
         }
         return (
           <g key={w.id || `w${i}`}>
             <line
               x1={w.start[0]} y1={w.start[1]} x2={w.end[0]} y2={w.end[1]}
               className={`plan-wall ${selW ? 'selected' : ''}`}
-              stroke={issue ? issue.color : undefined}
+              stroke={issue ? issue.color : ((editingRoom && editingRoom.soloWallColor) || w.color || undefined)}
               strokeWidth={issue ? WALL_T * 1.6 : WALL_T}
-              strokeOpacity={(w.opacity != null ? w.opacity : wallOpacity) / 100}
+              strokeOpacity={((editingRoom && editingRoom.soloWallOpacity != null ? editingRoom.soloWallOpacity : (w.opacity != null ? w.opacity : wallOpacity)) / 100)}
               onPointerDown={(e) => {
                 if (tool === 'delete') { e.stopPropagation(); onSelect({ type: 'wall', ref: w, index: i }) }
                 else if (tool === 'select') {
@@ -1033,8 +1306,15 @@ export default function PlanEditor({ onSelect, floorIndex }) {
                   e.stopPropagation()
                   if (e.ctrlKey || e.metaKey || multiSelect) toggleWallSel(w.id)
                   else setState({ wallSel: [w.id], selected: null })
+                } else if (tool === 'move') {
+                  // 移动模式下按住墙整体平移
+                  e.stopPropagation()
+                  setState({ wallSel: [w.id], selected: null })
+                  wallMoveRef.current = { wall: w, startPos: [...w.start, ...w.end], startMouse: toWorld(e) }
+                  svgRef.current && svgRef.current.setPointerCapture(e.pointerId)
                 }
               }}
+              onDoubleClick={(e) => doubleClickDrag(e, 'wall', w)}
             />
             {issue && (
               <>
@@ -1054,7 +1334,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
                 })()}
               </>
             )}
-            {selW && tool === 'select' && (
+            {selW && (tool === 'select' || tool === 'move') && (
               <>
                 <circle cx={w.start[0]} cy={w.start[1]} r={0.16} className="plan-wall-handle start" onPointerDown={(e) => startWallDrag(e, w, 'start')} />
                 <circle cx={w.end[0]} cy={w.end[1]} r={0.16} className="plan-wall-handle end" onPointerDown={(e) => startWallDrag(e, w, 'end')} />
@@ -1067,25 +1347,27 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         )
       })}
 
-      {/* 墙体交点：红点标记（判断线是否闭合/连接） */}
-      {(() => {
+      {/* 墙体交点：红点标记（判断线是否闭合/连接，容差与房间检测 SNAP_TOL 一致） */}
+      {showIntersections && !editingRoom && (() => {
         const pts = []
         const seen = new Set()
         const add = (p) => {
-          const k = `${Math.round(p[0] * 100)},${Math.round(p[1] * 100)}`
+          const k = `${Math.round(p[0] / SNAP_TOL)},${Math.round(p[1] / SNAP_TOL)}`
           if (seen.has(k)) return
           seen.add(k)
           pts.push(p)
+        }
+        // 端点几乎碰到另一条墙（T形连接）：投影到那条墙上，容差 SNAP_TOL
+        const snap = (p, s) => {
+          const r = pointToSeg(p, s.start, s.end)
+          if (r.dist < SNAP_TOL) add([s.start[0] + r.t * (s.end[0] - s.start[0]), s.start[1] + r.t * (s.end[1] - s.start[1])])
         }
         for (let i = 0; i < walls.length; i++) {
           for (let j = i + 1; j < walls.length; j++) {
             const a = walls[i], b = walls[j]
             const ip = segmentIntersect(a.start, a.end, b.start, b.end)
             if (ip) add(ip)
-            if (pointOnSeg(b.start, a.start, a.end)) add(b.start)
-            if (pointOnSeg(b.end, a.start, a.end)) add(b.end)
-            if (pointOnSeg(a.start, b.start, b.end)) add(a.start)
-            if (pointOnSeg(a.end, b.start, b.end)) add(a.end)
+            snap(a.start, b); snap(a.end, b); snap(b.start, a); snap(b.end, a)
           }
         }
         return pts.map((p, i) => (
@@ -1093,8 +1375,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         ))
       })()}
 
-      {/* 门窗（对齐原版：墙洞白线 + 门扇 + 开启弧） */}
-      {openings.map(op => {
+      {/* 门窗（对齐原版：墙洞白线 + 门扇 + 开启弧；单房间聚焦时只显示该房间边界墙上的门窗） */}
+      {openings.filter(op => { if (!editingRoom) return true; const ow = walls.find(x => x.id === op.wallId); return !!ow && wallCoversRoomEdge(ow) }).map(op => {
         const w = walls.find(x => x.id === op.wallId)
         if (!w) return null
         const t = Math.max(0, Math.min(1, op.offset || 0.5))
@@ -1133,12 +1415,20 @@ export default function PlanEditor({ onSelect, floorIndex }) {
                 <line x1={-wd / 2} y1={0.06} x2={wd / 2} y2={0.06} className="door-leaf" stroke={doorColor} />
               </>
             )}
+            {selO && (
+              <>
+                <circle cx={-wd / 2} cy={0} r={0.12} fill="#2f7fe0" stroke="#fff" strokeWidth={0.04}
+                  onPointerDown={(e) => startResizeOpening(e, op)} style={{ cursor: 'ew-resize' }} />
+                <circle cx={wd / 2} cy={0} r={0.12} fill="#2f7fe0" stroke="#fff" strokeWidth={0.04}
+                  onPointerDown={(e) => startResizeOpening(e, op)} style={{ cursor: 'ew-resize' }} />
+              </>
+            )}
           </g>
         )
       })}
 
-      {/* 家具 */}
-      {furniture.map(f => {
+      {/* 家具（单房间聚焦时只显示该房间内的） */}
+      {furniture.filter(f => posInEditingRoom(f.pos[0], f.pos[2])).map(f => {
         const lib = FURNITURE_LIB.find(x => x.type === f.type)
         const cat = getCatalogItem(f.type)
         const devModel = DEVICE_MODELS.find(m => m.id === f.type)
@@ -1150,7 +1440,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         return (
           <g
             key={f.id}
-            transform={`translate(${f.pos[0]} ${f.pos[2]}) rotate(${f.rot || 0})`}
+            transform={`translate(${f.pos[0] || 0} ${f.pos[2] || 0}) rotate(${f.rot || 0})`}
             onClick={e => clickEl(e, 'furniture', f)}
             onDoubleClick={e => doubleClickDrag(e, 'furniture', f)}
             onPointerDown={e => startDrag(e, 'furniture', f)}
@@ -1165,8 +1455,8 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         )
       })}
 
-      {/* 设备 */}
-      {devices.map(dev => {
+      {/* 设备（单房间聚焦时只显示该房间内的） */}
+      {devices.filter(dev => posInEditingRoom(dev.pos[0], dev.pos[2])).map(dev => {
         const selD = isSel('device', dev.id)
         const color = deviceColor(dev, haStates)
         return (
@@ -1320,6 +1610,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <input type="text" value={selFurniture.group || ''} placeholder="同组名一起移动"
             onChange={(e) => patchFurniture(selFurniture, { group: e.target.value || undefined })} />
         </div>
+        <MoveControls id={selFurniture.id} floorIndex={floorIndex} />
         <div className="plan-props-row">
           <span className="plan-props-label">大小</span>
           <input type="number" step="0.1" min="0.1" value={Math.round(curW * 100) / 100} title="宽"
@@ -1374,6 +1665,16 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           </button>
           <button className="plan-props-seg" onClick={() => duplicateFurniture(selFurniture)}>⧉ 复制</button>
         </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">实体</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selFurniture.entity_id || '未绑定'}</span>
+          <button className="plan-props-seg" onClick={() => setDeviceBindOpen(true)}>绑定</button>
+        </div>
+        {deviceBindOpen && (
+          <div style={{ marginTop: 8 }}>
+            <EntityPicker onPick={(e) => { patchFurniture(selFurniture, e); setDeviceBindOpen(false); toast(`已绑定 ${e.name}`) }} onClose={() => setDeviceBindOpen(false)} />
+          </div>
+        )}
       </div>
     )}
     {selOpening && (
@@ -1398,6 +1699,12 @@ export default function PlanEditor({ onSelect, floorIndex }) {
                   style={{ background: hex }}
                   onClick={() => patchOpening(selOpening, { color: name })} />
               ))}
+            </div>
+            <div className="plan-props-row">
+              <span className="plan-props-label">高度</span>
+              <input type="number" step="0.1" min="0.5" max="3" value={Math.round((selOpening.height || 2.1) * 10) / 10}
+                onChange={(e) => patchOpening(selOpening, { height: Math.min(3, Math.max(0.5, Number(e.target.value) || 2.1)) })} />
+              <span className="plan-props-unit">m</span>
             </div>
             {(selOpening.doorStyle || 'swing') !== 'frame' && (selOpening.doorStyle || 'swing') !== 'slide' && (
               <div className="plan-props-row">
@@ -1424,6 +1731,19 @@ export default function PlanEditor({ onSelect, floorIndex }) {
             ))}
           </div>
         )}
+        <div className="plan-props-row">
+          <span className="plan-props-label">框角</span>
+          <button className={`plan-props-seg ${(selOpening.frameStyle || 'square') === 'square' ? 'active' : ''}`}
+            onClick={() => patchOpening(selOpening, { frameStyle: 'square' })}>直角</button>
+          <button className={`plan-props-seg ${(selOpening.frameStyle || 'square') === 'rounded' ? 'active' : ''}`}
+            onClick={() => patchOpening(selOpening, { frameStyle: 'rounded' })}>圆角</button>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">框厚</span>
+          <input type="number" step="0.01" min="0.02" max="0.12" value={Math.round(((selOpening.frameThickness || (selOpening.type === 'door' ? 0.06 : 0.04)) * 100)) / 100}
+            onChange={(e) => patchOpening(selOpening, { frameThickness: Math.min(0.12, Math.max(0.02, Number(e.target.value) || 0.04)) })} />
+          <span className="plan-props-unit">m</span>
+        </div>
       </div>
     )}
     {selDevice && (
@@ -1432,6 +1752,7 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <span>{selDevice.name || selDevice.entity_id}</span>
           <button className="plan-props-del" onClick={() => deleteDevice(selDevice)}>删除</button>
         </div>
+        <MoveControls id={selDevice.id} floorIndex={floorIndex} />
         <div className="plan-props-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
           <span className="plan-props-label">模型（点缩略图选）</span>
           <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1486,8 +1807,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">实体</span>
-          <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selDevice.entity_id}</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selDevice.entity_id || '未绑定'}</span>
+          <button className="plan-props-seg" onClick={() => setDeviceBindOpen(true)}>绑定</button>
         </div>
+        {deviceBindOpen && (
+          <div style={{ marginTop: 8 }}>
+            <EntityPicker onPick={(e) => { patchDevice(selDevice, e); setDeviceBindOpen(false); toast(`已绑定 ${e.name}`) }} onClose={() => setDeviceBindOpen(false)} />
+          </div>
+        )}
       </div>
     )}
     {selRoom && (
@@ -1505,17 +1832,24 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <span style={{ fontSize: 12, color: 'var(--text)' }}>{polygonArea(selRoom.points || []).toFixed(1)} ㎡</span>
         </div>
         <div className="plan-props-row">
+          <span className="plan-props-label">尺寸锁定</span>
+          <button style={{ padding: '4px 12px', borderRadius: 6, border: selRoom.locked ? '1px solid var(--accent)' : '1px solid var(--border)', background: selRoom.locked ? 'var(--accent)' : 'var(--panel2)', color: selRoom.locked ? '#081018' : 'var(--text)', cursor: 'pointer', fontSize: 12 }}
+            onClick={() => patchRoom(selRoom, { locked: !selRoom.locked })}>
+            {selRoom.locked ? '🔒 已锁定' : '锁定'}
+          </button>
+        </div>
+        <div className="plan-props-row">
           <span className="plan-props-label">长</span>
-          <button onClick={() => resizeRoom(selRoom, Math.max(0.5, roomDims.w - 0.1), roomDims.d)}>−</button>
-          <NumInput value={Math.round(roomDims.w * 100) / 100} step={0.1} min={0.5} onChange={(v) => resizeRoom(selRoom, v, roomDims.d)} />
-          <button onClick={() => resizeRoom(selRoom, roomDims.w + 0.1, roomDims.d)}>＋</button>
+          <button disabled={selRoom.locked} style={{ opacity: selRoom.locked ? 0.4 : 1 }} onClick={() => resizeRoom(selRoom, Math.max(0.5, roomDims.w - 0.1), roomDims.d)}>−</button>
+          <NumInput disabled={selRoom.locked} value={Math.round(roomDims.w * 100) / 100} step={0.1} min={0.5} onChange={(v) => resizeRoom(selRoom, v, roomDims.d)} />
+          <button disabled={selRoom.locked} style={{ opacity: selRoom.locked ? 0.4 : 1 }} onClick={() => resizeRoom(selRoom, roomDims.w + 0.1, roomDims.d)}>＋</button>
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">宽</span>
-          <button onClick={() => resizeRoom(selRoom, roomDims.w, Math.max(0.5, roomDims.d - 0.1))}>−</button>
-          <NumInput value={Math.round(roomDims.d * 100) / 100} step={0.1} min={0.5} onChange={(v) => resizeRoom(selRoom, roomDims.w, v)} />
-          <button onClick={() => resizeRoom(selRoom, roomDims.w, roomDims.d + 0.1)}>＋</button>
+          <button disabled={selRoom.locked} style={{ opacity: selRoom.locked ? 0.4 : 1 }} onClick={() => resizeRoom(selRoom, roomDims.w, Math.max(0.5, roomDims.d - 0.1))}>−</button>
+          <NumInput disabled={selRoom.locked} value={Math.round(roomDims.d * 100) / 100} step={0.1} min={0.5} onChange={(v) => resizeRoom(selRoom, roomDims.w, v)} />
+          <button disabled={selRoom.locked} style={{ opacity: selRoom.locked ? 0.4 : 1 }} onClick={() => resizeRoom(selRoom, roomDims.w, roomDims.d + 0.1)}>＋</button>
           <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
@@ -1528,8 +1862,14 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <NumInput value={selRoom.thickness || 0.05} step={0.01} min={0.02} max={1} onChange={(v) => patchRoom(selRoom, { thickness: v })} />
           <span className="plan-props-unit">m</span>
         </div>
-        <div className="plan-props-row">
+        <div className="plan-props-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
           <span className="plan-props-label">颜色</span>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+            {FLOOR_COLORS.map((c) => (
+              <button key={c} title={c} onClick={() => patchRoom(selRoom, { color: c })}
+                className="plan-props-swatch" style={{ background: c }} />
+            ))}
+          </div>
           <HexColorPicker value={selRoom.color || '#7789ad'} onChange={(c) => patchRoom(selRoom, { color: c })} />
         </div>
         <div className="plan-props-row">
@@ -1572,18 +1912,26 @@ export default function PlanEditor({ onSelect, floorIndex }) {
     {roomSelIds.length > 0 && (
       <div className="plan-props">
         <div className="plan-props-head"><span>批量房间（{roomSelIds.length} 个）</span></div>
-        <div className="plan-props-row">
+        <div className="plan-props-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
           <span className="plan-props-label">颜色</span>
-          {FLOOR_COLORS.map((c) => (
-            <button key={c} title={c} onClick={() => patchRooms({ color: c })}
-              className="plan-props-swatch" style={{ background: c }} />
-          ))}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+            {FLOOR_COLORS.map((c) => (
+              <button key={c} title={c} onClick={() => patchRooms({ color: c })}
+                className="plan-props-swatch" style={{ background: c }} />
+            ))}
+          </div>
+          <HexColorPicker value="#7789ad" onChange={(c) => patchRooms({ color: c })} />
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">透明度</span>
           <input type="range" min="10" max="100" step="5" style={{ flex: 1 }} defaultValue={100}
             onChange={(e) => patchRooms({ opacity: Number(e.target.value) })} />
           <span className="plan-props-unit">%</span>
+        </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">厚度</span>
+          <NumInput value={(() => { const r = (getState().project.floors[floorIndex]?.rooms || []).find(x => roomSelIds.includes(x.id)); return (r && r.thickness != null) ? r.thickness : 0.05 })()} step={0.01} min={0.02} max={1} onChange={(v) => patchRooms({ thickness: v })} />
+          <span className="plan-props-unit">m</span>
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">贴图</span>
@@ -1722,12 +2070,15 @@ export default function PlanEditor({ onSelect, floorIndex }) {
           <input type="number" step="0.02" min="0.05" max="0.5" placeholder="统一" onChange={(e) => { if (e.target.value) patchWalls({ thickness: Number(e.target.value) || 0.12 }) }} />
           <span className="plan-props-unit">m</span>
         </div>
-        <div className="plan-props-row">
+        <div className="plan-props-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
           <span className="plan-props-label">颜色</span>
-          {WALL_COLORS.map((c) => (
-            <button key={c} title={c} onClick={() => patchWalls({ color: c })}
-              className="plan-props-swatch" style={{ background: c }} />
-          ))}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+            {WALL_COLORS.map((c) => (
+              <button key={c} title={c} onClick={() => patchWalls({ color: c })}
+                className="plan-props-swatch" style={{ background: c }} />
+            ))}
+          </div>
+          <HexColorPicker value="#d5e0f1" onChange={(c) => patchWalls({ color: c })} />
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">不透明度</span>

@@ -23,7 +23,11 @@ const NO_DEVICES = []
 const _v = new THREE.Vector3()  // 复用的临时向量，避免每帧 new 造成 GC 压力
 function DeviceLabels({ floorIndex, containerRef }) {
   const floor = useStore((s) => s.project.floors[floorIndex])
-  const devices = (floor && floor.devices) || NO_DEVICES
+  // 设备 + 绑定了实体的模型（家具）都显示设备名标签（_k 区分设备/家具，避免 id 冲突）
+  const devices = floor ? [
+    ...(floor.devices || []).map((d) => ({ ...d, _k: 'd' + d.id })),
+    ...(floor.furniture || []).filter((f) => f.entity_id).map((f) => ({ ...f, _k: 'f' + f.id })),
+  ] : []
   const haStates = useStore((s) => s.haStates)
   const showLabels = useStore((s) => s.showLabels)
   const night = useStore((s) => s.night)
@@ -36,11 +40,11 @@ function DeviceLabels({ floorIndex, containerRef }) {
     const wrap = containerRef.current
     if (!wrap) return
     devices.forEach((dev) => {
-      if (!els.current.has(dev.id)) {
+      if (!els.current.has(dev._k)) {
         const el = document.createElement('div')
         el.className = 'device-label'
         wrap.appendChild(el)
-        els.current.set(dev.id, el)
+        els.current.set(dev._k, el)
       }
     })
     return () => {
@@ -56,7 +60,7 @@ function DeviceLabels({ floorIndex, containerRef }) {
     const rect = wrap.getBoundingClientRect()
     const v = _v  // 复用临时向量，避免每帧 new 导致 GC 压力（GC 是周期性卡顿的常见原因）
     devices.forEach((dev) => {
-      const el = els.current.get(dev.id)
+      const el = els.current.get(dev._k)
       if (!el) return
       el.classList.toggle('light-theme', !night)
       const hide = mode === '结构'
@@ -95,8 +99,13 @@ function CameraFocus({ floorIndex }) {
     const box = new THREE.Box3()
     let has = false
     const add = (x, z) => { box.expandByPoint(new THREE.Vector3(x, 0, z)); has = true }
-    ;(floor?.rooms || []).forEach((r) => (r.points || []).forEach((p) => add(p[0], p[1])))
-    ;(floor?.walls || []).forEach((w) => { add(w.start[0], w.start[1]); add(w.end[0], w.end[1]) })
+    const hasRooms = (floor?.rooms || []).length > 0
+    if (hasRooms) {
+      // 有房间：只按房间取景，不含墙（伸出墙会把取景中心带偏）
+      ;(floor?.rooms || []).forEach((r) => (r.points || []).forEach((p) => add(p[0], p[1])))
+    } else {
+      ;(floor?.walls || []).forEach((w) => { add(w.start[0], w.start[1]); add(w.end[0], w.end[1]) })
+    }
     ;(floor?.furniture || []).forEach((f) => { add(f.pos[0], f.pos[2]) })
     const c = has ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 2)
     const width = has ? box.max.x - box.min.x : 8
@@ -169,10 +178,12 @@ function SceneBackground({ bgMode, bgImage, bgColor, bgGradient1, bgGradient2 })
 }
 
 // 后期处理：泛光 Bloom + 电影级色调映射（让发光设备/灯带有柔和光晕）
-function Effects({ bloom }) {
+function Effects({ bloom, glassMode }) {
   const { gl, scene, camera, size } = useThree()
   const composer = useMemo(() => {
-    const c = new EffectComposer(gl)
+    // 带 MSAA 的 render target：后期处理会丢失 Canvas 的 antialias，这里手动加 samples 抗锯齿（否则边缘有锯齿感）
+    const rt = new THREE.WebGLRenderTarget(size.width, size.height, { samples: 4, type: THREE.HalfFloatType })
+    const c = new EffectComposer(gl, rt)
     c.addPass(new RenderPass(scene, camera))
     c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 0.6, 0.55, 0.8))
     c.addPass(new OutputPass())
@@ -182,7 +193,7 @@ function Effects({ bloom }) {
   useEffect(() => {
     gl.toneMapping = THREE.ACESFilmicToneMapping
     gl.toneMappingExposure = 1.1
-  }, [gl])
+  }, [gl, glassMode])
 
   useEffect(() => {
     composer.setSize(size.width, size.height)
@@ -216,6 +227,7 @@ export default function Viewer({ onSelect, floorIndex }) {
   const bgColor = useStore((s) => s.bgColor)
   const bgGradient1 = useStore((s) => s.bgGradient1)
   const bgGradient2 = useStore((s) => s.bgGradient2)
+  const glassMode = useStore((s) => s.glassMode)
   const editing = useStore((s) => s.editing)
   const selected = useStore((s) => s.selected)
   const editorBgImage = useStore((s) => s.editorBgImage)
@@ -223,6 +235,27 @@ export default function Viewer({ onSelect, floorIndex }) {
   const containerRef = useRef(null)
   const q = QUALITY[quality] || QUALITY.balanced
   const fogColor = night ? '#0a1020' : (MODE_FOG[mode] || MODE_FOG['全屋'])
+
+  // 点击空白处（3D 场景没点到任何对象）→ 通知父组件（聚焦模式下整体居中退出聚焦）。
+  // 记录 pointerdown 位置做 delta 过滤：拖拽旋转/平移松手时 onPointerMissed 也会触发，不能算「点击空白」。
+  const downPos = useRef(null)
+  useEffect(() => {
+    const onDown = (e) => { downPos.current = [e.clientX, e.clientY] }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [])
+  const handleMiss = (e) => {
+    if (e && e.button !== 0) return  // 只左键算「点击空白」（右键在 Viewer 有取消逻辑，不触发整体居中）
+    // 点击 UI 面板（属性面板/侧边面板/设置/弹窗/房间导航等）不算「点空白」——否则点面板按钮会被当成点空白 → 清选中/关面板/视角跳走
+    if (e && e.target && e.target.closest) {
+      const p = e.target.closest('.plan-props, .side-panel, .settings-panel, .device-panel, .notif-panel, .scene-panel, .bb-menu, .modal-mask, .room-nav, .furn-picker, .bb-edit-panel')
+      if (p) return
+    }
+    const d = downPos.current ? Math.hypot(e.clientX - downPos.current[0], e.clientY - downPos.current[1]) : 0
+    downPos.current = null
+    if (d > 6) return  // 拖拽 >6px 不算点击（对齐 Scene.jsx 的 isDragClick）
+    onSelect(null)
+  }
 
   // 3D 视图右键 = 取消（单击右键取消；按住右键拖动=平移，不算取消）
   useEffect(() => {
@@ -252,7 +285,9 @@ export default function Viewer({ onSelect, floorIndex }) {
         gl={{ antialias: q.aa, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         shadows={shadows}
         camera={{ position: [8.4, 9.6, 10.2], fov: 36, near: 0.1, far: 150 }}
+        onPointerMissed={handleMiss}
         onCreated={({ gl, scene, camera }) => {
+          window.__camera = camera  // 调试用
           window.__dbg3d = {
             get frames() { return gl.info.render.frame },
             get calls() { return gl.info.render.calls },

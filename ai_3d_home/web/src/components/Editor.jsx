@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore, setState, currentFloor, getState, toast, undo, redo, loadProject, uid } from '../store'
 import { api, BASE } from '../api'
-import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, DEVICE_MODELS, DEVICE_KINDS, recomputeRooms, segmentIntersect, pointToSeg } from '../three/geometry'
+import { FURNITURE_LIB, FURNITURE_COLORS, polygonArea, DEVICE_MODELS, DEVICE_KINDS, recomputeRooms, segmentIntersect, pointToSeg, wallOnEdge } from '../three/geometry'
 import { thumbUrl } from '../catalog'
 import ModelPreview from './ModelPreview'
+import FurnitureEditor from './FurnitureEditor'
 
 // 内置家具图标（程序化建模无缩略图，用 emoji 表示）
 const FURNITURE_ICONS = {
@@ -11,7 +12,7 @@ const FURNITURE_ICONS = {
   橱柜: '🗄️', 岛台: '🍳', 茶几: '🪵', 书架: '📚', 马桶: '🚽',
   空气净化器: '🌀', 电视机: '📺', 壁灯: '💡', 挂画: '🖼️', 吊灯: '🛎️',
   吸顶灯: '💡', 筒灯: '💡', 空调: '❄️', 热水器: '♨️', 灯带: '✨',
-  开关: '🔘', 感应器: '👁️', 风扇: '🌀',
+  开关: '🔘', 感应器: '👁️', 风扇: '🌀', 门: '🚪',
 }
 
 // 地板颜色（选中房间可改）
@@ -32,7 +33,7 @@ const LEFT_TOOLS = [
   { id: 'door', label: '门', k: 'D' },
   { id: 'window', label: '窗', k: 'N' },
   { id: 'cut', label: '裁剪', k: 'X' },
-  { id: 'furniture', label: '家具', k: 'F' },
+  { id: 'furniture', label: '模型', k: 'F' },
   { id: 'device', label: '设备', k: 'E' },
   { id: 'texture', label: '贴图', k: 'B' },
   { id: 'delete', label: '删除', k: 'Del' },
@@ -57,9 +58,11 @@ export default function Editor() {
   const showLabels = useStore((s) => s.showLabels)
   const showFurnitureLabels = useStore((s) => s.showFurnitureLabels)
   const showDimensions = useStore((s) => s.showDimensions)
+  const showIntersections = useStore((s) => s.showIntersections)
   const planImage = useStore((s) => s.planImage)
   const settings = useStore((s) => s.settings)
   const view2d = useStore((s) => s.view2d)
+  const roomEditId = useStore((s) => s.roomEditId)  // 房间作用域：非空=从房间「编辑」进入，全选/改色只作用在这个房间
   const mode = useStore((s) => s.mode)
   const project = useStore((s) => s.project)
   const modelCatalog = useStore((s) => s.modelCatalog)
@@ -70,6 +73,7 @@ export default function Editor() {
   const floor = currentFloor()
   const currentFloorIdx = useStore((s) => s.currentFloor)
   const [furnOpen, setFurnOpen] = useState(false)
+  const [furnEditor, setFurnEditor] = useState(false)
   const [catOpen, setCatOpen] = useState(false)
   const [openCats, setOpenCats] = useState({})
   const [backups, setBackups] = useState([])
@@ -82,6 +86,8 @@ export default function Editor() {
   const [bgList, setBgList] = useState([])
   const [roomTplOpen, setRoomTplOpen] = useState(false)
   const [wallIssues, setWallIssues] = useState(null)
+  const [detectOptsOpen, setDetectOptsOpen] = useState(false)
+  const detectOpts = useStore((s) => s.detectOpts)
   const editorBgImage = useStore((s) => s.editorBgImage)
 
   // 下载模型按中文分类分组
@@ -119,20 +125,36 @@ export default function Editor() {
     toast(locked ? `已锁定 ${fs.length} 个家具` : `已解锁 ${fs.length} 个家具`)
   }
 
-  // 全选当前楼层所有墙
+  // 全选墙：房间作用域（roomEditId 非空，从房间「编辑」进入）只选这个房间边界对应的墙；否则选整个楼层所有墙
   const selectAllWalls = () => {
     const st = getState()
     const fl = st.project.floors[st.currentFloor]
-    const ids = (fl.walls || []).map((w) => w.id)
+    const walls = fl.walls || []
+    const room = st.roomEditId ? (fl.rooms || []).find((r) => r.id === st.roomEditId) : null
+    let ids
+    if (room && room.points) {
+      // 墙属于这个房间边界：和房间某条边共线且有交叠（覆盖单面墙/拼接墙/共用墙）
+      const pts = room.points
+      const covers = (w) => {
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length]
+          if (wallOnEdge(w, a, b)) return true
+        }
+        return false
+      }
+      ids = walls.filter(covers).map((w) => w.id)
+    } else {
+      ids = walls.map((w) => w.id)
+    }
     setState({ wallSel: ids, selected: null, roomSel: [], tool: 'select' })
     toast(`已选中 ${ids.length} 面墙`)
   }
 
-  // 全选房间（房间=地板，选中后可批量改颜色/透明度/贴图）
+  // 全选房间（房间=地板，选中后可批量改颜色/透明度/贴图）：房间作用域只选当前房间，否则选所有房间
   const selectAllRooms = () => {
     const st = getState()
     const fl = st.project.floors[st.currentFloor]
-    const ids = (fl.rooms || []).map((r) => r.id)
+    const ids = st.roomEditId ? [st.roomEditId] : (fl.rooms || []).map((r) => r.id)
     setState({ roomSel: ids, wallSel: [], selected: null, tool: 'select' })
     toast(`已选中 ${ids.length} 个房间`)
   }
@@ -153,66 +175,74 @@ export default function Editor() {
     toast(`已选中 ${ids.length} 面墙`)
   }
 
-  // 检测墙体问题：零长度 / 重复 / 重叠
+  // 检测墙体问题：零长度 / 短墙 / 重复 / 重叠 / 伸出，按 detectOpts 开关逐项检测
   const detectWallIssues = () => {
     const st = getState()
     const fl = st.project.floors[st.currentFloor]
     const walls = fl.walls || []
+    const opts = detectOpts || {}
     const eps = 0.05
+    const shortLen = opts.shortLen != null ? opts.shortLen : 0.05
     const d = (p1, p2) => Math.hypot(p1[0] - p2[0], p1[1] - p2[1])
     const len = (w) => Math.hypot(w.end[0] - w.start[0], w.end[1] - w.start[1])
-    const zeroLen = walls.filter((w) => len(w) < 0.01).map((w) => w.id)
+    const zeroLen = opts.zeroLen !== false ? walls.filter((w) => len(w) < 0.01).map((w) => w.id) : []
+    const shortWalls = opts.shortWall !== false ? walls.filter((w) => len(w) >= 0.01 && len(w) < shortLen).map((w) => w.id) : []
     const dupIds = new Set()
     const overlapIds = new Set()
-    const collinearOverlap = (a, b) => {
-      const ax = a.end[0] - a.start[0], ay = a.end[1] - a.start[1]
-      const alen = len(a)
-      if (alen < 0.01) return false
-      const cross = (p) => Math.abs(ax * (p[1] - a.start[1]) - ay * (p[0] - a.start[0])) / alen
-      if (cross(b.start) > eps || cross(b.end) > eps) return false
-      const proj = (p) => ((p[0] - a.start[0]) * ax + (p[1] - a.start[1]) * ay) / (alen * alen)
-      const lo = Math.max(0, Math.min(proj(b.start), proj(b.end)))
-      const hi = Math.min(1, Math.max(proj(b.start), proj(b.end)))
-      return hi - lo > 0.01
-    }
-    for (let i = 0; i < walls.length; i++) {
-      const a = walls[i]
-      for (let j = i + 1; j < walls.length; j++) {
-        const b = walls[j]
-        if (dupIds.has(b.id) || overlapIds.has(b.id) || overlapIds.has(a.id)) continue
-        const same = (d(a.start, b.start) < eps && d(a.end, b.end) < eps) || (d(a.start, b.end) < eps && d(a.end, b.start) < eps)
-        if (same) { dupIds.add(b.id); continue }
-        if (collinearOverlap(a, b)) {
-          if (len(a) >= len(b)) overlapIds.add(b.id); else overlapIds.add(a.id)
+    if (opts.dup !== false || opts.overlap !== false) {
+      const collinearOverlap = (a, b) => {
+        const ax = a.end[0] - a.start[0], ay = a.end[1] - a.start[1]
+        const alen = len(a)
+        if (alen < 0.01) return false
+        const cross = (p) => Math.abs(ax * (p[1] - a.start[1]) - ay * (p[0] - a.start[0])) / alen
+        if (cross(b.start) > eps || cross(b.end) > eps) return false
+        const proj = (p) => ((p[0] - a.start[0]) * ax + (p[1] - a.start[1]) * ay) / (alen * alen)
+        const lo = Math.max(0, Math.min(proj(b.start), proj(b.end)))
+        const hi = Math.min(1, Math.max(proj(b.start), proj(b.end)))
+        return hi - lo > 0.01
+      }
+      for (let i = 0; i < walls.length; i++) {
+        const a = walls[i]
+        for (let j = i + 1; j < walls.length; j++) {
+          const b = walls[j]
+          if (dupIds.has(b.id) || overlapIds.has(b.id) || overlapIds.has(a.id)) continue
+          const same = opts.dup !== false && ((d(a.start, b.start) < eps && d(a.end, b.end) < eps) || (d(a.start, b.end) < eps && d(a.end, b.start) < eps))
+          if (same) { dupIds.add(b.id); continue }
+          if (opts.overlap !== false && collinearOverlap(a, b)) {
+            if (len(a) >= len(b)) overlapIds.add(b.id); else overlapIds.add(a.id)
+          }
         }
       }
     }
-    // 悬挂/孤立墙：端点不接别的墙（伸出去了/孤零零的），属于「没用的墙」
-    // 注意：判断端点是否「接」在别的墙的任意位置（含中点，T形/共用墙），否则会把正常的墙误判成伸出
-    const pointToSegDist = (p, a, b) => {
-      const dx = b[0] - a[0], dy = b[1] - a[1]
-      const len2 = dx * dx + dy * dy
-      if (len2 < 1e-9) return Math.hypot(p[0] - a[0], p[1] - a[1])
-      let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2
-      t = Math.max(0, Math.min(1, t))
-      return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
-    }
-    const touchesAny = (p, excludeW) => walls.some((other) => {
-      if (other.id === excludeW.id) return false
-      return pointToSegDist(p, other.start, other.end) < eps
-    })
+    // 伸出（一端接、一端不接）/ 孤立（两端都不接），分开统计
     const danglingIds = new Set()
-    walls.forEach((w) => {
-      if (zeroLen.includes(w.id) || dupIds.has(w.id) || overlapIds.has(w.id)) return
-      const sTouch = touchesAny(w.start, w)
-      const eTouch = touchesAny(w.end, w)
-      if (!sTouch || !eTouch) danglingIds.add(w.id)
-    })
-    const issues = { zeroLen, dupIds: [...dupIds], overlapIds: [...overlapIds], danglingIds: [...danglingIds], total: zeroLen.length + dupIds.size + overlapIds.size + danglingIds.size }
+    const isolatedIds = new Set()
+    if (opts.dangling !== false || opts.isolated !== false) {
+      const pointToSegDist = (p, a, b) => {
+        const dx = b[0] - a[0], dy = b[1] - a[1]
+        const len2 = dx * dx + dy * dy
+        if (len2 < 1e-9) return Math.hypot(p[0] - a[0], p[1] - a[1])
+        let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2
+        t = Math.max(0, Math.min(1, t))
+        return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
+      }
+      const touchesAny = (p, excludeW) => walls.some((other) => {
+        if (other.id === excludeW.id) return false
+        return pointToSegDist(p, other.start, other.end) < eps
+      })
+      walls.forEach((w) => {
+        if (zeroLen.includes(w.id) || shortWalls.includes(w.id) || dupIds.has(w.id) || overlapIds.has(w.id)) return
+        const sTouch = touchesAny(w.start, w)
+        const eTouch = touchesAny(w.end, w)
+        if (!sTouch && !eTouch) { if (opts.isolated !== false) isolatedIds.add(w.id) }
+        else if (!sTouch || !eTouch) { if (opts.dangling !== false) danglingIds.add(w.id) }
+      })
+    }
+    const issues = { zeroLen, shortWalls, dupIds: [...dupIds], overlapIds: [...overlapIds], danglingIds: [...danglingIds], isolatedIds: [...isolatedIds], total: zeroLen.length + shortWalls.length + dupIds.size + overlapIds.size + danglingIds.size + isolatedIds.size }
     setWallIssues(issues)
     setState({ wallIssues: issues })  // 写 store，让 2D 户型图标注问题墙
     if (issues.total === 0) toast('检测完成，没有发现问题墙')
-    else toast(`发现 ${issues.total} 面问题墙：重复 ${dupIds.size}、重叠 ${overlapIds.size}、零长度 ${zeroLen.length}、伸出/孤立 ${danglingIds.size}，点「修复」处理`)
+    else toast(`发现 ${issues.total} 面问题墙：重复 ${dupIds.size}、重叠 ${overlapIds.size}、零长度 ${zeroLen.length}、短墙 ${shortWalls.length}、伸出 ${danglingIds.size}、孤立 ${isolatedIds.size}，点「修复」处理`)
   }
 
   // 自动修复墙体问题
@@ -221,7 +251,7 @@ export default function Editor() {
     const fl = st.project.floors[st.currentFloor]
     if (!wallIssues || wallIssues.total === 0) return
     const walls = fl.walls || []
-    const removeIds = new Set([...wallIssues.zeroLen, ...wallIssues.dupIds, ...wallIssues.overlapIds])
+    const removeIds = new Set([...(wallIssues.zeroLen || []), ...(wallIssues.shortWalls || []), ...(wallIssues.dupIds || []), ...(wallIssues.overlapIds || []), ...(wallIssues.isolatedIds || [])])
     let trimmed = 0
     // 伸出墙：把「自由端」缩回到它与别的墙的交点（只切掉伸出去那段，保留有用的那段）
     const danglingIds = wallIssues.danglingIds || []
@@ -262,6 +292,12 @@ export default function Editor() {
     setState({ project: { ...st.project }, saved: false, wallSel: [], wallIssues: null })
     toast(`已修复：删除 ${removeIds.size} 面、修剪 ${trimmed} 面伸出墙`)
     setWallIssues(null)
+  }
+  // 取消检测结果（清除问题墙标注，不做修复）
+  const cancelDetect = () => {
+    setWallIssues(null)
+    setState({ wallIssues: null })
+    toast('已取消检测')
   }
 
   // 插入房间模板：在现有户型右侧放一个标准尺寸矩形（4 面墙，自动识别成房间）
@@ -374,6 +410,11 @@ export default function Editor() {
     setState({ settings: s })
     api.saveSettings(s).catch(() => {})
   }
+  // 保存 3D 编辑视图背景（记忆功能：刷新后恢复）
+  const saveEditorBg = (image, mode) => {
+    setState({ editorBgImage: image, editorBgMode: mode })
+    api.saveSettings({ ...getState().settings, editorBgImage: image, editorBgMode: mode }).catch(() => {})
+  }
   // 隐藏（删除）某个下载模型，不再显示
   const hideModel = (m) => {
     const hidden = getState().settings.hiddenModels || []
@@ -385,17 +426,30 @@ export default function Editor() {
   }
   const closePreview = () => { setPreviewModel(null); setShow3d(false) }
 
-  // 点击空白处关闭 模型选择器/设备分类 弹窗
+  // 点击空白处关闭 模型选择器/设备分类 弹窗（模型预览打开时不关，由预览弹窗自己处理，避免一次点击关掉两层）
   useEffect(() => {
     const onDown = (e) => {
       if (!furnOpen && !catOpen) return
+      if (previewModel) return
       const t = e.target
       if (t.closest && (t.closest('.furn-picker') || t.closest('.furn-item') || t.closest('.furn-cat'))) return
       setFurnOpen(false); setCatOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [furnOpen, catOpen])
+  }, [furnOpen, catOpen, previewModel])
+
+  // 点击空白处关闭 检测设置面板
+  useEffect(() => {
+    if (!detectOptsOpen) return
+    const onDown = (e) => {
+      const t = e.target
+      if (t.closest && t.closest('[data-detect-panel]')) return
+      setDetectOptsOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [detectOptsOpen])
 
   const importJson = () => {
     const input = document.createElement('input')
@@ -525,24 +579,25 @@ export default function Editor() {
     <>
       {/* 顶部工具栏 */}
       <div className="editor-top">
+        <button className="et-btn" onClick={() => setFurnEditor(true)} title="自己设计柜子（尺寸/抽屉/柜门/颜色）">⚙ 家具</button>
         <button className="et-btn" onClick={() => { loadBackups(); setProjectManagerOpen(true) }}>项目</button>
         <button className="et-btn" onClick={() => undo()} title="撤销">↩️</button>
         <button className="et-btn" onClick={() => redo()} title="重做">↪️</button>
-        <button className="et-btn" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>
-        <button className="et-btn" onClick={importPlanImage}>导入底图</button>
-        {planImage && (
+        {!roomEditId && <button className="et-btn" onClick={() => setFloorManagerOpen(true)}>楼层管理</button>}
+        {!roomEditId && <button className="et-btn" onClick={importPlanImage}>导入底图</button>}
+        {!roomEditId && planImage && (
           <button className="et-btn" onClick={() => { setState({ calibrating: true, calibratePts: [] }); toast('标定：点底图选一段已知长度的起点') }} title="底图比例尺标定">标定</button>
         )}
         <button className="et-btn" onClick={() => setDefaultOpen(true)}>默认</button>
         <button className="et-btn" onClick={async () => { try { const r = await api.backgrounds(); setBgList(r.images || []) } catch (e) {} setEditorBgOpen(true) }}>背景</button>
-        {planImage && (
+        {!roomEditId && planImage && (
           <>
             <button className="et-btn" onClick={() => setState(s => ({ planImageScale: (s.planImageScale || 1) * 1.25 }))} title="放大底图">底图＋</button>
             <button className="et-btn" onClick={() => setState(s => ({ planImageScale: (s.planImageScale || 1) / 1.25 }))} title="缩小底图">底图−</button>
             <button className="et-btn" onClick={removePlanImage} style={{ color: 'var(--danger)' }}>删除底图</button>
           </>
         )}
-        <button className="et-btn" onClick={clearAll} style={{ color: 'var(--danger)' }}>清空全部</button>
+        {!roomEditId && <button className="et-btn" onClick={clearAll} style={{ color: 'var(--danger)' }}>清空全部</button>}
         <button className="et-btn" onClick={() => { saveNow(); createBackup() }} style={{ color: 'var(--accent)' }}>保存</button>
         <div className="et-sep" />
         <button className="et-btn" onClick={() => setState(s => ({ planZoomDelta: s.planZoomDelta - 1 }))} title="缩小">−</button>
@@ -550,8 +605,7 @@ export default function Editor() {
         <button className="et-btn" onClick={() => setState(s => ({ planRecenterKey: s.planRecenterKey + 1 }))} title="居中">居中</button>
         <div className="et-sep" />
 
-        {/* 家具库 */}
-        <button className="et-btn" onClick={() => setCatOpen(false) + setFurnOpen(!furnOpen)}>模型</button>
+        {/* 家具库（由左侧「模型」按钮打开） */}
         {furnOpen && (
           <div className="furn-picker">
             <div style={{ fontSize: 12, color: 'var(--muted)', padding: '0 4px 8px' }}>
@@ -569,7 +623,12 @@ export default function Editor() {
                   <button key={f.type}
                     className={`furn-item ${furnitureType === f.type ? 'active' : ''}`}
                     onClick={() => { setPreviewModel({ type: f.type, label: f.type, w: f.w, d: f.d, h: f.h, color: FURNITURE_COLORS[f.type] || '#888', builtin: true }); setShow3d(true) }} title="点击预览">
-                    <span className="furn-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{FURNITURE_ICONS[f.type] || '📦'}</span>
+                    <span className="furn-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, position: 'relative', overflow: 'hidden' }}>
+                      <img src={thumbUrl(`furn_${f.type}.webp`)} alt={f.type} loading="lazy"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
+                        onError={(e) => { e.target.style.display = 'none' }} />
+                      <span style={{ position: 'absolute' }}>{FURNITURE_ICONS[f.type] || '📦'}</span>
+                    </span>
                     {f.type}
                     <span className="furn-dim"> {f.w}×{f.d}m</span>
                   </button>
@@ -629,26 +688,16 @@ export default function Editor() {
         )}
         <div className="et-sep" />
 
-        {/* 设备分类 */}
-        <button className="et-btn" onClick={() => setFurnOpen(false) + setCatOpen(!catOpen)}>设备</button>
-        <button className="et-btn" onClick={() => { setState({ tool: 'device', bindOpen: true, bindCat: '全部' }); setFurnOpen(false); setCatOpen(false) }}>绑定设备</button>
-        {catOpen && (
-          <div className="furn-picker">
-            {['全部', '灯光', '开关', '窗帘', '空调', '传感器', '感应器', '摄像机', '风扇', '安防'].map((c) => (
-              <button key={c} className="furn-item" onClick={() => { setState({ tool: 'device', bindOpen: true, bindCat: c }); setCatOpen(false) }}>{c}</button>
-            ))}
-          </div>
-        )}
-        <div className="et-sep" />
 
-        <button className={`et-btn ${snap ? 'active' : ''}`} onClick={() => setState({ snap: !snap })}>吸附</button>
-        <button className="et-btn" title="吸附精度（点击切换）"
+        {!roomEditId && <button className={`et-btn ${snap ? 'active' : ''}`} onClick={() => setState({ snap: !snap })}>吸附</button>}
+        {!roomEditId && <button className="et-btn" title="吸附精度（点击切换）"
           onClick={() => { const o = [0.1, 0.25, 0.5, 1]; setState({ snapStep: o[(o.indexOf(snapStep) + 1) % o.length] }) }}>
-          {snapStep}m</button>
+          {snapStep}m</button>}
         <button className={`et-btn ${showLabels ? 'active' : ''}`} onClick={() => setState({ showLabels: !showLabels })}>标签</button>
         <button className={`et-btn ${showFurnitureLabels ? 'active' : ''}`} onClick={() => setState({ showFurnitureLabels: !showFurnitureLabels })}>名字</button>
         <button className={`et-btn ${showDimensions ? 'active' : ''}`} onClick={() => setState({ showDimensions: !showDimensions })} title="显示墙长度尺寸">尺寸</button>
-        <div style={{ position: 'relative' }}>
+        <button className={`et-btn ${showIntersections ? 'active' : ''}`} onClick={() => setState({ showIntersections: !showIntersections })} title="显示/隐藏墙体交点红点">交点</button>
+        {!roomEditId && <div style={{ position: 'relative' }}>
           <button className="et-btn" onClick={() => setRoomTplOpen(!roomTplOpen)} title="插入标准尺寸房间">📐 房间模板</button>
           {roomTplOpen && (
             <div className="bb-menu" style={{ bottom: '100%', marginBottom: 4 }}>
@@ -657,15 +706,16 @@ export default function Editor() {
               ))}
             </div>
           )}
-        </div>
-        <button className="et-btn" onClick={() => lockAllFurniture(true)} title="锁定当前楼层所有家具（防止移动）">🔒 全部锁定</button>
-        <button className="et-btn" onClick={() => lockAllFurniture(false)} title="解锁当前楼层所有家具">🔓 全部解锁</button>
+        </div>}
+        {!roomEditId && <button className="et-btn" onClick={() => lockAllFurniture(true)} title="锁定当前楼层所有家具（防止移动）">🔒 全部锁定</button>}
+        {!roomEditId && <button className="et-btn" onClick={() => lockAllFurniture(false)} title="解锁当前楼层所有家具">🔓 全部解锁</button>}
         <button className="et-btn" onClick={selectAllWalls} title="全选当前楼层所有墙">全选墙</button>
         <button className="et-btn" onClick={selectAllRooms} title="全选当前楼层所有房间(地板)">全选地板</button>
-        <button className="et-btn" onClick={detectWallIssues} title="检测零长度/重复/重叠的问题墙">🔍 检测</button>
-        {wallIssues && wallIssues.total > 0 && (
+        {!roomEditId && <button className="et-btn" onClick={detectWallIssues} title="检测问题墙">🔍 检测</button>}
+        {!roomEditId && wallIssues && wallIssues.total > 0 && (
           <button className="et-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={fixWallIssues} title="删除检测到的问题墙">🔧 修复({wallIssues.total})</button>
         )}
+        {!roomEditId && <button className={`et-btn ${detectOptsOpen ? 'active' : ''}`} onClick={() => setDetectOptsOpen(!detectOptsOpen)} title="检测项设置">⚙</button>}
         <button className={`et-btn ${view2d ? 'active' : ''}`} onClick={() => setState({ view2d: !view2d })}>2D</button>
         <button className={`et-btn ${!view2d ? 'active' : ''}`} onClick={() => setState({ view2d: false, tool: 'select', pickItem: null, wallSel: [] })}>3D</button>
         <div style={{ flex: 1 }} />
@@ -673,7 +723,7 @@ export default function Editor() {
 
       {/* 左侧竖排工具 */}
       <div className="editor-left">
-        {LEFT_TOOLS.map((t) => (
+        {LEFT_TOOLS.filter((t) => !roomEditId || t.id === 'browse' || t.id === 'select').map((t) => (
           <button key={t.id}
             className={`el-btn ${tool === t.id ? 'active' : ''} ${t.id === 'delete' ? 'danger' : ''}`}
             onClick={() => setTool(t.id)}
@@ -690,7 +740,7 @@ export default function Editor() {
       </div>
 
       {/* 右侧信息栏（未选中、不是墙体/门/窗工具、且没选墙时显示户型信息；否则和墙面板/约束面板重叠） */}
-      {!selected && !['wall', 'door', 'window'].includes(tool) && wallSelIds.length === 0 && (
+      {!selected && !['wall', 'door', 'window'].includes(tool) && wallSelIds.length === 0 && !furnOpen && (
         <div className="editor-info">
           <div className="editor-info-title">户型信息</div>
           <div className="editor-info-row"><span>楼层</span><b>{currentFloorIdx + 1} / {project.floors.length}</b></div>
@@ -730,8 +780,9 @@ export default function Editor() {
                 ))}
               </div>
             )}
-            <div className="dev-actions" style={{ margin: '0 0 10px' }}>
-              <button className="primary" onClick={async () => {
+            <div className="dev-actions" style={{ margin: '0 0 10px', display: 'flex', gap: 8 }}>
+              <button className="primary" style={{ flex: 1 }} onClick={async () => { await saveNow(); await createBackup(); loadBackups() }}>保存项目</button>
+              <button className="primary" style={{ flex: 1 }} onClick={async () => {
                 const name = prompt('新项目名字：', '我的家')
                 if (name && name.trim()) {
                   // 先保存当前项目为存档（项目名_日期），再开新项目，避免之前的项目丢失
@@ -831,7 +882,7 @@ export default function Editor() {
                       })
                       const res = await r.json()
                       if (res.ok && res.name) {
-                        setState({ editorBgImage: res.name, editorBgMode: 'image' })
+                        saveEditorBg(res.name, 'image')
                         setBgList([{ name: res.name, time: Date.now() / 1000 }, ...bgList])
                         toast('3D 背景已上传')
                       }
@@ -846,12 +897,12 @@ export default function Editor() {
                     <div key={img.name} style={{ position: 'relative' }}>
                       <img src={BASE + 'api/background/' + img.name} alt=""
                         style={{ width: 56, height: 38, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: editorBgImage === img.name ? '2px solid var(--accent)' : '1px solid var(--border)' }}
-                        onClick={() => setState({ editorBgImage: img.name, editorBgMode: 'image' })} />
+                        onClick={() => saveEditorBg(img.name, 'image')} />
                       <button title="删除" onClick={async () => {
                         if (!confirm('删除这张背景图？')) return
                         await api.backgroundDelete(img.name)
                         setBgList(bgList.filter((x) => x.name !== img.name))
-                        if (getState().editorBgImage === img.name) setState({ editorBgImage: '', editorBgMode: 'color' })
+                        if (getState().editorBgImage === img.name) saveEditorBg('', 'color')
                       }} style={{ position: 'absolute', top: -6, right: -6, width: 16, height: 16, lineHeight: '14px', borderRadius: '50%', background: 'var(--panel-solid)', color: 'var(--danger)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: 10, padding: 0 }}>✕</button>
                     </div>
                   ))}
@@ -859,9 +910,9 @@ export default function Editor() {
               )}
               <button className="primary" onClick={() => document.getElementById('editor-bg-file').click()}>上传背景图</button>
               <button style={{ marginLeft: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}
-                onClick={() => { setState({ editorBgImage: '', editorBgMode: 'color' }); toast('已恢复默认蓝色背景') }}>默认</button>
+                onClick={() => { saveEditorBg('', 'color'); toast('已恢复默认蓝色背景') }}>默认</button>
               <button style={{ marginLeft: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}
-                onClick={() => { setState({ editorBgImage: getState().bgImage, editorBgMode: getState().bgMode }); toast('已同步主界面背景') }}>同步主界面背景</button>
+                onClick={() => { saveEditorBg(getState().bgImage, getState().bgMode); toast('已同步主界面背景') }}>同步主界面背景</button>
             </div>
             <button className="close-btn" onClick={() => setEditorBgOpen(false)}>关闭</button>
           </div>
@@ -869,7 +920,7 @@ export default function Editor() {
       )}
       {/* 模型预览弹窗（3D 预览 + 尺寸 + 缩放 + 放置/删除） */}
       {previewModel && (
-        <div className="modal-mask" onClick={() => closePreview()}>
+        <div className="modal-mask preview-right" onClick={() => closePreview()}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
             <div className="dname">{previewModel.label}</div>
             {show3d ? (
@@ -906,6 +957,42 @@ export default function Editor() {
                 onClick={() => { if (confirm(`确认删除「${previewModel.label}」？`)) { hideModel(previewModel); closePreview() } }}>删除</button>
               <button className="close-btn" onClick={() => closePreview()}>关闭</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 家具编辑器（自己设计柜子） */}
+      {furnEditor && <FurnitureEditor onClose={() => setFurnEditor(false)} />}
+
+      {/* 检测设置面板（右侧固定，不遮挡） */}
+      {detectOptsOpen && (
+        <div data-detect-panel="1" style={{ position: 'fixed', right: 14, top: 90, width: 240, background: 'var(--panel-solid)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, zIndex: 60, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>检测设置</div>
+          {[
+            { key: 'zeroLen', label: '零长度 (<1cm)' },
+            { key: 'shortWall', label: `短墙 (<${Math.round(detectOpts.shortLen * 100)}cm)` },
+            { key: 'dup', label: '重复' },
+            { key: 'overlap', label: '重叠' },
+            { key: 'dangling', label: '伸出' },
+            { key: 'isolated', label: '孤立' },
+          ].map((item) => (
+            <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
+              <input type="checkbox" checked={detectOpts[item.key] !== false}
+                onChange={(e) => setState({ detectOpts: { ...detectOpts, [item.key]: e.target.checked } })} />
+              <span>{item.label}</span>
+            </label>
+          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 10px' }}>
+            <span style={{ fontSize: 13 }}>短墙阈值</span>
+            <input type="number" step="0.01" min="0.02" max="1" value={detectOpts.shortLen}
+              onChange={(e) => setState({ detectOpts: { ...detectOpts, shortLen: Number(e.target.value) || 0.05 } })}
+              style={{ width: 52, padding: '3px 5px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', fontSize: 13 }} />
+            <span style={{ fontSize: 13 }}>m</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--accent)', color: '#081018', cursor: 'pointer', fontSize: 12 }} onClick={detectWallIssues}>🔍 检测</button>
+            <button style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 12 }} onClick={fixWallIssues}>🔧 修复</button>
+            <button style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }} onClick={cancelDetect}>取消</button>
           </div>
         </div>
       )}

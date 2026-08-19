@@ -6,6 +6,8 @@ import { useStore, setState, getState, toast } from '../store'
 import { recomputeRooms, polygonArea } from '../three/geometry'
 import { api, BASE } from '../api'
 import HexColorPicker from './HexColorPicker'
+import EntityPicker from './EntityPicker'
+import MoveControls from './MoveControls'
 
 const WALL_COLORS = ['#ffffff', '#d5e0f1', '#f5f7fa', '#e8e4dc', '#c9c9c9', '#d8e8f0', '#e0d8e8', '#d0e8d8', '#f0e0d0']
 
@@ -32,6 +34,7 @@ export default function WallProps3D({ floorIndex }) {
   const wallOpacity = useStore((s) => s.wallOpacity)
   const [favColors, setFavColors] = useState(getFav())
   const [bgList, setBgList] = useState([])
+  const [deviceBindOpen, setDeviceBindOpen] = useState(false)  // 设备属性面板里的绑定设备选择器
   useEffect(() => { api.backgrounds().then((r) => setBgList(r.images || [])).catch(() => {}) }, [])
   if (!selected && wallSelIds.length === 0) return null
 
@@ -297,6 +300,7 @@ export default function WallProps3D({ floorIndex }) {
           <input type="text" value={f.group || ''} placeholder="同组名一起移动"
             onChange={(e) => commit(() => { f.group = e.target.value || undefined })} />
         </div>
+        <MoveControls id={f.id} floorIndex={floorIndex} />
         <div className="plan-props-row">
           <span className="plan-props-label">位置</span>
           <button className="plan-props-seg" onClick={() => commit(() => { f.pos[1] = 0; f.placement = 'floor' })}>地面</button>
@@ -323,6 +327,16 @@ export default function WallProps3D({ floorIndex }) {
             {f.locked ? '🔒 已锁定（点击解锁）' : '🔓 锁定（防止移动）'}
           </button>
         </div>
+        <div className="plan-props-row">
+          <span className="plan-props-label">实体</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.entity_id || '未绑定'}</span>
+          <button className="plan-props-seg" onClick={() => setDeviceBindOpen(true)}>绑定</button>
+        </div>
+        {deviceBindOpen && (
+          <div style={{ marginTop: 8 }}>
+            <EntityPicker onPick={(e) => { commit(() => { f.entity_id = e.entity_id; f.name = e.name; f.modelId = e.modelId }); setDeviceBindOpen(false); toast(`已绑定 ${e.name}`) }} onClose={() => setDeviceBindOpen(false)} />
+          </div>
+        )}
       </div>
     )
   }
@@ -348,6 +362,7 @@ export default function WallProps3D({ floorIndex }) {
           <button onClick={() => commit(() => { d.pos[1] = (d.pos[1] || 1.4) + 0.1 })}>＋</button>
           <span className="plan-props-unit">m</span>
         </div>
+        <MoveControls id={d.id} floorIndex={floorIndex} />
         <div className="plan-props-row">
           <span className="plan-props-label">位置</span>
           <button className="plan-props-seg" onClick={() => commit(() => { d.pos[1] = 0 })}>地面</button>
@@ -371,8 +386,14 @@ export default function WallProps3D({ floorIndex }) {
         </div>
         <div className="plan-props-row">
           <span className="plan-props-label">实体</span>
-          <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.entity_id}</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.entity_id || '未绑定'}</span>
+          <button className="plan-props-seg" onClick={() => setDeviceBindOpen(true)}>绑定</button>
         </div>
+        {deviceBindOpen && (
+          <div style={{ marginTop: 8 }}>
+            <EntityPicker onPick={(e) => { commit(() => { d.entity_id = e.entity_id; d.name = e.name; d.modelId = e.modelId }); setDeviceBindOpen(false); toast(`已绑定 ${e.name}`) }} onClose={() => setDeviceBindOpen(false)} />
+          </div>
+        )}
       </div>
     )
   }

@@ -48,6 +48,12 @@ export function modelBase() {
 
 let catalog = []
 
+// 自定义模型（本地部署新增，随 deploy 上传，不依赖镜像 manifest）
+const CUSTOM_MODELS = [
+  { type: 'cabinet_custom', label: '自定义柜子', glb: 'cabinet_custom.glb', thumb: 'cabinet_custom.webp', w: 1.0, d: 0.6, h: 1.8 },
+  { type: 'storage_bin', label: '自定义收纳盒', glb: 'storage_bin.glb', thumb: 'storage_bin.webp', w: 0.5, d: 0.4, h: 0.6 },
+]
+
 export async function loadCatalog() {
   try {
     const r = await fetch(modelBase() + 'models/manifest.json')
@@ -56,14 +62,16 @@ export async function loadCatalog() {
       const [w, d, h] = CATEGORY_DIMS[m.type] || [0.6, 0.6, 0.7]
       return {
         type: m.name,           // 唯一标识（文件名）
-        label: m.type,          // 中文分类
+        // 显示名：title 含中文才用 title（自定义模型中文名）；否则用 type（manifest 的 type 是中文分类，title 常有英文名如 "Coat Rack"）
+        label: (m.title && /[一-龥]/.test(m.title)) ? m.title : (m.type || m.title || m.name),
         glb: m.glb,
         thumb: m.thumb,
         w, d, h,
       }
     })
+    catalog.push(...CUSTOM_MODELS)
   } catch (e) {
-    catalog = []
+    catalog = [...CUSTOM_MODELS]
   }
   return catalog
 }

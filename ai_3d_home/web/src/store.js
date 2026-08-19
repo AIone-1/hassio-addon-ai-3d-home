@@ -46,10 +46,23 @@ let state = {
   roofOpacity: 80,             // 屋顶不透明度（%）
   roofColor: '',               // 屋顶颜色（空=用房间颜色）
   showDimensions: false,       // 显示尺寸标注（墙长度）
+  showIntersections: true,     // 显示墙体交点红点（2D 编辑器，判断墙是否闭合/连接）
   immersive: false,           // 纯净沉浸模式（隐藏所有 UI，双击退出）
   deviceListOpen: false,      // 设备列表弹窗（查看已绑定设备）
   // 编辑状态
   editing: false,             // 是否在编辑器
+  editingScreen: false,       // 电视/屏幕画面「编辑画面」模式（打开才显示缩放手柄/移动手柄/参数编辑）
+  smoothFocus: false,         // 平滑聚焦：开启后点模型相机从当前视角平滑移动过去（不是闪现）
+  hoverTip: false,            // 悬停提示：鼠标移到模型上显示名称提示
+  clickToggleState: true,     // 点击切换状态：开时点击有状态的模型（窗帘/柜门）直接切换，无需绑定实体
+  selectEffect: 'glow',       // 选中模型时的指示效果：glow 底部光环 / outline 描边 / pulse 顶部脉冲球 / column 光柱 / ring 顶部环 / none 无
+  selectOutline: { width: 2, speed: 3.5, mode: 'frame', size: 0.18 },  // 描边配置：宽度/呼吸速度/位置(frame外框 halo底部 top顶部)/大小
+  showStatusPulse: true,      // 显示设备状态小球（绑定实体的模型顶上：灰=关 黄=开）
+  fpsMode: false,             // 第一人称浏览模式：WASD 移动 + 鼠标拖动转向
+  fpsKeys: {},                // 第一人称虚拟方向键（手机/平板屏幕按键，w/a/s/d）
+  panelOpacity: 0.96,         // 模型详情弹窗背景透明度（0.3~1）
+  panelColor: '#0d1526',      // 模型详情弹窗背景颜色
+  hoveredItem: null,          // 悬停提示内容 {name, x, y}（鼠标屏幕坐标）
   tool: 'select',             // select|pan|wall|door|window|furniture|device|texture|delete
   furnitureType: '沙发',
   furnitureScale: 1,          // 家具尺寸缩放倍数
@@ -78,10 +91,26 @@ let state = {
   settingsOpen: false,   // 设置面板
   sceneOpen: false,      // 场景同步面板
   notifOpen: false,      // 通知中心面板
+  roomNavOpen: false,    // 房间导航面板（左侧：全部 + 各房间，点击跳转居中）
+  focusRoomId: null,     // 聚焦的房间 id（null=显示全部；非 null=只显示该房间，其他隐藏）
+  roomView: null,        // 要应用的房间锁定视角 { pos:[x,y,z], target:[x,y,z] }（配合 camViewSignal type='roomview'）
+  roomEditId: null,      // 正在编辑的房间 id（房间导航栏点「编辑」后进入 2D 编辑选中该房间）
+  mihomeMode: true,      // 米家模式（渲染层覆盖成米家配色，存 settings 持久化，默认开）
+  glassMode: true,       // 原版玻璃墙（meshPhysicalMaterial + clearcoat 清漆层，对齐 JMGLink 原版，默认开）
   sunAuto: true,         // 自动跟随 sun.sun 切日夜（手动切日夜则关掉）
   sunElevation: null,    // 太阳高度角（度），用于日照/天空
+  sunLight: true,        // 太阳光（方向光）开关
   roomSel: [],           // 多选房间（全选地板/屋顶）的 id 列表
-  wallIssues: null,      // 检测出的问题墙 { zeroLen, dupIds, overlapIds, danglingIds }
+  wallIssues: null,      // 检测出的问题墙 { zeroLen, dupIds, overlapIds, danglingIds, shortWalls }
+  detectOpts: {          // 检测项开关 + 短墙阈值（米）
+    zeroLen: true,       // 零长度（<1cm）
+    shortWall: true,     // 短墙（< shortLen）
+    dup: true,           // 重复
+    overlap: true,       // 重叠
+    dangling: true,      // 伸出（一端接、一端不接）
+    isolated: true,      // 孤立（两端都不接）
+    shortLen: 0.05,      // 短墙阈值（米），低于此长度判定为短墙
+  },
   showToolbar: true,     // 显示底部工具栏（默认选项里可设默认）
   haEntitiesFp: '',      // 全量实体指纹（entity_id 排序拼接），变了才更新 haEntities，避免闪屏
   showFps: true,         // 显示帧率/卡顿（主界面左上角，默认选项里可关）
@@ -115,6 +144,11 @@ export function setState(partial) {
     }
     lastClean = JSON.parse(JSON.stringify(next.project))
     delete next.__noUndo
+    // 浅拷贝每层 floor：patchRoom/patchWall 等是「原地 Object.assign 墙/房间对象」再 setState，
+    // project 只是浅拷贝、floor 引用不变的话，useSyncExternalStore 用 Object.is 比较 selector 返回的
+    // floor 对象发现没变 → 组件不重渲染 → 「改了颜色/透明度数据保存了但界面没刷新」。
+    // 这里让 floor 引用也变一次，触发依赖 floor 的组件重渲染（floor 内部数组/对象还是原引用，原地改的值能读到）。
+    next.project = { ...next.project, floors: (next.project.floors || []).map((f) => ({ ...f })) }
   }
   state = { ...state, ...next }
   listeners.forEach((l) => l(state))

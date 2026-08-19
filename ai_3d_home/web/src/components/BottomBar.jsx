@@ -12,10 +12,34 @@ const Ic = ({ children }) => (
 )
 
 // 可编辑按钮的默认顺序（id 列表）
-const DEFAULT_ORDER = ['rotate', 'center', 'fullscreen', 'immersive', 'wall', 'openings', 'ceiling', 'view', 'night', 'scene', 'notif', 'device', 'edit', 'settings', 'baredit']
+const DEFAULT_ORDER = ['rotate', 'center', 'room', 'fps', 'fullscreen', 'immersive', 'wall', 'openings', 'ceiling', 'view', 'night', 'scene', 'notif', 'device', 'edit', 'settings', 'baredit']
+
+// 设置里的选项（可加到工具栏作为实时开关；改的是 store 状态，不持久化——刷新后回设置里的默认值）
+const SETTING_TOGGLES = [
+  { key: 'showLabels', label: '显示设备名' },
+  { key: 'camFocusOnModel', label: '模型聚焦' },
+  { key: 'smoothFocus', label: '平滑聚焦' },
+  { key: 'hoverTip', label: '悬停提示' },
+  { key: 'mihomeMode', label: '米家模式' },
+  { key: 'glassMode', label: '原版玻璃' },
+  { key: 'showWalls', label: '显示墙' },
+  { key: 'showOpenings', label: '显示门窗' },
+  { key: 'showCeiling', label: '显示屋顶' },
+  { key: 'showFps', label: '帧率' },
+  { key: 'shadows', label: '投影' },
+  { key: 'bloom', label: '泛光' },
+  { key: 'sunLight', label: '太阳光' },
+  { key: 'roomBorderLines', label: '分隔线' },
+  { key: 'roomBorderAlwaysVisible', label: '分隔线不隐藏' },
+  { key: 'roomBorderSkipDoors', label: '分隔线跳过门' },
+]
+// 这些设置选项已有对应的图标工具栏按钮（不重复添加）
+const SETTING_EXISTING_BTN = { showWalls: 'wall', showOpenings: 'openings', showCeiling: 'ceiling' }
 
 export default function BottomBar() {
   const mode = useStore((s) => s.mode)
+  // 订阅所有可加到工具栏的设置选项（点击实时切换、按钮高亮跟随）
+  const toggleVals = Object.fromEntries(SETTING_TOGGLES.map((t) => [t.key, useStore((s) => s[t.key])]))
   const autoRotate = useStore((s) => s.autoRotate)
   const rotateDir = useStore((s) => s.rotateDir)
   const rotateSpeed = useStore((s) => s.rotateSpeed)
@@ -23,14 +47,27 @@ export default function BottomBar() {
   const showOpenings = useStore((s) => s.showOpenings)
   const showCeiling = useStore((s) => s.showCeiling)
   const night = useStore((s) => s.night)
+  const sunAuto = useStore((s) => s.sunAuto)
   const editing = useStore((s) => s.editing)
   const project = useStore((s) => s.project)
   const settings = useStore((s) => s.settings)
   const sceneOpen = useStore((s) => s.sceneOpen)
   const notifOpen = useStore((s) => s.notifOpen)
+  const roomNavOpen = useStore((s) => s.roomNavOpen)
+  const fpsMode = useStore((s) => s.fpsMode)
   const deviceCount = new Set(project.floors.flatMap((f) => (f.devices || []).map((d) => d.entity_id))).size
   const [viewOpen, setViewOpen] = useState(false)
   const [barEditOpen, setBarEditOpen] = useState(false)
+  // 工具栏编辑面板：点击空白处收回（点面板内或工具栏按钮不关）
+  useEffect(() => {
+    if (!barEditOpen) return
+    const onDown = (e) => {
+      if (e.target.closest && (e.target.closest('.bb-edit-panel') || e.target.closest('.bb-btn'))) return
+      setBarEditOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [barEditOpen])
   const customViews = useStore((s) => s.customViews)
 
   const setView = (type) => {
@@ -77,6 +114,14 @@ export default function BottomBar() {
 
   // ---------- 工具栏按钮（数据驱动：id -> 渲染函数，支持排序/隐藏） ----------
   const BTNS = {
+    fps: {
+      label: '第一人称',
+      render: () => (
+        <button key="fps" className={`bb-btn ${fpsMode ? 'active' : ''}`} onClick={() => setState((s) => ({ fpsMode: !s.fpsMode, editing: false, settingsOpen: false, view2d: false, roomNavOpen: false, selected: null }))} title="第一人称浏览：WASD 移动 + 鼠标左键拖动转向">
+          <Ic><path d="M12 3v18M4 8l8-5 8 5M4 16l8 5 8-5" /></Ic>第一人称
+        </button>
+      ),
+    },
     rotate: {
       label: '旋转',
       render: () => (
@@ -95,7 +140,7 @@ export default function BottomBar() {
           )}
           {autoRotate && (
             <span className="bb-speed" title="转速">
-              <input type="range" min="0.5" max="5" step="0.1" value={rotateSpeed}
+              <input type="range" min="0.5" max={settings.rotateSpeedMax || 5} step="0.1" value={rotateSpeed}
                 onChange={(e) => setState({ rotateSpeed: parseFloat(e.target.value) })} />
               <span className="bb-speed-val">{rotateSpeed.toFixed(1)}×</span>
             </span>
@@ -108,6 +153,14 @@ export default function BottomBar() {
       render: () => (
         <button key="center" className="bb-btn" onClick={() => setState((s) => ({ recenterKey: s.recenterKey + 1 }))} title="居中视角">
           <Ic><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></Ic>居中
+        </button>
+      ),
+    },
+    room: {
+      label: '房间',
+      render: () => (
+        <button key="room" className={`bb-btn room-btn ${roomNavOpen ? 'active' : ''}`} onClick={() => setState((s) => ({ roomNavOpen: !s.roomNavOpen }))} title="房间导航（跳转到单个房间/全部）">
+          <Ic><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></Ic>房间
         </button>
       ),
     },
@@ -179,11 +232,18 @@ export default function BottomBar() {
     night: {
       label: '日间/夜间',
       render: () => (
-        <button key="night" className={`bb-btn ${night ? 'active' : ''}`} onClick={() => setState({ night: !night, sunAuto: false })} title="日间/夜间（点一次后改为手动，不再跟太阳）">
-          {night
-            ? <Ic><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></Ic>
-            : <Ic><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></Ic>}
-          {night ? '夜间' : '日间'}
+        <button key="night" className={`bb-btn ${sunAuto || night ? 'active' : ''}`} onClick={() => {
+          const s = getState()
+          if (s.sunAuto) setState({ sunAuto: false, night: false })   // 自动 → 日间
+          else if (!s.night) setState({ night: true })                 // 日间 → 夜间
+          else setState({ sunAuto: true })                             // 夜间 → 自动
+        }} title="日夜：自动(跟太阳) / 日间 / 夜间 循环切换">
+          {sunAuto
+            ? <Ic><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></Ic>
+            : night
+              ? <Ic><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></Ic>
+              : <Ic><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></Ic>}
+          {sunAuto ? '自动' : (night ? '夜间' : '日间')}
         </button>
       ),
     },
@@ -215,8 +275,8 @@ export default function BottomBar() {
       label: '编辑',
       render: () => (
         <button key="edit" className={`bb-btn ${editing ? 'active' : ''}`} onClick={() => {
-          if (editing) setState({ editing: false, view2d: false, tool: 'select' })
-          else setState({ editing: true, view2d: true })
+          if (editing) setState((s) => ({ editing: false, view2d: false, tool: 'select', focusRoomId: s.roomEditId, roomEditId: null }))
+          else setState({ editing: true, view2d: true, roomEditId: null, focusRoomId: null, roomNavOpen: false })
         }}>
           {editing ? '退出编辑' : (
             <>
@@ -244,8 +304,37 @@ export default function BottomBar() {
     },
   }
 
+  // 设置里的选项也加进工具栏（实时切换，不持久化——刷新后回设置里的默认值；已有图标按钮的跳过）
+  for (const t of SETTING_TOGGLES) {
+    if (BTNS[t.key]) continue
+    if (SETTING_EXISTING_BTN[t.key] && BTNS[SETTING_EXISTING_BTN[t.key]]) continue
+    BTNS[t.key] = {
+      label: t.label,
+      render: () => (
+        <button key={t.key} className={`bb-btn ${toggleVals[t.key] ? 'active' : ''}`} onClick={() => setState({ [t.key]: !toggleVals[t.key] })} title={t.label}>
+          {t.label}
+        </button>
+      ),
+    }
+  }
+
   // ---------- 顺序 + 隐藏 ----------
-  const order = (settings.toolbarOrder && settings.toolbarOrder.length) ? settings.toolbarOrder : DEFAULT_ORDER
+  // 用户可能自定义过 toolbarOrder（不含后来新增的按钮），这里把 DEFAULT_ORDER 里缺失的按钮补插进去
+  const order = (() => {
+    const base = (settings.toolbarOrder && settings.toolbarOrder.length) ? settings.toolbarOrder : DEFAULT_ORDER
+    const o = [...base]
+    for (const id of DEFAULT_ORDER) {
+      if (o.includes(id)) continue
+      const di = DEFAULT_ORDER.indexOf(id)
+      let insertAt = -1
+      for (let j = di - 1; j >= 0; j--) {
+        const p = o.indexOf(DEFAULT_ORDER[j])
+        if (p >= 0) { insertAt = p; break }
+      }
+      o.splice(insertAt + 1, 0, id)
+    }
+    return o
+  })()
   const hidden = settings.toolbarHidden || []
 
   const persistBar = (nextOrder, nextHidden) => {
@@ -261,9 +350,9 @@ export default function BottomBar() {
     ;[next[idx], next[j]] = [next[j], next[idx]]
     persistBar(next, hidden)
   }
-  const toggleBtn = (id) => {
-    const nextHidden = hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]
-    persistBar(order, nextHidden)
+  const removeBtn = (id) => {
+    // 叉移除 = 加入隐藏列表（从工具栏消失，进入下方可添加区；保留在 order 里，避免 DEFAULT_ORDER 补插逻辑把它加回来）
+    persistBar(order, [...hidden.filter((x) => x !== id), id])
   }
 
   // 渲染可见按钮
@@ -285,22 +374,30 @@ export default function BottomBar() {
       {/* 工具栏编辑面板 */}
       {barEditOpen && (
         <div className="bb-edit-panel">
-          <div className="bb-edit-head">工具栏按钮（↑↓排序 · 眼睛=显示/隐藏）</div>
-          {order.filter((id) => id !== 'baredit').map((id) => {
+          <div className="bb-edit-head">工具栏按钮（↑↓排序 · ✕移除后到下方可加回）</div>
+          {order.filter((id) => id !== 'baredit' && !hidden.includes(id)).map((id) => {
             const b = BTNS[id]
             if (!b) return null
-            const isHidden = hidden.includes(id)
             return (
-              <div key={id} className={`bb-edit-row ${isHidden ? 'hidden' : ''}`}>
+              <div key={id} className="bb-edit-row">
                 <button className="bb-edit-arrow" onClick={() => moveBtn(id, -1)} title="上移">↑</button>
                 <button className="bb-edit-arrow" onClick={() => moveBtn(id, 1)} title="下移">↓</button>
                 <span className="bb-edit-label">{b.label}</span>
-                <button className="bb-edit-eye" onClick={() => toggleBtn(id)} title={isHidden ? '显示' : '隐藏'}>
-                  {isHidden ? '—' : '👁'}
-                </button>
+                <button className="bb-edit-del" onClick={() => removeBtn(id)} title="移除">✕</button>
               </div>
             )
           })}
+          <div className="bb-edit-add">
+            <div className="bb-edit-head">已移除 / 可添加（点击加入工具栏）</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '4px 10px 8px' }}>
+              {hidden.filter((id) => id !== 'baredit' && BTNS[id]).map((id) => (
+                <button key={id} className="bb-edit-addbtn" onClick={() => persistBar(order, hidden.filter((x) => x !== id))}>+ {BTNS[id].label}</button>
+              ))}
+              {SETTING_TOGGLES.filter((t) => !order.includes(t.key) && !(SETTING_EXISTING_BTN[t.key] && BTNS[SETTING_EXISTING_BTN[t.key]])).map((t) => (
+                <button key={t.key} className="bb-edit-addbtn" onClick={() => persistBar([...order, t.key], hidden)}>+ {t.label}</button>
+              ))}
+            </div>
+          </div>
           <button className="bb-edit-close" onClick={() => setBarEditOpen(false)}>完成</button>
         </div>
       )}

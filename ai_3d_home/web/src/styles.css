@@ -107,6 +107,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 /* ---------- 设备详情弹窗 ---------- */
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center;
   justify-content: center; z-index: 60; }
+/* 家具预览弹窗：右侧固定（跟家具库面板对齐） */
+.modal-mask.preview-right { justify-content: flex-end; align-items: flex-start; padding: 60px 14px 0 0; }
 .modal-box { width: 320px; background: var(--panel-solid); border-radius: 12px; border: 1px solid var(--border); padding: 18px; }
 .modal-box .dname { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
 .modal-box .dstate { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
@@ -182,7 +184,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 .plan-origin circle { fill: none; stroke: #ff8a4a; stroke-width: 0.05; }
 
 /* ---------- 家具选择器（编辑器顶部弹出） ---------- */
-.furn-picker { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); display: flex;
+.furn-picker { position: fixed; top: 60px; right: 14px; display: flex;
   flex-direction: column; gap: 2px; padding: 10px; background: var(--panel); border: 1px solid var(--border);
   border-radius: 10px; z-index: 30; max-width: 80vw; max-height: 72vh; overflow-y: auto; }
 .furn-size { display: flex; gap: 4px; align-items: center; padding: 2px 0 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
@@ -248,6 +250,27 @@ input[type="number"] { -moz-appearance: textfield; }
 .side-panel-item:hover { background: rgba(255,255,255,0.08); }
 .side-panel-empty { font-size: 12px; color: var(--muted); }
 
+/* 房间导航面板（左侧，透明效果对齐右侧 side-panel；列表项半透明，active 蓝底） */
+.room-nav { position: fixed; left: 14px; top: 64px; width: 180px; max-height: 62vh; overflow-y: auto;
+  z-index: 45; background: transparent; border: none; padding: 0;
+  display: flex; flex-direction: column; gap: 3px; }
+.room-nav-head { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+  margin: 2px 0 4px; }
+.room-nav-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 6px;
+  border: 1px solid transparent; background: transparent; color: var(--text); cursor: pointer;
+  font-size: 12px; text-align: left; transition: all .15s; }
+.room-nav-item:hover { background: rgba(255,255,255,.04); }
+.room-nav-item.active { background: rgba(90,162,255,.15); border-color: var(--accent); }
+.room-nav-empty { font-size: 12px; color: var(--muted); margin: 4px 0; }
+.room-nav-row { display: flex; align-items: center; gap: 3px; }
+.room-nav-row .room-nav-item { flex: 1; }
+.room-lock { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  padding: 0; border-radius: 6px; border: 1px solid transparent; background: transparent;
+  color: var(--muted); cursor: pointer; opacity: 0; transition: all .15s; flex-shrink: 0; }
+.room-nav-row:hover .room-lock { opacity: 1; }
+.room-lock:hover { color: var(--text); border-color: var(--border); }
+.room-lock.locked { opacity: 1; color: var(--accent); }
+
 /* 场景列表（对标 JMGLink：图标 + 名字 + 状态 + 圆形执行按钮，暖琥珀色） */
 .ha-scene-list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
 .ha-scene-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px;
@@ -277,9 +300,9 @@ input[type="number"] { -moz-appearance: textfield; }
 .app.settings-open .bottom-bar { left: 25%; }
 
 /* 工具栏编辑面板（↑↓排序 · 眼睛显示/隐藏） */
-.bb-edit-panel { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+.bb-edit-panel { position: fixed; right: 14px; bottom: 90px;
   width: 280px; max-height: 52vh; overflow-y: auto; background: var(--panel-solid);
-  border: 1px solid var(--border); border-radius: 12px; padding: 12px; z-index: 40; }
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px; z-index: 60; }
 .bb-edit-head { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 .bb-edit-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
 .bb-edit-row.hidden { opacity: 0.45; }
